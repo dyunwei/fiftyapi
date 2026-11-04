@@ -23,7 +23,7 @@ def docker(*args):
     return subprocess.check_output(['docker',*args],text=True,stderr=subprocess.PIPE).strip()
 with tempfile.TemporaryDirectory(prefix='fiftyapi-docker-') as directory:
     env=Path(directory)/'runtime.env'
-    setup=secrets.token_hex(32)
+    setup=secrets.token_hex(4)
     password=secrets.token_hex(16)
     env.write_text(prefix+'MASTER_KEY='+base64.b64encode(secrets.token_bytes(32)).decode()+'\n'+prefix+'SETUP_TOKEN='+setup+'\n')
     if automatic:env.write_text('FIFTYAPI_MASTER_KEY=\nFIFTYAPI_SETUP_TOKEN=\n')
@@ -45,7 +45,8 @@ with tempfile.TemporaryDirectory(prefix='fiftyapi-docker-') as directory:
         if automatic:
             setup=docker('exec',name,'cat','/data/setup-token')
             generated_key=docker('exec',name,'cat','/data/master.key')
-            assert len(base64.b64decode(generated_key,validate=True))==32 and len(setup)==64
+            assert len(base64.b64decode(generated_key,validate=True))==32
+            assert len(setup)==8 and all(c in '0123456789abcdef' for c in setup)
             for secret in ['master.key','setup-token']:
                 assert docker('exec',name,'stat','-c','%a','/data/'+secret)=='600'
         assert b'<html' in request('/').read()
