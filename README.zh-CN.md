@@ -27,15 +27,15 @@
 
 | 功能 | 说明 |
 | --- | --- |
-| 🔑 **上游账号** | Claude Code、OpenAI Codex、Antigravity OAuth 授权、令牌刷新、模型目录同步 |
-| 🔌 **API&nbsp;网关** | 接入 Sub2Api、New API、其他 FiftyAPI 及兼容上游，支持模型别名 |
-| 🧭 **原生协议** | Chat Completions、Messages、Responses（HTTP / SSE / WebSocket） |
-| 💰 **美元额度** | 每人 5 小时与 7 天窗口，所有 Key 和供应商共享 |
-| ⚖️ **调度** | 优先级、权重、并发上限、健康检查、冷却与安全重试 |
-| 📊 **日志与结算** | 个人请求日志、模型定价、自动结算与操作审计 |
-| 👥 **成员** | 首次访问设置管理员、自助注册、邮件邀请、账号贡献链接 |
-| 🌐 **界面** | 简体中文 / English，适配手机 |
-| 💾 **备份** | 本地备份及 S3 / Cloudflare R2 |
+| 🔑&nbsp;**上游账号** | Claude Code、OpenAI Codex、Antigravity OAuth 授权、令牌刷新、模型目录同步 |
+| 🔌&nbsp;**API&nbsp;网关** | 接入 Sub2Api、New API、其他 FiftyAPI 及兼容上游，支持模型别名 |
+| 🧭&nbsp;**原生协议** | Chat Completions、Messages、Responses（HTTP / SSE / WebSocket） |
+| 💰&nbsp;**美元额度** | 每人 5 小时与 7 天窗口，所有 Key 和供应商共享 |
+| ⚖️&nbsp;**调度** | 优先级、权重、并发上限、健康检查、冷却与安全重试 |
+| 📊&nbsp;**日志与结算** | 个人请求日志、模型定价、自动结算与操作审计 |
+| 👥&nbsp;**成员** | 首次访问设置管理员、自助注册、邮件邀请、账号贡献链接 |
+| 🌐&nbsp;**界面** | 简体中文 / English，适配手机 |
+| 💾&nbsp;**备份** | 本地备份及 S3 / Cloudflare R2 |
 
 ## 快速开始
 

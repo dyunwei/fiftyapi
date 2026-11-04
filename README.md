@@ -27,15 +27,15 @@ English | [简体中文](README.zh-CN.md)
 
 | Feature | Description |
 | --- | --- |
-| 🔑 **Upstream&nbsp;accounts** | Claude Code, OpenAI Codex and Antigravity OAuth: authorize, refresh and sync model catalogs |
-| 🔌 **API&nbsp;gateways** | Connect Sub2Api, New API, another FiftyAPI or compatible upstreams, with model aliases |
-| 🧭 **Native&nbsp;protocols** | Chat Completions, Messages, Responses (HTTP / SSE / WebSocket) |
-| 💰 **Dollar&nbsp;budgets** | Per-user 5-hour and 7-day windows shared across all keys and providers |
-| ⚖️ **Scheduling** | Priority, weights, concurrency limits, health checks, cooldown and safe retries |
-| 📊 **Logs&nbsp;&&nbsp;settlement** | Personal request logs, model pricing, automatic settlement and audit trail |
-| 👥 **Members** | Admin setup on first visit, self-registration, email invitations, account contribution links |
-| 🌐 **UI** | English / 简体中文, mobile friendly |
-| 💾 **Backups** | Local backups plus S3 / Cloudflare R2 |
+| 🔑&nbsp;**Upstream&nbsp;accounts** | Claude Code, OpenAI Codex and Antigravity OAuth with token refresh and model sync |
+| 🔌&nbsp;**API&nbsp;gateways** | Connect Sub2Api, New API, another FiftyAPI or compatible upstreams, with model aliases |
+| 🧭&nbsp;**Native&nbsp;protocols** | Chat Completions, Messages, Responses (HTTP / SSE / WebSocket) |
+| 💰&nbsp;**Dollar&nbsp;budgets** | Per-user 5-hour and 7-day windows shared across all keys and providers |
+| ⚖️&nbsp;**Scheduling** | Priority, weights, concurrency limits, health checks, cooldown and safe retries |
+| 📊&nbsp;**Logs&nbsp;&&nbsp;settlement** | Personal request logs, model pricing, automatic settlement and audit trail |
+| 👥&nbsp;**Members** | Admin setup on first visit, self-registration, email invitations, account contribution links |
+| 🌐&nbsp;**UI** | English / 简体中文, mobile friendly |
+| 💾&nbsp;**Backups** | Local backups plus S3 / Cloudflare R2 |
 
 ## Quick Start
 
