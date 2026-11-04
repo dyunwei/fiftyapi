@@ -1,0 +1,72 @@
+name: Quality and local release
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      FIFTYAPI_BUILD_COMMIT: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.25.x'
+          cache: true
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Build binary, embedded UI and notices
+        run: ./scripts/build-release.sh
+      - name: Go race, backup restore and static checks
+        run: |
+          go test -race -timeout=3m ./...
+          go vet ./...
+          python3 scripts/check-source.py
+      - name: Form logic tests
+        run: npm --prefix web run test:unit
+      - name: Install browser
+        working-directory: web
+        run: npx playwright install --with-deps chromium
+      - name: Desktop and mobile browser tests
+        working-directory: web
+        env:
+          FIFTYAPI_TEST_BINARY: ${{ github.workspace }}/dist/fiftyapi
+        run: npx playwright test
+      - name: Verify version and checksum
+        run: |
+          ./dist/fiftyapi version
+          cd dist
+          sha256sum --check SHA256SUMS
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: fiftyapi-linux-amd64-${{ github.sha }}
+          path: dist/
+          retention-days: 7
+          if-no-files-found: error
+  container:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Build local image
+        run: docker build --build-arg BUILD_COMMIT="$GITHUB_SHA" -t fiftyapi:local .
+      - name: Disposable container smoke
+        run: python3 scripts/docker-smoke.py
+      - name: Automatic secrets and container recreation
+        run: FIFTYAPI_TEST_AUTO_SECRETS=1 python3 scripts/docker-smoke.py
+      - name: Legacy configuration compatibility
+        run: FIFTYAPI_TEST_LEGACY_ENV=1 python3 scripts/docker-smoke.py

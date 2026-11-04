@@ -1,0 +1,27 @@
+/bin/
+/.local/
+*.db
+*.db-wal
+*.db-shm
+.env
+__pycache__/
+/data/
+node_modules/
+test-results/
+playwright-report/
+/dist/
+/backup/
+
+# Local credentials, tooling state and exported backups
+/.aws/
+/.agents/
+/.codex/
+/secrets/
+/backups/
+*.session
+*.key
+.env.*
+!.env.example
+
+# Automatically generated initialization secret
+setup-token

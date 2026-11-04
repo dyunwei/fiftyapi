@@ -1,0 +1,14 @@
+{
+  "provider": "antigravity",
+  "authorize_url": "https://accounts.google.com/o/oauth2/v2/auth",
+  "token_url": "https://oauth2.googleapis.com/token",
+  "client_id": "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com",
+  "client_secret_env": "ANTIGRAVITY_OAUTH_CLIENT_SECRET",
+  "redirect_uri": "http://localhost:8085/callback",
+  "scope": "https://www.googleapis.com/auth/cloud-platform https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/cclog https://www.googleapis.com/auth/experimentsandconfigs",
+  "token_encoding": "form",
+  "auth_params": {"access_type": "offline", "prompt": "consent"},
+  "models_url": "https://cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels",
+  "models_method": "POST",
+  "models_body": {}
+}

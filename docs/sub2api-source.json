@@ -1,0 +1,61 @@
+[
+  {
+    "file": "backend/internal/pkg/antigravity/request_transformer.go",
+    "sha256": "226fd917226860d74dc9ef473068099d5110d6bf047780ab75adc495ee20ef16"
+  },
+  {
+    "file": "backend/internal/pkg/antigravity/response_transformer.go",
+    "sha256": "6d5bb020995b8e72bcc3bcd1dcce65bed5eca63fe928c798f0d123a61c4987b2"
+  },
+  {
+    "file": "backend/internal/pkg/antigravity/stream_transformer.go",
+    "sha256": "4f9bf1eea184bb9f1eb7da88bc06ae91dcf66958d9f27d93b53236de6c22f657"
+  },
+  {
+    "file": "backend/internal/pkg/antigravity/schema_cleaner.go",
+    "sha256": "c8a997c715e92dd30ba00fe04f26f24d928058732bebfbdff45b357e63d17345"
+  },
+  {
+    "file": "backend/internal/pkg/antigravity/claude_types.go",
+    "sha256": "594808943a7a28300b8b63ff0a9dee1ce45ea43294101cc6a848d80fd277f995"
+  },
+  {
+    "file": "backend/internal/pkg/antigravity/gemini_types.go",
+    "sha256": "9cbf27347b517e8b1b205fde4cdb4828c06610a77ba5cbf2139308882dc897c7"
+  },
+  {
+    "file": "backend/resources/model-pricing/model_prices_and_context_window.json",
+    "sha256": "00766dba3b455ddfdc3a54405f377541725eba85a8522d4c77369b0ed2d248da",
+    "adaptation": "Decimal conversion from USD/token to microUSD/million tokens; text rates only"
+  },
+  {
+    "file": "backend/internal/pkg/antigravity/oauth.go",
+    "sha256": "949312c5a648090dfd611cd4c5d3b1200efcf1d1f8d8aa7ed7439143a04aa6bf",
+    "adaptation": "Platform OAuth defaults / lifecycle or client identity behavior reference; not user credentials"
+  },
+  {
+    "file": "backend/internal/pkg/oauth/oauth.go",
+    "sha256": "02367d429dd6a8f41e306b975f75e32d6f6dce43a88bdb10a3c75c08465f9fb9",
+    "adaptation": "Platform OAuth defaults / lifecycle or client identity behavior reference; not user credentials"
+  },
+  {
+    "file": "backend/internal/pkg/openai/oauth.go",
+    "sha256": "d080a475211b3e8a37d8e34529182914f5a63933fe4807d4ea86ad4dd8b98053",
+    "adaptation": "Platform OAuth defaults / lifecycle or client identity behavior reference; not user credentials"
+  },
+  {
+    "file": "backend/internal/service/openai_codex_identity.go",
+    "sha256": "9569a16531cbf33ba89b5588cb694879c328b3616f1efa229f8918647b127244",
+    "adaptation": "Platform OAuth defaults / lifecycle or client identity behavior reference; not user credentials"
+  },
+  {
+    "file": "backend/internal/service/openai_codex_account_identity.go",
+    "sha256": "21d4f82742c1ce5aa226df7494dd73ea5f39cc95012624c701810eca642c52a5",
+    "adaptation": "Platform OAuth defaults / lifecycle or client identity behavior reference; not user credentials"
+  },
+  {
+    "file": "backend/internal/service/antigravity_oauth_service.go",
+    "sha256": "7a7f616f4734b40e2fcb6953c8ee38e1ff9439366f61a7014e6c02d9cbd85d51",
+    "adaptation": "Platform OAuth defaults / lifecycle or client identity behavior reference; not user credentials"
+  }
+]

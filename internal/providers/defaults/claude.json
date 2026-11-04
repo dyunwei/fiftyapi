@@ -1,0 +1,12 @@
+{
+  "provider": "claude",
+  "authorize_url": "https://claude.com/cai/oauth/authorize",
+  "token_url": "https://platform.claude.com/v1/oauth/token",
+  "client_id": "9d1c250a-e61b-44d9-88ed-5944d1962f5e",
+  "redirect_uri": "https://platform.claude.com/oauth/code/callback",
+  "scope": "org:create_api_key user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload",
+  "token_encoding": "json",
+  "auth_params": {"code": "true"},
+  "models_url": "https://api.anthropic.com/v1/models",
+  "models_headers": {"anthropic-version": "2023-06-01", "anthropic-beta": "oauth-2025-04-20"}
+}
