@@ -589,5 +589,6 @@
   "HTTP 服务关闭超时，已强制关闭": "HTTP shutdown timed out; service forcibly closed",
   "HTTP 服务已关闭": "HTTP service stopped",
   "公共访问地址应为 HTTP 或 HTTPS 源站地址，不含路径、参数或片段": "Public URL must be an HTTP or HTTPS origin without a path, query or fragment",
-  "邀请邮件需要有效的 FIFTYAPI_PUBLIC_URL：HTTP 或 HTTPS 源站地址": "Invitation email requires a valid FIFTYAPI_PUBLIC_URL: an HTTP or HTTPS origin"
+  "邀请邮件需要有效的 FIFTYAPI_PUBLIC_URL：HTTP 或 HTTPS 源站地址": "Invitation email requires a valid FIFTYAPI_PUBLIC_URL: an HTTP or HTTPS origin",
+  "密钥不可复制，请创建新密钥": "This key cannot be copied. Create a new key."
 }

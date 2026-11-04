@@ -11,7 +11,7 @@ patterns={
  'google-access':rb'ya29\.[A-Za-z0-9_-]{20,}',
  'google-refresh':rb'1//[A-Za-z0-9_-]{40,}',
  'provider-key':rb'sk-(?:proj-|ant-)?[A-Za-z0-9_-]{25,}',
- 'gateway-key':rb'fifty_[A-Za-z0-9_-]{43}',
+ 'gateway-key':rb'sk-[A-Za-z0-9_-]{43}',
 }
 errors=[]
 for file in root.rglob('*'):

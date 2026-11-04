@@ -1,4 +1,5 @@
 <script setup>
+import { copyText } from './clipboard.js'
 import { t, locale } from './i18n.js'
 import {computed,ref} from 'vue'
 const props=defineProps({provider:{type:String,required:true}})
@@ -10,7 +11,7 @@ const folders={openai:{windows:'%USERPROFILE%\\.codex',macos:'~/.codex',linux:'~
 const folder=computed(()=>folders[props.provider]?.[system.value]||({windows:'%USERPROFILE%\\Downloads',macos:'~/Downloads',linux:'~/Downloads'}[system.value]))
 const filename=computed(()=>props.provider==='openai'?'auth.json':'.credentials.json')
 const copied=ref(false),copyError=ref('')
-async function copy(){copyError.value='';try{await navigator.clipboard.writeText(folder.value);copied.value=true;setTimeout(()=>copied.value=false,2000)}catch{copyError.value=t('请手动选择并复制上方路径。')}}
+async function copy(){copyError.value='';try{await copyText(folder.value);copied.value=true;setTimeout(()=>copied.value=false,2000)}catch{copyError.value=t('请手动选择并复制上方路径。')}}
 </script>
 <template>
  <aside class="auth-file-guide" :aria-label="t('授权文件操作说明')"><div class="contribution-step-heading"><span>1</span><h2>{{ t('找到你的授权文件') }}</h2></div><p class="subtle">{{ labels[provider] }} {{ t('· 选择登录账号时使用的系统') }}</p>

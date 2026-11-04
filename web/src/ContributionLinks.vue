@@ -1,4 +1,5 @@
 <script setup>
+import { copyText } from './clipboard.js'
 import { t, locale } from './i18n.js'
 import {computed,onMounted,onBeforeUnmount,ref,watch} from 'vue'
 const props=defineProps({api:{type:Function,required:true}})
@@ -18,7 +19,7 @@ async function action(fn){if(busy.value)return;busy.value=true;error.value='';tr
 onMounted(()=>action(load))
 async function create(){await action(async()=>{const r=await props.api('/admin/contribution-links',{method:'POST',body:{provider:provider.value,hours:hours.value,note:note.value}});url.value=location.origin+location.pathname+r.fragment;copied.value=false;filter.value='all';page.value=1;await load()})}
 async function revoke(link){await action(async()=>{await props.api(`/admin/contribution-links/${link.id}/revoke`,{method:'POST',body:{}});url.value='';await load()})}
-async function copy(){try{await navigator.clipboard.writeText(url.value);copied.value=true}catch{error.value=t('复制失败，请手动选择并复制链接')}}
+async function copy(){copied.value=false;error.value='';try{await copyText(url.value);copied.value=true}catch{error.value=t('复制失败，请手动选择并复制链接')}}
 const date=n=>new Date(n*1000).toLocaleString(locale.value,{hour12:false})
 </script>
 <template>

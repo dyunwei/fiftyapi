@@ -143,11 +143,12 @@ func (a *API) createKey(w http.ResponseWriter, r *http.Request, id identity) {
 	if !decode(w, r, &in) {
 		return
 	}
-	key, token, err := a.store.CreateAPIKey(r.Context(), id.user.ID, in.Name)
+	key, token, err := a.store.CreateAPIKey(r.Context(), id.user.ID, in.Name, a.cfg.SettingsKey)
 	if err != nil {
 		writeError(w, 400, "创建密钥失败")
 		return
 	}
+	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, 201, map[string]any{"key": key, "token": token})
 }
 func (a *API) revokeKey(w http.ResponseWriter, r *http.Request, id identity) {
@@ -431,4 +432,19 @@ func (a *API) setSettings(w http.ResponseWriter, r *http.Request, id identity) {
 		return
 	}
 	writeJSON(w, 200, map[string]bool{"ok": true})
+}
+
+func (a *API) revealKey(w http.ResponseWriter, r *http.Request, id identity) {
+	w.Header().Set("Cache-Control", "no-store")
+	target, err := targetID(r)
+	if err != nil {
+		writeError(w, 400, err.Error())
+		return
+	}
+	token, err := a.store.RevealAPIKey(r.Context(), id.user.ID, target, a.cfg.SettingsKey)
+	if err != nil {
+		writeError(w, 404, "密钥不可复制，请创建新密钥")
+		return
+	}
+	writeJSON(w, 200, map[string]string{"token": token})
 }

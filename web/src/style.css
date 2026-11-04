@@ -169,3 +169,7 @@ svg{width:20px;height:20px;flex-shrink:0}.workspace{background:radial-gradient(a
 .public-language{position:fixed;top:12px;right:16px;z-index:1200}
 html[lang="en"] .nav-item{white-space:normal}
 @media(max-width:580px){.public-language{top:8px;right:10px}.language-select{max-width:104px;font-size:12px;padding-left:6px}.header-controls{gap:6px}.header-user{display:none}}
+
+.key-actions{display:flex;align-items:center;justify-content:flex-end;gap:12px;white-space:nowrap}.key-actions>button{min-height:36px;padding:8px 12px;border-radius:7px;line-height:20px;flex-shrink:0}.key-actions>.text-button{background:#f0fdfa;color:#0f766e}.key-actions>.text-button:hover{background:#ccfbf1}.key-actions>.danger-text:hover{background:#fef2f2}
+
+.key-token{display:flex;align-items:center;gap:12px;white-space:nowrap}.key-token>code{background:#f2f4f7;color:#0d9488;border-radius:5px;padding:5px 9px;font-size:13px}.key-copy{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:7px;color:#98a2b3;flex-shrink:0}.key-copy:hover:not(:disabled){background:#f0fdfa;color:#0d9488}.key-copy svg{width:18px;height:18px}.key-copy:disabled{cursor:default}.key-token+small{display:block;margin-top:5px;font-size:11px}

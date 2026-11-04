@@ -1,6 +1,7 @@
 <script setup>
 defineProps({name:{type:String,default:'grid'}})
 const paths={
+ copy:['M9 5H6v16h13V5h-3 M10 3h5v4h-5z'],
  grid:['M3 3h6v6H3z M15 3h6v6h-6z M3 15h6v6H3z M15 15h6v6h-6z'],
  key:['M14 3a7 7 0 1 0 7 7 7 7 0 0 0-7-7Z','M9 15l-7 7H0v-4l7-7','M15 7h.01'],
  logs:['M5 3h14v18H5z','M8 8h8 M8 12h8 M8 16h5'],

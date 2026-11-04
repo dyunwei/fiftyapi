@@ -72,7 +72,7 @@ test('管理员初始化、密钥一次性显示、成员权限与退出',async(
  const dialog=page.getByRole('dialog')
  await dialog.getByLabel('密钥名称').fill('浏览器测试')
  await dialog.getByRole('button',{name:'保存',exact:true}).click()
- await expect(dialog.locator('.secret-box code')).toHaveText(/^fifty_/)
+ await expect(dialog.locator('.secret-box code')).toHaveText(/^sk-/)
  const key=await dialog.locator('.secret-box code').textContent();browserAPIKey=key
  await dialog.getByRole('button',{name:'完成',exact:true}).click()
  await expect(page.getByText(key,{exact:true})).toHaveCount(0)

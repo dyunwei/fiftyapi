@@ -1,0 +1,2 @@
+ALTER TABLE api_keys ADD COLUMN suffix TEXT NOT NULL DEFAULT '';
+ALTER TABLE api_keys ADD COLUMN token_encrypted BLOB;

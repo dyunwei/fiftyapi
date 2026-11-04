@@ -21,7 +21,7 @@ English | [简体中文](README.zh-CN.md)
 
 - **Simple to run** – one Go binary with an embedded Vue 3 UI and SQLite. No Redis, no extra services.
 - **Built for teams of dozens** – "Fifty" describes the target size, not a hard user limit.
-- **Your keys, not upstream tokens** – members use their own `fifty_…` API keys; upstream credentials stay encrypted on the server.
+- **Your keys, not upstream tokens** – members use their own `sk-…` API keys; upstream credentials stay encrypted on the server.
 
 ## Features
 
