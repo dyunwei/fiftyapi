@@ -4,7 +4,7 @@
 
 ## 开发环境
 
-- Go 1.25+；修改前端需要 Node 24+。
+- Go 1.25+，推荐使用与 CI 一致的 Go 1.26.10；修改前端需要 Node 24+。
 - 构建与测试命令见 [README](README.zh-CN.md#开发与构建)。
 
 ## 提交 PR 前
@@ -25,7 +25,7 @@
 
 ## Contributing (English)
 
-Issues and pull requests are welcome. Use Go 1.25+ and Node 24+ for frontend changes.
+Issues and pull requests are welcome. Use Go 1.25+ (Go 1.26.10 recommended, matching CI) and Node 24+ for frontend changes.
 
 Before submitting:
 

@@ -6,12 +6,16 @@ FiftyAPI runs as a single instance using SQLite on persistent local disk. Do not
 
 ## Binary
 
-Build from source with Go 1.25+; Node is unnecessary when using the included frontend assets:
+Build from source with Go 1.25+; Go 1.26.10 is recommended, matching CI and Docker builds. The minimum language version in `go.mod` remains 1.25.0. Node is unnecessary when using the included frontend assets. Rocky Linux 9.8 can use its system Go toolchain; the pure Go SQLite driver needs no SQLite development libraries. Race tests require GCC, and offline backups require Python 3.9+.
 
 ```sh
 go build -buildvcs=false -o bin/fiftyapi ./cmd/fiftyapi
 ./scripts/start-local.sh
 ```
+
+Use `./scripts/build-release.sh` to create a release package (requires Node 24+). It builds with `CGO_ENABLED=0` and defaults to `GOAMD64=v1` so distribution toolchains defaulting to v2 do not raise the x86-64 CPU requirements. Override `GOAMD64` explicitly when needed; ordinary `go build` keeps the system defaults. Rebuild binaries after upgrading Go to use the new runtime and standard library.
+
+On Rocky Linux with SELinux enabled, keep the default Compose named volume, or use `./data:/data:Z` for a dedicated bind-mounted data directory and grant container UID/GID 10001 write access. Loopback-only deployments need no external port opened; configure firewalld for the actual public entry point when exposing the service.
 
 The local helper saves its master key and setup token under `.local/` and reuses them. For explicit configuration or a downloaded package, follow the [release quickstart](release-quickstart.md).
 

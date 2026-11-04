@@ -6,7 +6,7 @@ COPY web/ ./
 COPY internal/i18n/en.json /src/internal/i18n/en.json
 RUN npm run build
 
-FROM golang:1.25-alpine AS build
+FROM golang:1.26.10-alpine AS build
 ARG GOPROXY=https://goproxy.cn,direct
 ARG BUILD_COMMIT=unknown
 ENV GOPROXY=${GOPROXY}

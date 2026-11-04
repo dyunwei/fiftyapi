@@ -43,7 +43,7 @@ Compose、HTTPS、升级与恢复见 [部署说明](docs/deployment.md)。
 
 ## 本机启动
 
-需要 Go 1.25+；仓库已包含前端产物，直接构建无需 Node。修改前端需 Node 24+。
+需要 Go 1.25+，推荐 Go 1.26.10（与 CI、Docker 构建一致）；仓库已包含前端产物，直接构建无需 Node。修改前端需 Node 24+。
 
 ```sh
 go build -buildvcs=false -o bin/fiftyapi ./cmd/fiftyapi

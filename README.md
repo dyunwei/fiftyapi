@@ -39,7 +39,7 @@ For Compose, HTTPS, upgrades and restoration, see the [deployment guide](docs/en
 
 ## Build and run from source
 
-Requires Go 1.25+. Built frontend assets are included, so building the server does not require Node. Frontend development requires Node 24+.
+Requires Go 1.25+; Go 1.26.10 is recommended and used by CI and Docker builds. Built frontend assets are included, so building the server does not require Node. Frontend development requires Node 24+.
 
 ```sh
 go build -buildvcs=false -o bin/fiftyapi ./cmd/fiftyapi

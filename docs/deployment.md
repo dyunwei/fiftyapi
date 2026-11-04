@@ -4,10 +4,16 @@
 
 ## 二进制启动
 
+推荐使用 Go 1.26.10；`go.mod` 保留 Go 1.25.0 作为最低语言版本。Rocky Linux 9.8 可使用系统 Go 工具链构建，SQLite 使用纯 Go 驱动，无需安装 SQLite 开发库。执行竞态测试需要 GCC；离线备份需要 Python 3.9+。
+
 ```sh
 go build -buildvcs=false -o bin/fiftyapi ./cmd/fiftyapi
 ./scripts/start-local.sh
 ```
+
+制作发布包使用 `./scripts/build-release.sh`（需要 Node 24+），生成 `CGO_ENABLED=0` 二进制。发布脚本默认 `GOAMD64=v1`，避免发行版工具链的 v2 默认值提高 x86-64 CPU 要求；可以通过环境变量显式覆盖。普通 `go build` 仍使用系统工具链默认值。升级 Go 后需要重新构建二进制才能使用新的运行时和标准库。
+
+Rocky Linux 启用 SELinux 时，Compose 默认 named volume 可继续使用；若改用专属数据目录的 bind mount，使用 `./data:/data:Z`，并确保容器 UID/GID 10001 可写。默认仅监听回环地址的部署无需开放外部端口；对外提供服务时按实际入口配置 firewalld。
 
 本机脚本在 `.local/` 首次创建主密钥和部署口令，以后复用。读取 `.local/setup-token` 填入网页初始化表单，设置管理员用户名和密码；随后正常登录。登录页提供注册入口，邮箱、真实姓名和密码必填；新用户两种额度均为 0，由管理员分配。不要重新生成旧数据库的主密钥。
 
