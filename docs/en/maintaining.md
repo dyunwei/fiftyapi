@@ -14,6 +14,8 @@ Keep `internal/buildinfo/VERSION`, `web/package.json` and the root/package versi
 4. Commit/push and wait for CI. For the first release, create and push the annotated tag `v0.1.0`.
 5. Draft a GitHub release with the changelog and attach the prepared files. Packaging alone does not publish anything.
 
+Publishing the GitHub release triggers `Publish Docker Hub image`. It builds the release tag for Linux amd64 and pushes to `<DOCKERHUB_USERNAME>/fiftyapi` using the repository secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`. A release tagged `v0.1.0` publishes `:v0.1.0`; stable releases also update `:latest`, while prereleases do not. The token must have write access to the Docker Hub repository. Pushing a Git tag or saving a release draft alone does not trigger publication.
+
 ## Translations
 
 UI locale selection supports `zh-CN` and `en`, follows supported browser preferences and persists in local storage. English is the fallback when browser languages are unsupported. API error defaults remain Chinese for compatibility.

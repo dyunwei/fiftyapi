@@ -14,6 +14,8 @@
 4. 打标签：`git tag -a v0.1.0 -m "v0.1.0" && git push origin v0.1.0`。
 5. 在 GitHub 页面 Releases → Draft a new release 选择标签，粘贴 CHANGELOG 内容；如附带二进制，上传 `dist/` 中的二进制、`SHA256SUMS`、许可证和依赖声明。
 
+点击 Publish release 后，`Publish Docker Hub image` 工作流会使用仓库密钥 `DOCKERHUB_USERNAME` 和 `DOCKERHUB_TOKEN`，构建该标签源码并推送 Linux amd64 镜像到 `<DOCKERHUB_USERNAME>/fiftyapi`。例如 `v0.1.0` 发布会推送 `:v0.1.0`，正式版同时更新 `:latest`；预发布版不更新 `:latest`。Token 需要有目标 Docker Hub 仓库的写入权限。仅推送 Git 标签或保存 Release 草稿不会触发发布。
+
 ## 许可证义务（LGPL-3.0）
 
 部分代码改编自 sub2api，必须保留 `LICENSE`、`COPYING.GPL-3`、`THIRD_PARTY_NOTICES.md` 和 `docs/sub2api-source.json`。分发二进制或镜像时，同时提供对应版本的完整源码（GitHub 标签即可满足）。新增依赖后运行 `scripts/build-release.sh` 更新依赖声明。
