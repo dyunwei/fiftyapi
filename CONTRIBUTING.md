@@ -5,7 +5,7 @@
 ## 开发环境
 
 - Go 1.25+；修改前端需要 Node 24+。
-- 构建与测试命令见 [README](README.md#开发与构建)。
+- 构建与测试命令见 [README](README.zh-CN.md#开发与构建)。
 
 ## 提交 PR 前
 
@@ -21,7 +21,7 @@
 
 ## 中英文
 
-修改界面文案时同步更新 `web/src/locales/en.json`；固定诊断消息位于 `internal/i18n/en.json`。`t()` 使用完整中文句子作为键，变量使用占位符。英文文档位于 `README.en.md` 和 `docs/en/`。修改后检查两种语言的桌面与手机布局。
+修改界面文案时同步更新 `web/src/locales/en.json`；固定诊断消息位于 `internal/i18n/en.json`。`t()` 使用完整中文句子作为键，变量使用占位符。英文文档位于 `README.md` 和 `docs/en/`。修改后检查两种语言的桌面与手机布局。
 
 ## Contributing (English)
 
@@ -35,4 +35,4 @@ Before submitting:
 4. Update the relevant documentation. Keep Chinese and English text in sync; use complete messages with placeholders in `t()`, with English catalogs in `web/src/locales/en.json` and shared diagnostics in `internal/i18n/en.json`.
 5. Tests must use simulated upstreams; real-provider acceptance tests remain opt-in.
 
-Contributions are accepted under [LGPL-3.0](LICENSE). Build commands are in the [English README](README.en.md#development).
+Contributions are accepted under [LGPL-3.0](LICENSE). Build commands are in the [English README](README.md#development).

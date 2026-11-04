@@ -1,70 +1,66 @@
 # FiftyAPI
 
-简体中文 | [English](README.en.md)
+English | [简体中文](README.zh-CN.md)
 
-面向几十人小团队的 AI 上游账号与金额额度网关。一个 Go 服务、一套嵌入式 Vue 3 页面、一个 SQLite 数据库，无 Redis。Fifty 表示面向小团队的定位，不是 50 人的硬性人数限制。
+An AI upstream account and dollar-budget gateway for small teams. One Go service, an embedded Vue 3 interface and SQLite, with no Redis. “Fifty” describes the intended team size, not a hard limit of 50 users.
 
-- Claude Code、OpenAI Codex、Antigravity OAuth 授权、重新授权、令牌刷新和模型目录同步。
-- Sub2Api、FiftyAPI、New API 网关：API Key 接入、Messages/Responses、模型发现与别名映射。
-- 首次访问设置管理员；支持邮箱、真实姓名和密码自助注册，初始额度为 0；管理员也可通过邮件邀请成员。
-- 每人共享美元额度：5 小时和 7 天窗口，覆盖所有 API Key 与供应商。
-- 用户查看自己的请求日志；管理员管理全部日志、模型价格、日志中的结算异常和操作记录。
-- 参考 Sub2Api 的白色侧栏、青绿导航和卡片界面，适配手机。
-- Go 单文件或 Docker 部署，适用于单实例、本地持久化磁盘。
+Current version: **0.1.0**, the first public preview.
 
-![管理控制台](docs/screenshots/admin-dashboard.png)
+- Simplified Chinese and English throughout the console, setup, sign-in, invitations and account contributions. Choose a language in the top-right corner; browser preferences set the initial language and your selection is saved locally.
+- Claude Code, OpenAI Codex and Antigravity OAuth authorization, reauthorization, token refresh and model catalog sync.
+- API key connections to Sub2Api, FiftyAPI, New API and compatible upstreams, with native Chat Completions, Messages and Responses, discovery and aliases.
+- Initial administrator setup, email/name/password self-registration with zero initial budget, and email invitations.
+- Per-user dollar budgets across all keys and providers, with 5-hour and 7-day windows.
+- Personal request logs; administrator pricing, settlement exceptions, audit and runtime logs.
+- Responsive interface, single-binary or Docker deployment, and S3 / Cloudflare R2 backups.
 
-当前版本：**0.1.0**，首个公开预览版。支持简体中文与 English，可在页面右上角切换，默认根据浏览器语言选择并在本机记住偏好。
+![Admin console](docs/screenshots/admin-dashboard-en.png)
 
-支持原生 Chat Completions、Messages 和 Responses；同一 API 上游模型可声明多种协议并共用 ID 和价格。账号并发在「调度与健康」设置。请求日志包含结算异常，系统设置支持邮件和 S3 / Cloudflare R2 备份。[多协议配置](docs/model-protocols.md) · [日志与结算](docs/request-logs.md) · [邮件配置](docs/email-invitations.md)。
+## Run locally
 
-上游网关接入、模型映射、定价与兼容边界见 [网关接入说明](docs/gateway-upstreams.md)。
-
-## 本机启动
-
-需要 Go 1.25+；仓库已包含前端产物，直接构建无需 Node。修改前端需 Node 24+。
+Requires Go 1.25+. Built frontend assets are included, so building the server does not require Node. Frontend development requires Node 24+.
 
 ```sh
 go build -buildvcs=false -o bin/fiftyapi ./cmd/fiftyapi
 ./scripts/start-local.sh
 ```
 
-打开 http://127.0.0.1:8080 。首次初始化的部署口令保存在 `.local/setup-token`，在本机读取后填入页面。后续启动会复用密钥和数据库。管理员登录后：添加上游账号 → 完成 OAuth → 验证目录 → 核对模型价格 → 创建成员并分配额度 → 成员创建 API Key。
+Open http://127.0.0.1:8080. Read the setup token from `.local/setup-token` on the host and enter it during administrator setup. Later starts reuse the database and master key.
 
-邮件邀请配置见 [邮件邀请](docs/email-invitations.md)。管理员和普通用户的登录密码最少 8 字节。
+After signing in: add upstream accounts → authorize → verify and sync → confirm model prices → allocate member budgets → let members create API keys. Sign-in passwords must be 8–72 bytes.
 
-Docker 新安装可将两个密钥环境变量留空，服务会自动生成并持久保存；内网部署允许 HTTP 公共访问地址。已发布镜像的直接运行方式见 [部署说明](docs/deployment.md#使用已发布镜像)。
+New Docker installations can leave both key variables blank; the service generates and persists unique random credentials. LAN public URLs may use HTTP. See [published-image deployment](docs/en/deployment.md#published-images).
 
-全部文档见 [文档索引](docs/README.md)。Docker、HTTPS、备份恢复见 [部署说明](docs/deployment.md)。Claude Code / Codex 配置见 [客户端接入](docs/clients.md)。开发探针见 [probe.md](docs/probe.md)。
+See the [English documentation](docs/en/README.md), [deployment guide](docs/en/deployment.md), [client configuration](docs/en/clients.md) and [administrator guide](docs/en/administration.md).
 
-## 团队贡献账号
+## Account contributions
 
-管理员可在「上游账号 → 贡献链接」选择供应商并生成临时链接，默认 24 小时有效，可提前停用。同一链接支持多位账号所有者无需登录、自行导入授权 JSON（每次最多 20 个文件，总大小 1 MiB）。完整链接仅在创建后显示，请及时复制保存。
+Administrators can create provider-specific contribution links under **Upstream accounts → Contribution links**. Links default to 24 hours and can be disabled early. Multiple account owners can use the same link without signing in, importing up to 20 authorization JSON files totaling 1 MiB per submission.
 
-贡献链接管理采用紧凑分页，每页 5 条，并可按有效、已停用、已过期筛选。公开贡献页面提供 Windows、macOS、Linux 的文件查找步骤，按供应商区分 Codex auth.json、Claude Code .credentials.json 和导出的授权 JSON；macOS 钥匙串、自定义目录等情况另有提示。
+The public page explains where to find Codex and Claude authorization files on Windows, macOS and Linux, including Keychain and custom-directory cases. Submitted credentials are encrypted and accounts start disabled. Administrators must configure, enable and verify them. Import validates credential format, not actual model access. Full links are displayed only when created.
 
-贡献页面只提供文件导入和账号名称，不允许设置并发、代理或其他高级参数。账号加密保存后默认停用，管理员配置完成并手动启用后，再验证并同步模型。账号列表显示贡献链接编号与提交时间；链接过期或停用不影响已提交的账号。导入只检查授权格式，实际有效性及模型权限由管理员后续验证。
+## Protocols and verification limits
 
-## 验证范围
+Use the protocol declared by the model catalog. Claude and Antigravity use Messages; Codex OAuth uses Responses. Chat Completions is forwarded only to API upstreams that explicitly support Chat. A model can declare several protocols with one ID and shared prices; standard protocols are not automatically converted.
 
-Antigravity `gemini-3.5-flash-lite` 已通过真实刷新、目录、网关 SSE、工具调用与结果回传，额度和日志核对一致。OpenAI 已导入账号的真实目录、文本、流式工具往返、取消与额度核对通过；原生 Codex 固定短提示与 WebSocket 已验收，真实 OAuth 刷新、新身份 compact 和长时间工具工作流尚未验收。Claude 缺少真实账号，保留模拟验证。模型出现在目录中不代表账号拥有调用权限。
+Real Antigravity tests cover token refresh, discovery, SSE and tool round trips for `gemini-3.5-flash-lite`. Imported OpenAI credentials have passed discovery, text, streaming tool round trips, cancellation and budget accounting. Native Codex short-prompt and Responses WebSocket tests passed. Real Claude authorization, OpenAI authorization-code exchange and refresh rotation, compact with the newer client identity, and long-running native workflows remain unverified. A model appearing in a catalog does not prove permission to call it.
 
-目前支持 Messages、Responses HTTP/SSE、原生 Responses WebSocket 和 compact 接口；compact 的新身份真实可用性仍待验收。Chat Completions 只直通声明支持 Chat 的上游 API；Claude/Antigravity 继续使用 Messages，Codex OAuth 使用 Responses；未实现图片/音频生成、付费套餐、支付或复杂分组调度。完整验证记录与已知限制见 [兼容性](docs/compatibility.md)。
+Responses HTTP/SSE, native Responses WebSocket and the compact endpoint are implemented; compact availability depends on the account and upstream and remains unverified with the newer identity. Images/audio generation, payments, paid plans and complex grouping are outside scope. See [compatibility](docs/en/compatibility.md).
 
-## 开发与构建
+## Development
 
 ```sh
-make test             # Go race、vet、表单逻辑、源码检查
-make test-load        # 50 用户模拟负载（不调用真实供应商）
-make build            # npm ci、前端构建、Go 单文件
-make test-ui          # 需先安装 Playwright Chromium
-./scripts/build-release.sh  # dist/ 中的本机架构二进制、许可证和依赖声明
+make test                   # Go race, vet, frontend unit tests and source checks
+make test-load              # 50-user simulated load; no real providers
+make build                  # npm ci, frontend build and Go binary
+make test-ui                # requires Playwright Chromium
+./scripts/build-release.sh  # local architecture release files in dist/
 ```
 
-前端浏览器测试首次需 `cd web && npx playwright install chromium`。测试使用临时数据库和模拟账号；不会执行真实供应商调用。
+Install the browser once with `cd web && npx playwright install chromium`. Tests use temporary databases and simulated upstreams; they do not make real provider calls. Release scripts prepare local artifacts without publishing.
 
-## 来源与开源
+## Source and license
 
-账号协议和部分 Antigravity 转换代码参考或改编自 [sub2api](https://github.com/Wei-Shaw/sub2api)。仓库采用 LGPL-3.0，保留 [LICENSE](LICENSE)、[COPYING.GPL-3](COPYING.GPL-3)、[第三方声明](THIRD_PARTY_NOTICES.md) 及 [源码指纹](docs/sub2api-source.json)。功能取舍见 [迁移清单](docs/upstream-migration.md)。
+Account protocols and parts of the Antigravity adapter are based on or adapted from [sub2api](https://github.com/Wei-Shaw/sub2api). FiftyAPI is licensed under LGPL-3.0. Keep [LICENSE](LICENSE), [COPYING.GPL-3](COPYING.GPL-3), [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and the [source fingerprints](docs/sub2api-source.json).
 
-发布与维护流程见 [维护指南](docs/maintaining.md)；运行数据、主密钥及用户令牌不属于发布内容。
+See [Contributing](CONTRIBUTING.md), [Security](SECURITY.md), [Changelog](CHANGELOG.md) and [release maintenance](docs/en/maintaining.md). Runtime databases, master keys and user credentials are excluded from releases.

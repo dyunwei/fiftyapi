@@ -9,7 +9,7 @@
 - 团队成员、共享额度、请求日志、自动结算、邮件邀请及备份。
 - 简体中文和 English 界面、浏览器语言识别及本机偏好保存；中英文入门文档与邮件。
 
-完整能力及已知限制见 [README](README.md) 和 [兼容性](docs/compatibility.md)。
+完整能力及已知限制见 [README](README.zh-CN.md) 和 [兼容性](docs/compatibility.md)。
 
 First public preview. Public release history starts here.
 
@@ -18,4 +18,4 @@ First public preview. Public release history starts here.
 - Team members, shared budgets, request logs, automatic settlement, email invitations and backups.
 - Simplified Chinese and English interface, browser language detection and locally saved preferences; bilingual onboarding documentation and emails.
 
-See the [English README](README.en.md) and [compatibility guide](docs/en/compatibility.md) for capabilities and known limitations.
+See the [English README](README.md) and [compatibility guide](docs/en/compatibility.md) for capabilities and known limitations.

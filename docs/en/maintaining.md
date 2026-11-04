@@ -20,7 +20,7 @@ UI locale selection supports `zh-CN` and `en`, follows supported browser prefere
 
 Use complete Chinese messages as `t()` keys and put English translations in `web/src/locales/en.json`. Use positional placeholders such as `{0}` rather than concatenating translated fragments. Shared operational diagnostics are in `internal/i18n/en.json`, embedded by Go and imported by the frontend. Translate diagnostic fields only; preserve names, notes, model IDs, credentials and response bodies.
 
-Keep English user guides under `docs/en/` and `README.en.md` aligned with Chinese documentation. Run catalog/unit tests and both-language browser flows. Rebuild and commit `internal/server/ui` after frontend changes.
+Keep English user guides under `docs/en/` and `README.md` aligned with Chinese documentation. Run catalog/unit tests and both-language browser flows. Rebuild and commit `internal/server/ui` after frontend changes.
 
 ## Source and credentials
 
