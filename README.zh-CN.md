@@ -20,6 +20,27 @@
 
 上游网关接入、模型映射、定价与兼容边界见 [网关接入说明](docs/gateway-upstreams.md)。
 
+## Docker 安装部署
+
+镜像已发布到 [Docker Hub](https://hub.docker.com/r/dyunwei/fiftyapi)，无需下载源码或安装 Go/Node，直接运行：
+
+```sh
+docker run -d --name fiftyapi --restart unless-stopped --stop-timeout 60 \
+  -p 28080:8080 -v fiftyapi-data:/data dyunwei/fiftyapi
+```
+
+打开 http://localhost:28080；在其他机器访问时使用 `http://服务器IP:28080`。容器启动后，读取初始化口令：
+
+```sh
+docker exec fiftyapi cat /data/setup-token
+```
+
+将口令填入初始化页面并创建管理员账号。新安装无需预先配置环境变量：服务会自动生成随机主密钥和部署口令，保存到 `fiftyapi-data` 数据卷中，重建容器后继续复用。请保留此数据卷，并单独备份 `/data/master.key`；数据库备份压缩包不包含主密钥。
+
+`28080:8080` 左侧是宿主机端口，可按需更换 `28080`。支持内网 HTTP；发送邮件邀请时，在邮件设置中填写收件人可访问的 HTTP 或 HTTPS 地址，例如 `http://192.168.1.10:28080`。
+
+Compose、HTTPS、升级与恢复见 [部署说明](docs/deployment.md)。
+
 ## 本机启动
 
 需要 Go 1.25+；仓库已包含前端产物，直接构建无需 Node。修改前端需 Node 24+。
@@ -32,8 +53,6 @@ go build -buildvcs=false -o bin/fiftyapi ./cmd/fiftyapi
 打开 http://127.0.0.1:8080 。首次初始化的部署口令保存在 `.local/setup-token`，在本机读取后填入页面。后续启动会复用密钥和数据库。管理员登录后：添加上游账号 → 完成 OAuth → 验证目录 → 核对模型价格 → 创建成员并分配额度 → 成员创建 API Key。
 
 邮件邀请配置见 [邮件邀请](docs/email-invitations.md)。管理员和普通用户的登录密码最少 8 字节。
-
-Docker 新安装可将两个密钥环境变量留空，服务会自动生成并持久保存；内网部署允许 HTTP 公共访问地址。已发布镜像的直接运行方式见 [部署说明](docs/deployment.md#使用已发布镜像)。
 
 全部文档见 [文档索引](docs/README.md)。Docker、HTTPS、备份恢复见 [部署说明](docs/deployment.md)。Claude Code / Codex 配置见 [客户端接入](docs/clients.md)。开发探针见 [probe.md](docs/probe.md)。
 

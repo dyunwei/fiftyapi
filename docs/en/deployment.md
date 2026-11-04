@@ -39,19 +39,19 @@ docker compose up -d --build
 
 When blank, the service generates `/data/master.key` and `/data/setup-token` with mode 0600 and reuses them across restarts and container recreation. Read the initial setup token with `docker compose exec fiftyapi cat /data/setup-token`. Explicit environment values take precedence and must satisfy their format and length requirements; do not use a shared value such as `fiftyapi`. Compose binds `127.0.0.1:8080`, stores data in a named volume, runs with a read-only root filesystem and allows 60 seconds for shutdown. Keep `.env` private and back it up separately. Set `FIFTYAPI_COOKIE_SECURE=true` for public HTTPS access. Compose defaults to `TZ=Asia/Shanghai`; change it if desired.
 
-The provided image is built locally. No public image registry or release download URL is assumed.
+The command above builds from source. To use the published Docker Hub image, follow the next section.
 
 ## Published images
 
-Once an image is published, set `FIFTYAPI_IMAGE` in `.env` to its actual registry name/tag and run `docker compose pull` followed by `docker compose up -d --no-build`. Alternatively, replace `YOUR_IMAGE:TAG` below with the actual published image:
+The published image is [`dyunwei/fiftyapi` on Docker Hub](https://hub.docker.com/r/dyunwei/fiftyapi). With the repository's Compose configuration, set `FIFTYAPI_IMAGE=dyunwei/fiftyapi` in `.env`, then run `docker compose pull` followed by `docker compose up -d --no-build`. Without a source checkout, run the image directly:
 
 ```sh
 docker run -d --name fiftyapi --restart unless-stopped --stop-timeout 60 \
-  -p 8080:8080 -v fiftyapi-data:/data dyunwei/fiftyapi:latest
+  -p 28080:8080 -v fiftyapi-data:/data dyunwei/fiftyapi
 docker exec fiftyapi cat /data/setup-token
 ```
 
-No key variables are required for a new installation. Open `http://SERVER_LAN_IP:8080` and initialize your administrator with the generated token. Configure the public URL only when needed for invitations, in environment variables or web email settings. The image name above is a placeholder; publishing/pushing the image is a separate step.
+No key variables are required for a new installation. Open `http://SERVER_LAN_IP:28080` and initialize your administrator with the generated token. Configure the public URL only when needed for invitations, in environment variables or web email settings. The host port is 28080; the container continues to listen on port 8080.
 
 Persist the data volume and separately back up the generated master key. Online database archives still exclude it. If a database already exists and its original key is unavailable, startup fails without generating a replacement key. Restore the original key before restoring an existing database. Custom database paths use key files in the same directory as that database.
 

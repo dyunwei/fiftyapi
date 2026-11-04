@@ -38,22 +38,22 @@ docker compose up -d --build
 
 ## 使用已发布镜像
 
-镜像发布后，将 `.env` 的 `FIFTYAPI_IMAGE` 改为实际镜像地址及标签，再执行：
+Docker Hub 镜像为 [`dyunwei/fiftyapi`](https://hub.docker.com/r/dyunwei/fiftyapi)。使用仓库中的 Compose 配置时，将 `.env` 的 `FIFTYAPI_IMAGE` 设置为 `dyunwei/fiftyapi`，再执行：
 
 ```sh
 docker compose pull
 docker compose up -d --no-build
 ```
 
-也可直接运行镜像，`YOUR_IMAGE:TAG` 替换为实际发布地址：
+无需源码也可直接运行镜像：
 
 ```sh
 docker run -d --name fiftyapi --restart unless-stopped --stop-timeout 60 \
-  -p 8080:8080 -v fiftyapi-data:/data YOUR_IMAGE:TAG
+  -p 28080:8080 -v fiftyapi-data:/data dyunwei/fiftyapi
 docker exec fiftyapi cat /data/setup-token
 ```
 
-无需提前配置两个密钥。打开 `http://服务器内网IP:8080`，填入上一步读取的口令并设置管理员。`FIFTYAPI_PUBLIC_URL` 只需在发送邀请时配置为收件人能访问的 HTTP 或 HTTPS 站点地址，例如 `http://192.168.1.10:8080`，也可在网页邮件配置中填写。HTTP 部署保持 `FIFTYAPI_COOKIE_SECURE=false`。上述镜像地址是占位符，镜像的发布、推送另行完成。
+无需提前配置两个密钥。打开 `http://服务器内网IP:28080`，填入上一步读取的口令并设置管理员。`FIFTYAPI_PUBLIC_URL` 只需在发送邀请时配置为收件人能访问的 HTTP 或 HTTPS 站点地址，例如 `http://192.168.1.10:28080`，也可在网页邮件配置中填写。HTTP 部署保持 `FIFTYAPI_COOKIE_SECURE=false`。宿主机端口为 28080，容器内仍监听 8080。
 
 自动生成的主密钥必须与数据卷一起保留，并另行备份；在线数据库备份仍不包含它。已有数据库丢失 `master.key` 且未提供原 `FIFTYAPI_MASTER_KEY` 时会拒绝启动，不生成替代密钥。恢复旧数据库须先恢复原主密钥；自定义数据库路径时，自动密钥文件位于该数据库所在目录。
 

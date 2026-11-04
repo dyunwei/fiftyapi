@@ -16,7 +16,28 @@ Current version: **0.1.0**, the first public preview.
 
 ![Admin console](docs/screenshots/admin-dashboard-en.png)
 
-## Run locally
+## Install with Docker
+
+The published image is available on [Docker Hub](https://hub.docker.com/r/dyunwei/fiftyapi). Start it without cloning the repository or installing Go/Node:
+
+```sh
+docker run -d --name fiftyapi --restart unless-stopped --stop-timeout 60 \
+  -p 28080:8080 -v fiftyapi-data:/data dyunwei/fiftyapi
+```
+
+Open http://localhost:28080, or `http://SERVER_IP:28080` from another machine. Once the container has started, read the setup token:
+
+```sh
+docker exec fiftyapi cat /data/setup-token
+```
+
+Enter that token in the setup page and create your administrator account. No environment variables are required for a new installation: the service generates a random master key and setup token, saves them in the `fiftyapi-data` volume and reuses them across container recreation. Keep this volume and separately back up `/data/master.key`; database backup archives do not include the master key.
+
+The left side of `28080:8080` is the host port; change `28080` to use a different port. LAN HTTP is supported. Set an HTTP or HTTPS public URL in email settings when sending invitations, for example `http://192.168.1.10:28080`.
+
+For Compose, HTTPS, upgrades and restoration, see the [deployment guide](docs/en/deployment.md).
+
+## Build and run from source
 
 Requires Go 1.25+. Built frontend assets are included, so building the server does not require Node. Frontend development requires Node 24+.
 
@@ -28,8 +49,6 @@ go build -buildvcs=false -o bin/fiftyapi ./cmd/fiftyapi
 Open http://127.0.0.1:8080. Read the setup token from `.local/setup-token` on the host and enter it during administrator setup. Later starts reuse the database and master key.
 
 After signing in: add upstream accounts → authorize → verify and sync → confirm model prices → allocate member budgets → let members create API keys. Sign-in passwords must be 8–72 bytes.
-
-New Docker installations can leave both key variables blank; the service generates and persists unique random credentials. LAN public URLs may use HTTP. See [published-image deployment](docs/en/deployment.md#published-images).
 
 See the [English documentation](docs/en/README.md), [deployment guide](docs/en/deployment.md), [client configuration](docs/en/clients.md) and [administrator guide](docs/en/administration.md).
 
