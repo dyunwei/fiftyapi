@@ -80,7 +80,7 @@ func Save(path string, key []byte, binding string, plain []byte) error {
 	if _, err = rand.Read(nonce); err != nil {
 		return err
 	}
-	data := append([]byte("ZTM1"), nonce...)
+	data := append([]byte("FTY1"), nonce...)
 	data = gcm.Seal(data, nonce, plain, []byte(binding))
 	if err = os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		return errors.New("无法创建会话目录")
@@ -120,7 +120,7 @@ func Load(path string, key []byte, binding string) ([]byte, error) {
 		return nil, err
 	}
 	b, err := io.ReadAll(io.LimitReader(f, maxSize+128))
-	if err != nil || len(b) > maxSize+64 || len(b) < 4+gcm.NonceSize()+gcm.Overhead() || string(b[:4]) != "ZTM1" {
+	if err != nil || len(b) > maxSize+64 || len(b) < 4+gcm.NonceSize()+gcm.Overhead() || string(b[:4]) != "FTY1" {
 		return nil, errors.New("会话文件格式错误")
 	}
 	nonce := b[4 : 4+gcm.NonceSize()]

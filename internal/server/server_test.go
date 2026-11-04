@@ -20,7 +20,7 @@ func TestAuthenticationAndAdminBoundary(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close()
-	api, err := New(s, Config{SetupToken: strings.Repeat("s", 32)})
+	api, err := New(s, Config{SetupToken: strings.Repeat("s", 8)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,11 +41,11 @@ func TestAuthenticationAndAdminBoundary(t *testing.T) {
 		handler.ServeHTTP(w, r)
 		return w
 	}
-	setup := fmt.Sprintf(`{"username":"admin","password":"long-admin-password","setup_token":%q}`, strings.Repeat("s", 32))
+	setup := fmt.Sprintf(`{"username":"admin","password":"long-admin-password","setup_token":%q}`, strings.Repeat("s", 8))
 	if w := request("POST", "/api/setup", setup, nil, "", "https://evil.test"); w.Code != 403 {
 		t.Fatal("accepted cross-origin setup")
 	}
-	if w := request("POST", "/api/setup", strings.Replace(setup, strings.Repeat("s", 32), "wrong", 1), nil, "", ""); w.Code != 403 {
+	if w := request("POST", "/api/setup", strings.Replace(setup, strings.Repeat("s", 8), "wrong", 1), nil, "", ""); w.Code != 403 {
 		t.Fatal("accepted invalid setup token")
 	}
 	if w := request("POST", "/api/setup", setup, nil, "", ""); w.Code != 201 {
@@ -131,7 +131,7 @@ func TestAdminPasswordEightByteMinimum(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close()
-	api, err := New(s, Config{SetupToken: strings.Repeat("s", 32)})
+	api, err := New(s, Config{SetupToken: strings.Repeat("s", 8)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -147,7 +147,7 @@ func TestAdminPasswordEightByteMinimum(t *testing.T) {
 		return w
 	}
 	for _, password := range []string{"1234567", "12345678"} {
-		body, _ := json.Marshal(map[string]string{"username": "admin", "password": password, "setup_token": strings.Repeat("s", 32)})
+		body, _ := json.Marshal(map[string]string{"username": "admin", "password": password, "setup_token": strings.Repeat("s", 8)})
 		w := request("POST", "/api/setup", string(body), nil, "")
 		want := 400
 		if len(password) == 8 {

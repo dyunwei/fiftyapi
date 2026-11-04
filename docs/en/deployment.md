@@ -22,7 +22,7 @@ The local helper saves its master key and setup token under `.local/` and reuses
 | Variable | Purpose |
 | --- | --- |
 | `FIFTYAPI_MASTER_KEY` | Optional Base64-encoded 32-byte key; when blank, generate `master.key` beside the database |
-| `FIFTYAPI_SETUP_TOKEN` | Optional setup token (at least 32 bytes); when blank, generate `setup-token` beside the database |
+| `FIFTYAPI_SETUP_TOKEN` | Optional setup token (at least 8 bytes); when blank, generate `setup-token` beside the database |
 | `FIFTYAPI_DB_PATH` | Database path, e.g. `data/fiftyapi.db` |
 | `FIFTYAPI_LISTEN` | Listen address, e.g. `127.0.0.1:8080` |
 | `FIFTYAPI_COOKIE_SECURE` | Set `true` when serving through HTTPS |

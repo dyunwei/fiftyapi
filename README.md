@@ -82,6 +82,10 @@ go build -buildvcs=false -o bin/fiftyapi ./cmd/fiftyapi
 ./scripts/start-local.sh      # setup token: .local/setup-token
 ```
 
+The local startup script loads `.env` from the repository root as shell assignments
+and exports its values (overriding matching shell environment variables). Set
+`FIFTYAPI_LISTEN=127.0.0.1:28080` there to change the local listening address.
+
 ```sh
 make test       # Go race, vet, frontend unit tests, source checks
 make build      # frontend build + Go binary

@@ -68,5 +68,3 @@ jobs:
         run: python3 scripts/docker-smoke.py
       - name: Automatic secrets and container recreation
         run: FIFTYAPI_TEST_AUTO_SECRETS=1 python3 scripts/docker-smoke.py
-      - name: Legacy configuration compatibility
-        run: FIFTYAPI_TEST_LEGACY_ENV=1 python3 scripts/docker-smoke.py

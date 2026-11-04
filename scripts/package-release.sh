@@ -3,7 +3,7 @@ set -eu
 cd "$(dirname "$0")/.."
 
 VERSION=$(tr -d '[:space:]' < internal/buildinfo/VERSION)
-COMMIT="${FIFTYAPI_BUILD_COMMIT:-${ZTOKENMGR_BUILD_COMMIT:-unknown}}"
+COMMIT="${FIFTYAPI_BUILD_COMMIT:-unknown}"
 
 # Ensure dist/ base files (UI built, licenses, docs, QUICKSTART) exist
 ./scripts/build-release.sh

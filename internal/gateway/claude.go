@@ -45,7 +45,7 @@ func normalizeClaude(request map[string]json.RawMessage, r *http.Request, c acco
 					session = uuid.NewString()
 				}
 			}
-			device := sha256.Sum256([]byte("ztokenmgr:claude-account:" + strconv.FormatInt(c.AccountID, 10)))
+			device := sha256.Sum256([]byte("fiftyapi:claude-account:" + strconv.FormatInt(c.AccountID, 10)))
 			account := ""
 			if c.Token.Account != nil {
 				account = c.Token.Account.UUID

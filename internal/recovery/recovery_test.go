@@ -17,7 +17,7 @@ import (
 	"time"
 )
 
-func TestLegacyNamedBackupStillRestores(t *testing.T) {
+func TestFiftyAPIBackupRestores(t *testing.T) {
 	python, err := exec.LookPath("python3")
 	if err != nil {
 		t.Skip("Python required")
@@ -27,23 +27,23 @@ func TestLegacyNamedBackupStillRestores(t *testing.T) {
 	if err = os.Mkdir(source, 0700); err != nil {
 		t.Fatal(err)
 	}
-	data := []byte("legacy snapshot bytes")
-	if err = os.WriteFile(filepath.Join(source, "ztokenmgr.db"), data, 0600); err != nil {
+	data := []byte("snapshot bytes")
+	if err = os.WriteFile(filepath.Join(source, "fiftyapi.db"), data, 0600); err != nil {
 		t.Fatal(err)
 	}
 	hash := sha256.Sum256(data)
-	manifest, _ := json.Marshal(map[string]any{"format": 1, "files": map[string]string{"ztokenmgr.db": hex.EncodeToString(hash[:])}})
+	manifest, _ := json.Marshal(map[string]any{"format": 1, "files": map[string]string{"fiftyapi.db": hex.EncodeToString(hash[:])}})
 	if err = os.WriteFile(filepath.Join(source, "manifest.json"), manifest, 0600); err != nil {
 		t.Fatal(err)
 	}
 	out := filepath.Join(dir, "restored")
 	command := exec.Command(python, filepath.Join("..", "..", "scripts", "backup-offline.py"), "restore", "--from", source, "--output", out)
 	if output, err := command.CombinedOutput(); err != nil {
-		t.Fatalf("legacy restore failed: %v %s", err, output)
+		t.Fatalf("restore failed: %v %s", err, output)
 	}
-	got, err := os.ReadFile(filepath.Join(out, "ztokenmgr.db"))
+	got, err := os.ReadFile(filepath.Join(out, "fiftyapi.db"))
 	if err != nil || !bytes.Equal(got, data) {
-		t.Fatal("legacy backup changed or disappeared", err)
+		t.Fatal("backup changed or disappeared", err)
 	}
 }
 

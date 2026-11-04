@@ -69,8 +69,8 @@ def restore(source, output):
         raise ValueError('Restore output must be a new directory; existing data will not be overwritten')
     manifest = json.loads((source/'manifest.json').read_text())
     files = manifest.get('files', {})
-    # Accept old snapshots without renaming bytes or mixing two database families.
-    base = 'fiftyapi.db' if 'fiftyapi.db' in files else 'ztokenmgr.db'
+    # Restore only the supported database snapshot files.
+    base = 'fiftyapi.db'
     allowed = {base, base+'-wal', base+'-shm'}
     if manifest.get('format') != 1 or base not in files or not set(files).issubset(allowed):
         raise ValueError('Invalid backup manifest')

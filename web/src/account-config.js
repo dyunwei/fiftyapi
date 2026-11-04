@@ -6,13 +6,13 @@ export function parseHeaders(text) {
   const at=line.indexOf(':'),key=line.slice(0,at).trim(),value=line.slice(at+1).trim()
   if(at<1||!/^[-!#$%&'*+.^_`|~0-9A-Za-z]+$/.test(key)||/[\r\n]/.test(value))throw new Error('请求头请每行填写「名称: 值」')
   if(seen.has(key.toLowerCase()))throw new Error('请求头重复：'+key)
-  if(['authorization','cookie','x-api-key','proxy-authorization','host','connection','content-length','transfer-encoding','x-ztokenmgr-relay-chain'].includes(key.toLowerCase()))throw new Error('请求头不能覆盖认证凭据或连接设置')
+  if(['authorization','cookie','x-api-key','proxy-authorization','host','connection','content-length','transfer-encoding','x-fiftyapi-relay-chain'].includes(key.toLowerCase()))throw new Error('请求头不能覆盖认证凭据或连接设置')
   seen.add(key.toLowerCase());headers[key]=value
  }
  return headers
 }
 export function toConfigForm(config) {
- return {...config,...(config.inference_policy?{inference_policy:{...config.inference_policy}}:{}),...(config.gateway?{gateway:{...config.gateway,platform:config.gateway.platform==='ztokenmgr'?'fiftyapi':config.gateway.platform,protocols:[...(config.gateway.protocols||[])],models:(config.gateway.models||[]).map(({protocol,protocols,...m})=>({...m,protocols:[...(protocols?.length?protocols:protocol?[protocol]:[])]}))}}:{}),gateway_headers_text:headersText(config.gateway_headers),models_headers_text:headersText(config.models_headers),fallback_urls_text:(config.antigravity_fallback_urls||[]).join('\n')}
+ return {...config,...(config.inference_policy?{inference_policy:{...config.inference_policy}}:{}),...(config.gateway?{gateway:{...config.gateway,protocols:[...(config.gateway.protocols||[])],models:(config.gateway.models||[]).map(({protocol,protocols,...m})=>({...m,protocols:[...(protocols?.length?protocols:protocol?[protocol]:[])]}))}}:{}),gateway_headers_text:headersText(config.gateway_headers),models_headers_text:headersText(config.models_headers),fallback_urls_text:(config.antigravity_fallback_urls||[]).join('\n')}
 }
 export function fromConfigForm(form) {
  const {gateway_headers_text,models_headers_text,fallback_urls_text,max_concurrency:_legacyMaxConcurrency,...config}=form

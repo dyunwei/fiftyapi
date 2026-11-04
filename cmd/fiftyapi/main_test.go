@@ -81,34 +81,16 @@ func TestServeLocksBeforeDatabaseCreationOrMigration(t *testing.T) {
 	}
 }
 
-func TestDatabasePathPreservesLegacyAndRejectsAmbiguity(t *testing.T) {
+func TestDatabasePathDefaultAndExplicitOverride(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("FIFTYAPI_DATA_DIR", dir)
 	t.Setenv("FIFTYAPI_DB_PATH", "")
-	current, legacy := filepath.Join(dir, "fiftyapi.db"), filepath.Join(dir, "ztokenmgr.db")
-	if path, err := databasePath(); err != nil || path != current {
-		t.Fatal("new database default", path, err)
+	if path, err := databasePath(); err != nil || path != filepath.Join(dir, "fiftyapi.db") {
+		t.Fatal("database default", path, err)
 	}
-	if err := os.WriteFile(legacy, []byte("legacy-placeholder"), 0600); err != nil {
-		t.Fatal(err)
-	}
-	if path, err := databasePath(); err != nil || path != legacy {
-		t.Fatal("legacy database not selected", path, err)
-	}
-	if err := os.WriteFile(current, []byte("current-placeholder"), 0600); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := databasePath(); err == nil {
-		t.Fatal("ambiguous database auto-selected")
-	}
-	t.Setenv("FIFTYAPI_DB_PATH", legacy)
-	if path, err := databasePath(); err != nil || path != legacy {
+	explicit := filepath.Join(dir, "custom.db")
+	t.Setenv("FIFTYAPI_DB_PATH", explicit)
+	if path, err := databasePath(); err != nil || path != explicit {
 		t.Fatal("explicit choice ignored", path, err)
-	}
-	t.Setenv("FIFTYAPI_DB_PATH", "")
-	os.Unsetenv("FIFTYAPI_DB_PATH")
-	t.Setenv("ZTOKENMGR_DB_PATH", legacy)
-	if path, err := databasePath(); err != nil || path != legacy {
-		t.Fatal("old deployment path ignored", path, err)
 	}
 }

@@ -90,7 +90,7 @@ func TestOpenAILive(t *testing.T) {
 	if err != nil {
 		t.Fatal("invalid source key encoding")
 	}
-	plain, err := credentials.Decrypt(sourceKey, fmt.Sprintf("ztokenmgr:upstream:%d", account), encrypted)
+	plain, err := credentials.Decrypt(sourceKey, fmt.Sprintf("fiftyapi:upstream:%d", account), encrypted)
 	if err != nil {
 		t.Fatal("cannot decrypt selected account")
 	}

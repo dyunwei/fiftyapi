@@ -60,9 +60,8 @@ func New(s *store.Store, key []byte, options ...Option) (*Service, error) {
 	return service, nil
 }
 
-// Keep the stored AAD stable across the FiftyAPI rename; old account ciphertext
-// must remain decryptable with the original master key.
-func binding(id int64) string { return fmt.Sprintf("ztokenmgr:upstream:%d", id) }
+// Bind encrypted credentials to their account ID.
+func binding(id int64) string { return fmt.Sprintf("fiftyapi:upstream:%d", id) }
 func (s *Service) Import(ctx context.Context, actor int64, name string, c Credential) (int64, error) {
 	return s.importWithOrigin(ctx, actor, name, c, store.AccountOrigin{})
 }

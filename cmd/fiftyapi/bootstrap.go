@@ -50,7 +50,7 @@ func initializationToken(dbPath string) (string, error) {
 		path := filepath.Join(filepath.Dir(dbPath), "setup-token")
 		saved, err := readSecret(path)
 		if errors.Is(err, os.ErrNotExist) {
-			data := make([]byte, 32)
+			data := make([]byte, 4)
 			if _, err = rand.Read(data); err != nil {
 				return "", err
 			}
@@ -63,8 +63,8 @@ func initializationToken(dbPath string) (string, error) {
 		}
 		value = saved
 	}
-	if len(value) < 32 {
-		return "", errors.New("FIFTYAPI_SETUP_TOKEN / setup-token must contain at least 32 bytes")
+	if len(value) < 8 {
+		return "", errors.New("FIFTYAPI_SETUP_TOKEN / setup-token must contain at least 8 bytes")
 	}
 	return value, nil
 }

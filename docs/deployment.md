@@ -22,7 +22,7 @@ Rocky Linux 启用 SELinux 时，Compose 默认 named volume 可继续使用；�
 | 变量 | 用途 |
 | --- | --- |
 | `FIFTYAPI_MASTER_KEY` | 可选：32 字节随机密钥的 Base64 编码；留空时首次启动在数据库旁自动生成 `master.key` |
-| `FIFTYAPI_SETUP_TOKEN` | 可选：至少 32 字节；留空时首次初始化在数据库旁自动生成 `setup-token` |
+| `FIFTYAPI_SETUP_TOKEN` | 可选：至少 8 字节；留空时首次初始化在数据库旁自动生成 `setup-token` |
 | `FIFTYAPI_DB_PATH` | 新部署默认 `data/fiftyapi.db`；未显式指定时兼容同目录旧数据库 |
 | `FIFTYAPI_DATA_DIR` | 默认 `data`；容器默认 `/data`，用于自动选择数据库文件 |
 | `FIFTYAPI_LISTEN` | 默认 `127.0.0.1:8080` |

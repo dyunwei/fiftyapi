@@ -18,7 +18,7 @@ func TestAutomaticSecretsPersistAndDifferBetweenInstallations(t *testing.T) {
 		t.Fatal("generate key", err)
 	}
 	token, err := initializationToken(path)
-	if err != nil || len(token) != 64 {
+	if err != nil || len(token) != 8 {
 		t.Fatal("generate token", err)
 	}
 	if err = os.WriteFile(path, []byte("existing database"), 0600); err != nil {
@@ -93,12 +93,12 @@ func TestExplicitSecretsTakePrecedenceAndValidate(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "app.db")
 	key := bytes.Repeat([]byte{1}, 32)
 	t.Setenv("FIFTYAPI_MASTER_KEY", base64.StdEncoding.EncodeToString(key))
-	t.Setenv("FIFTYAPI_SETUP_TOKEN", strings.Repeat("s", 32))
+	t.Setenv("FIFTYAPI_SETUP_TOKEN", strings.Repeat("s", 8))
 	got, err := masterKey(path, true)
 	if err != nil || !bytes.Equal(got, key) {
 		t.Fatal("explicit key ignored", err)
 	}
-	if token, err := initializationToken(path); err != nil || token != strings.Repeat("s", 32) {
+	if token, err := initializationToken(path); err != nil || token != strings.Repeat("s", 8) {
 		t.Fatal("explicit token ignored", err)
 	}
 	if _, err := os.Stat(filepath.Join(filepath.Dir(path), "master.key")); !os.IsNotExist(err) {
@@ -108,7 +108,7 @@ func TestExplicitSecretsTakePrecedenceAndValidate(t *testing.T) {
 	if _, err := masterKey(path, true); err == nil {
 		t.Fatal("accepted invalid explicit key")
 	}
-	t.Setenv("FIFTYAPI_SETUP_TOKEN", "fiftyapi")
+	t.Setenv("FIFTYAPI_SETUP_TOKEN", "short")
 	if _, err := initializationToken(path); err == nil {
 		t.Fatal("accepted short explicit token")
 	}

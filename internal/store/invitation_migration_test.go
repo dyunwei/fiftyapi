@@ -41,9 +41,9 @@ func TestEmailMigrationKeepsExistingLoginSessionsAndKeys(t *testing.T) {
 	if _, err = db.ExecContext(ctx, "INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES(?,1,'retained-csrf',?)", sessionHash[:], time.Now().Add(time.Hour).Unix()); err != nil {
 		t.Fatal(err)
 	}
-	token := "ztm_" + strings.Repeat("a", 43)
+	token := "fifty_" + strings.Repeat("a", 43)
 	keyHash := sha256.Sum256([]byte(token))
-	if _, err = db.ExecContext(ctx, "INSERT INTO api_keys(user_id,name,prefix,token_hash,created_at) VALUES(1,'legacy','ztm_legacy',?,?)", keyHash[:], time.Now().Unix()); err != nil {
+	if _, err = db.ExecContext(ctx, "INSERT INTO api_keys(user_id,name,prefix,token_hash,created_at) VALUES(1,'legacy','fifty_legacy',?,?)", keyHash[:], time.Now().Unix()); err != nil {
 		t.Fatal(err)
 	}
 	db.Close()

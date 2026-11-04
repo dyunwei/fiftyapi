@@ -40,39 +40,11 @@ func env(name, fallback string) string {
 	return fallback
 }
 
-// Keep an existing installation on its original database. Never create a fresh
-// FiftyAPI database beside legacy data and silently appear uninitialized.
 func databasePath() (string, error) {
 	if path := configenv.Value("FIFTYAPI_DB_PATH"); path != "" {
 		return path, nil
 	}
-	directory := env("FIFTYAPI_DATA_DIR", "data")
-	current, legacy := filepath.Join(directory, "fiftyapi.db"), filepath.Join(directory, "ztokenmgr.db")
-	exists := func(path string) (bool, error) {
-		_, err := os.Stat(path)
-		if err == nil {
-			return true, nil
-		}
-		if os.IsNotExist(err) {
-			return false, nil
-		}
-		return false, err
-	}
-	hasCurrent, err := exists(current)
-	if err != nil {
-		return "", err
-	}
-	hasLegacy, err := exists(legacy)
-	if err != nil {
-		return "", err
-	}
-	if hasCurrent && hasLegacy {
-		return "", errors.New("同时存在 FiftyAPI 与旧版数据库，请通过 FIFTYAPI_DB_PATH 明确选择；不会自动合并或新建")
-	}
-	if hasLegacy {
-		return legacy, nil
-	}
-	return current, nil
+	return filepath.Join(env("FIFTYAPI_DATA_DIR", "data"), "fiftyapi.db"), nil
 }
 func run() error {
 	command := "serve"

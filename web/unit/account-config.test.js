@@ -20,10 +20,10 @@ test('inference policy survives editing without mutating the saved configuration
  assert.deepEqual(saved.inference_policy,{max_effort:'medium',max_thinking_tokens:4096,force_standard:true})
  assert.deepEqual(result.inference_policy,{max_effort:'low',max_thinking_tokens:2048,force_standard:true})
 })
-test('legacy gateway preset displays the renamed brand without changing the source object',()=>{
- const original={gateway:{platform:'ztokenmgr',protocols:['messages']},gateway_headers:{},models_headers:{},antigravity_fallback_urls:[],max_concurrency:0,timeout_seconds:0}
+test('gateway preset preserves the brand without changing the source object',()=>{
+ const original={gateway:{platform:'fiftyapi',protocols:['messages']},gateway_headers:{},models_headers:{},antigravity_fallback_urls:[],max_concurrency:0,timeout_seconds:0}
  const form=toConfigForm(original)
- assert.equal(form.gateway.platform,'fiftyapi');assert.equal(original.gateway.platform,'ztokenmgr')
+ assert.equal(form.gateway.platform,'fiftyapi');assert.equal(original.gateway.platform,'fiftyapi')
  assert.equal(fromConfigForm(form).gateway.platform,'fiftyapi')
 })
 test('protocol form upgrades legacy mappings without mutating saved arrays',()=>{

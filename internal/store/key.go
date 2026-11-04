@@ -17,10 +17,9 @@ func (s *Store) CheckMasterKey(ctx context.Context, key []byte) error {
 	defer tx.Rollback()
 	var encrypted []byte
 	err = tx.QueryRowContext(ctx, "SELECT value FROM system_metadata WHERE key='master_key_check'").Scan(&encrypted)
-	// Persistent cryptographic identifiers predate the FiftyAPI rename. Changing
-	// either value would make existing master keys fail verification.
-	const binding = "ztokenmgr:master-key-check:v1"
-	const value = "ztokenmgr-key-verification"
+	// Bind the verification record to the FiftyAPI credential format.
+	const binding = "fiftyapi:master-key-check:v1"
+	const value = "fiftyapi-key-verification"
 	if errors.Is(err, sql.ErrNoRows) {
 		encrypted, err = credentials.Encrypt(key, binding, []byte(value))
 		if err != nil {

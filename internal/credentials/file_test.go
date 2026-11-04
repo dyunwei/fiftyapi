@@ -73,7 +73,7 @@ func TestInvalidExistingKeyNotOverwritten(t *testing.T) {
 func TestBadEnvelope(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "session")
 	key := make([]byte, 32)
-	for _, b := range [][]byte{nil, []byte("ZTM1"), bytes.Repeat([]byte("x"), maxSize+128)} {
+	for _, b := range [][]byte{nil, []byte("FTY1"), bytes.Repeat([]byte("x"), maxSize+128)} {
 		os.WriteFile(path, b, 0600)
 		if _, err := Load(path, key, "provider"); err == nil {
 			t.Fatal("accepted invalid envelope")

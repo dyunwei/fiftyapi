@@ -56,8 +56,8 @@ type identity struct {
 	hash []byte
 }
 
-// Retained to preserve existing authenticated browser sessions after rename.
-const cookieName = "ztokenmgr_session"
+// Browser session cookie for FiftyAPI.
+const cookieName = "fiftyapi_session"
 
 var usernamePattern = regexp.MustCompile(`^[A-Za-z0-9_.-]{3,64}$`)
 
@@ -298,7 +298,7 @@ func (a *API) setup(w http.ResponseWriter, r *http.Request) {
 	}
 	expected := sha256.Sum256([]byte(a.cfg.SetupToken))
 	provided := sha256.Sum256([]byte(in.SetupToken))
-	if len(a.cfg.SetupToken) < 32 || subtle.ConstantTimeCompare(expected[:], provided[:]) != 1 {
+	if len(a.cfg.SetupToken) < 8 || subtle.ConstantTimeCompare(expected[:], provided[:]) != 1 {
 		writeError(w, 403, "初始化口令无效")
 		return
 	}

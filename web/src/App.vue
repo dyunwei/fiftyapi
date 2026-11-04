@@ -110,7 +110,7 @@ const description=computed(()=>({overview:t('了解你的额度、使用情况�
 const usd=n=>new Intl.NumberFormat(locale.value,{style:'currency',currency:'USD',currencyDisplay:'narrowSymbol',maximumFractionDigits:6}).format((Number(n)||0)/1e6)
 const date=n=>n?new Date(n*1000).toLocaleString(locale.value,{hour12:false}):t('尚未开始')
 const providerLabel=p=>p?.startsWith('gateway/')?t('网关 #{0} · {1}',[p.split('/')[1],p.split('/')[2]]):({gateway:t('API Key 网关'),claude:'Claude',openai:'OpenAI',antigravity:'Antigravity'}[p]||p)
-const accountLabel=a=>a.provider==='gateway'?({sub2api:'Sub2Api',fiftyapi:'FiftyAPI',ztokenmgr:'FiftyAPI','new-api':'New API',custom:t('兼容网关')}[a.gateway_platform]||t('API Key 网关')):providerLabel(a.provider)
+const accountLabel=a=>a.provider==='gateway'?({sub2api:'Sub2Api',fiftyapi:'FiftyAPI','new-api':'New API',custom:t('兼容网关')}[a.gateway_platform]||t('API Key 网关')):providerLabel(a.provider)
 const stateLabel=s=>({authorized:t('已授权'),catalog_ready:t('目录就绪'),ready:t('可用'),project_pending:t('项目待补全'),reauth_required:t('需重新授权'),error:t('需要检查')}[s]||s)
 const percent=w=>w.limit>0?Math.min(100,((w.used+w.reserved)/w.limit)*100):0
 let toastTimer

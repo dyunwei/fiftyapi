@@ -16,17 +16,16 @@ import uuid
 
 name='fiftyapi-smoke-'+uuid.uuid4().hex[:12]
 volume=name+'-data'
-image=os.environ.get('FIFTYAPI_TEST_IMAGE',os.environ.get('ZTOKENMGR_TEST_IMAGE','fiftyapi:local'))
-legacy=os.environ.get('FIFTYAPI_TEST_LEGACY_ENV')=='1'
+image=os.environ.get('FIFTYAPI_TEST_IMAGE','fiftyapi:local')
 automatic=os.environ.get('FIFTYAPI_TEST_AUTO_SECRETS')=='1'
-prefix='ZTOKENMGR_' if legacy else 'FIFTYAPI_'
+prefix='FIFTYAPI_'
 def docker(*args):
     return subprocess.check_output(['docker',*args],text=True,stderr=subprocess.PIPE).strip()
 with tempfile.TemporaryDirectory(prefix='fiftyapi-docker-') as directory:
     env=Path(directory)/'runtime.env'
     setup=secrets.token_hex(32)
     password=secrets.token_hex(16)
-    env.write_text(prefix+'MASTER_KEY='+base64.b64encode(secrets.token_bytes(32)).decode()+'\n'+prefix+'SETUP_TOKEN='+setup+'\n'+(prefix+'DB_PATH=/data/ztokenmgr.db\n'+prefix+'LISTEN=0.0.0.0:8080\n' if legacy else ''))
+    env.write_text(prefix+'MASTER_KEY='+base64.b64encode(secrets.token_bytes(32)).decode()+'\n'+prefix+'SETUP_TOKEN='+setup+'\n')
     if automatic:env.write_text('FIFTYAPI_MASTER_KEY=\nFIFTYAPI_SETUP_TOKEN=\n')
     env.chmod(0o600)
     try:
@@ -115,8 +114,8 @@ with tempfile.TemporaryDirectory(prefix='fiftyapi-docker-') as directory:
         assert docker('inspect','--format','{{.HostConfig.ReadonlyRootfs}}',name)=='true'
         docker('exec',name,'test','-f','/app/licenses/index.json')
         docker('exec',name,'test','-w','/data')
-        docker('exec',name,'test','-f','/data/'+('ztokenmgr.db' if legacy else 'fiftyapi.db'))
-        print(('Automatic persisted secrets: ' if automatic else 'Legacy aliases: ' if legacy else 'FiftyAPI variables: ')+'Docker smoke passed: embedded UI, setup, persisted restart, login, UID 10001, read-only root, writable data and dependency notices, encrypted email settings, account import/routing persistence/deletion, stale connection save preserves scheduling, authenticated WebSocket routes/Origin isolation and paginated logs. Temporary resources removed.')
+        docker('exec',name,'test','-f','/data/fiftyapi.db')
+        print(('Automatic persisted secrets: ' if automatic else 'FiftyAPI variables: ')+'Docker smoke passed: embedded UI, setup, persisted restart, login, UID 10001, read-only root, writable data and dependency notices, encrypted email settings, account import/routing persistence/deletion, stale connection save preserves scheduling, authenticated WebSocket routes/Origin isolation and paginated logs. Temporary resources removed.')
     finally:
         for args in [('rm','-f',name),('volume','rm',volume)]:
             subprocess.run(['docker',*args],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)

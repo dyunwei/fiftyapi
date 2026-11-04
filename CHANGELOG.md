@@ -5,8 +5,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 English | 中文说明见各版本下方折叠区域
 
-## [Unreleased]
-
 ## [0.1.0] - 2026-11-04
 
 First public preview.

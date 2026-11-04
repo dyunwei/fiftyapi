@@ -12,8 +12,8 @@ import (
 	"strings"
 )
 
-// Wire identifier retained so mixed-version relays share the same loop guard.
-const RelayChainHeader = "X-Ztokenmgr-Relay-Chain"
+// RelayChainHeader carries the visited instances for relay loop detection.
+const RelayChainHeader = "X-FiftyAPI-Relay-Chain"
 const RelayHopLimit = 4
 
 type GatewayModel = modelref.Mapping
@@ -72,7 +72,7 @@ func (c Config) ValidateGateway() error {
 		return errors.New("缺少 API Key 网关配置")
 	}
 	switch g.Platform {
-	case "sub2api", "fiftyapi", "ztokenmgr", "new-api", "custom":
+	case "sub2api", "fiftyapi", "new-api", "custom":
 	default:
 		return errors.New("网关平台无效")
 	}
@@ -137,7 +137,7 @@ func ValidateGatewayHeaders(headers map[string]string) error {
 			return errors.New("请求头格式无效")
 		}
 		switch strings.ToLower(k) {
-		case "authorization", "cookie", "x-api-key", "proxy-authorization", "host", "connection", "content-length", "transfer-encoding", "x-ztokenmgr-relay-chain":
+		case "authorization", "cookie", "x-api-key", "proxy-authorization", "host", "connection", "content-length", "transfer-encoding", "x-fiftyapi-relay-chain":
 			return errors.New("请求头不能覆盖认证、连接或循环保护字段")
 		}
 	}

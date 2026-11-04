@@ -19,7 +19,7 @@ func Encrypt(key []byte, binding string, plain []byte) ([]byte, error) {
 	if _, err = rand.Read(nonce); err != nil {
 		return nil, err
 	}
-	data := append([]byte("ZTM1"), nonce...)
+	data := append([]byte("FTY1"), nonce...)
 	return gcm.Seal(data, nonce, plain, []byte(binding)), nil
 }
 func Decrypt(key []byte, binding string, data []byte) ([]byte, error) {
@@ -27,7 +27,7 @@ func Decrypt(key []byte, binding string, data []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(data) > maxSize+64 || len(data) < 4+gcm.NonceSize()+gcm.Overhead() || string(data[:4]) != "ZTM1" {
+	if len(data) > maxSize+64 || len(data) < 4+gcm.NonceSize()+gcm.Overhead() || string(data[:4]) != "FTY1" {
 		return nil, errors.New("凭据格式错误")
 	}
 	nonce := data[4 : 4+gcm.NonceSize()]
