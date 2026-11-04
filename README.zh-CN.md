@@ -25,10 +25,10 @@
 
 ## 功能
 
-| | |
+| 功能 | 说明 |
 | --- | --- |
 | 🔑 **上游账号** | Claude Code、OpenAI Codex、Antigravity OAuth 授权、令牌刷新、模型目录同步 |
-| 🔌 **API 网关** | 接入 Sub2Api、New API、其他 FiftyAPI 及兼容上游，支持模型别名 |
+| 🔌 **API&nbsp;网关** | 接入 Sub2Api、New API、其他 FiftyAPI 及兼容上游，支持模型别名 |
 | 🧭 **原生协议** | Chat Completions、Messages、Responses（HTTP / SSE / WebSocket） |
 | 💰 **美元额度** | 每人 5 小时与 7 天窗口，所有 Key 和供应商共享 |
 | ⚖️ **调度** | 优先级、权重、并发上限、健康检查、冷却与安全重试 |
@@ -40,8 +40,13 @@
 ## 快速开始
 
 ```sh
-docker run -d --name fiftyapi --restart unless-stopped --stop-timeout 60 \
-  -p 28080:8080 -v fiftyapi-data:/data dyunwei/fiftyapi
+docker run -d \
+  --name fiftyapi \
+  --restart unless-stopped \
+  --stop-timeout 60 \
+  -p 28080:8080 \
+  -v fiftyapi-data:/data \
+  dyunwei/fiftyapi
 ```
 
 1. 打开 http://localhost:28080（其他机器访问用 `http://服务器IP:28080`）。

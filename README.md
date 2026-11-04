@@ -25,14 +25,14 @@ English | [简体中文](README.zh-CN.md)
 
 ## Features
 
-| | |
+| Feature | Description |
 | --- | --- |
-| 🔑 **Upstream accounts** | Claude Code, OpenAI Codex and Antigravity OAuth: authorize, refresh and sync model catalogs |
-| 🔌 **API gateways** | Connect Sub2Api, New API, another FiftyAPI or compatible upstreams, with model aliases |
-| 🧭 **Native protocols** | Chat Completions, Messages, Responses (HTTP / SSE / WebSocket) |
-| 💰 **Dollar budgets** | Per-user 5-hour and 7-day windows shared across all keys and providers |
+| 🔑 **Upstream&nbsp;accounts** | Claude Code, OpenAI Codex and Antigravity OAuth: authorize, refresh and sync model catalogs |
+| 🔌 **API&nbsp;gateways** | Connect Sub2Api, New API, another FiftyAPI or compatible upstreams, with model aliases |
+| 🧭 **Native&nbsp;protocols** | Chat Completions, Messages, Responses (HTTP / SSE / WebSocket) |
+| 💰 **Dollar&nbsp;budgets** | Per-user 5-hour and 7-day windows shared across all keys and providers |
 | ⚖️ **Scheduling** | Priority, weights, concurrency limits, health checks, cooldown and safe retries |
-| 📊 **Logs & settlement** | Personal request logs, model pricing, automatic settlement and audit trail |
+| 📊 **Logs&nbsp;&&nbsp;settlement** | Personal request logs, model pricing, automatic settlement and audit trail |
 | 👥 **Members** | Admin setup on first visit, self-registration, email invitations, account contribution links |
 | 🌐 **UI** | English / 简体中文, mobile friendly |
 | 💾 **Backups** | Local backups plus S3 / Cloudflare R2 |
@@ -40,8 +40,13 @@ English | [简体中文](README.zh-CN.md)
 ## Quick Start
 
 ```sh
-docker run -d --name fiftyapi --restart unless-stopped --stop-timeout 60 \
-  -p 28080:8080 -v fiftyapi-data:/data dyunwei/fiftyapi
+docker run -d \
+  --name fiftyapi \
+  --restart unless-stopped \
+  --stop-timeout 60 \
+  -p 28080:8080 \
+  -v fiftyapi-data:/data \
+  dyunwei/fiftyapi
 ```
 
 1. Open http://localhost:28080 (or `http://SERVER_IP:28080`).
