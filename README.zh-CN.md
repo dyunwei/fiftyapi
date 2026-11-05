@@ -41,12 +41,14 @@
 ## 快速开始
 
 ```sh
+mkdir -p data
 docker run -d \
   --name fiftyapi \
   --restart unless-stopped \
   --stop-timeout 60 \
   -p 28080:8080 \
-  -v fiftyapi-data:/data \
+  -e TZ=Asia/Shanghai \
+  -v "$(pwd)/data:/data" \
   dyunwei/fiftyapi
 ```
 
@@ -58,7 +60,7 @@ docker run -d \
 3. 添加上游账号 → 验证并同步模型 → 核对价格 → 给成员分配额度 → 成员创建 API Key。
 
 > [!IMPORTANT]
-> 主密钥自动生成并保存在 `fiftyapi-data` 数据卷中。请保留数据卷，并单独备份 `/data/master.key`：数据库备份不包含主密钥，丢失后已加密的凭据无法恢复。
+> 主密钥自动生成并保存在宿主机 `./data` 目录中。请保留该目录，并单独备份 `/data/master.key`：数据库备份不包含主密钥，丢失后已加密的凭据无法恢复。
 
 Compose、HTTPS、升级与恢复见 [部署说明](docs/deployment.md)。
 

@@ -41,12 +41,14 @@ English | [简体中文](README.zh-CN.md)
 ## Quick Start
 
 ```sh
+mkdir -p data
 docker run -d \
   --name fiftyapi \
   --restart unless-stopped \
   --stop-timeout 60 \
   -p 28080:8080 \
-  -v fiftyapi-data:/data \
+  -e TZ=Asia/Shanghai \
+  -v "$(pwd)/data:/data" \
   dyunwei/fiftyapi
 ```
 
@@ -58,7 +60,7 @@ docker run -d \
 3. Add upstream accounts → verify and sync models → confirm prices → allocate member budgets → members create API keys.
 
 > [!IMPORTANT]
-> The master key is generated automatically and stored in the `fiftyapi-data` volume. Keep the volume and back up `/data/master.key` separately – database backups do not include it, and encrypted credentials cannot be recovered without it.
+> The master key is generated automatically and stored in the host `./data` directory. Keep this directory and back up `/data/master.key` separately – database backups do not include it, and encrypted credentials cannot be recovered without it.
 
 Compose, HTTPS, upgrades and restore: see the [deployment guide](docs/en/deployment.md).
 

@@ -68,5 +68,5 @@ jobs:
         run: docker build --build-arg BUILD_COMMIT="$GITHUB_SHA" -t fiftyapi:local .
       - name: Disposable container smoke
         run: python3 scripts/docker-smoke.py
-      - name: Automatic secrets and container recreation
-        run: FIFTYAPI_TEST_AUTO_SECRETS=1 python3 scripts/docker-smoke.py
+      - name: Bind mount permissions, automatic secrets and container recreation
+        run: FIFTYAPI_TEST_AUTO_SECRETS=1 FIFTYAPI_TEST_BIND_MOUNT=1 python3 scripts/docker-smoke.py

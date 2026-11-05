@@ -22,13 +22,12 @@ RUN CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags="-s -w -X fiftyapi
 RUN python3 scripts/dependency-notices.py
 
 FROM alpine:3.22
-RUN apk add --no-cache ca-certificates tzdata && addgroup -g 10001 app && adduser -D -u 10001 -G app app && mkdir -p /data /app && chown app:app /data /app
+RUN apk add --no-cache ca-certificates tzdata su-exec && addgroup -g 10001 app && adduser -D -u 10001 -G app app && mkdir -p /data /app && chown app:app /data /app
 WORKDIR /app
 COPY --from=build /out/fiftyapi /app/fiftyapi
 COPY --from=build /src/dist/licenses /app/licenses
 COPY LICENSE COPYING.GPL-3 THIRD_PARTY_NOTICES.md /app/
 COPY --chmod=755 scripts/container-entrypoint.sh /app/entrypoint.sh
-USER app
 ENV FIFTYAPI_DATA_DIR=/data
 EXPOSE 8080
 VOLUME ["/data"]

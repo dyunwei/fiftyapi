@@ -15,7 +15,7 @@ go build -buildvcs=false -o bin/fiftyapi ./cmd/fiftyapi
 
 Use `./scripts/build-release.sh` to create a release package (requires Node 24+). It builds with `CGO_ENABLED=0` and defaults to `GOAMD64=v1` so distribution toolchains defaulting to v2 do not raise the x86-64 CPU requirements. Override `GOAMD64` explicitly when needed; ordinary `go build` keeps the system defaults. Rebuild binaries after upgrading Go to use the new runtime and standard library.
 
-On Rocky Linux with SELinux enabled, keep the default Compose named volume, or use `./data:/data:Z` for a dedicated bind-mounted data directory and grant container UID/GID 10001 write access. Loopback-only deployments need no external port opened; configure firewalld for the actual public entry point when exposing the service.
+On Rocky Linux with SELinux enabled, keep the default Compose named volume, or use `./data:/data:Z` for a dedicated bind-mounted data directory. The entrypoint prepares data directory ownership automatically before running the service as UID/GID 10001 (an explicit non-root `--user` must already have write access). Loopback-only deployments need no external port opened; configure firewalld for the actual public entry point when exposing the service.
 
 The local helper saves its master key and setup token under `.local/` and reuses them. For explicit configuration or a downloaded package, follow the [release quickstart](release-quickstart.md).
 

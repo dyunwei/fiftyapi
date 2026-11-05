@@ -18,6 +18,7 @@ name='fiftyapi-smoke-'+uuid.uuid4().hex[:12]
 volume=name+'-data'
 image=os.environ.get('FIFTYAPI_TEST_IMAGE','fiftyapi:local')
 automatic=os.environ.get('FIFTYAPI_TEST_AUTO_SECRETS')=='1'
+bind_mount=os.environ.get('FIFTYAPI_TEST_BIND_MOUNT')=='1'
 prefix='FIFTYAPI_'
 def docker(*args):
     return subprocess.check_output(['docker',*args],text=True,stderr=subprocess.PIPE).strip()
@@ -28,9 +29,16 @@ with tempfile.TemporaryDirectory(prefix='fiftyapi-docker-') as directory:
     env.write_text(prefix+'MASTER_KEY='+base64.b64encode(secrets.token_bytes(32)).decode()+'\n'+prefix+'SETUP_TOKEN='+setup+'\n')
     if automatic:env.write_text('FIFTYAPI_MASTER_KEY=\nFIFTYAPI_SETUP_TOKEN=\n')
     env.chmod(0o600)
+    mount=volume+':/data'
     try:
         docker('volume','create',volume)
-        docker('run','-d','--name',name,'--read-only','--tmpfs','/tmp:rw,noexec,nosuid,size=32m','--security-opt','no-new-privileges:true','--env-file',str(env),'-v',volume+':/data','-p','127.0.0.1::8080',image)
+        if bind_mount:
+            data=Path(directory)/'data'
+            data.mkdir(mode=0o755)
+            # Reproduce a private file left by an earlier root-run container.
+            docker('run','--rm','--user','0:0','--entrypoint','sh','-v',str(data)+':/data',image,'-c','touch /data/ownership-fixture; chmod 600 /data/ownership-fixture')
+            mount=str(data)+':/data'
+        docker('run','-d','--name',name,'--read-only','--tmpfs','/tmp:rw,noexec,nosuid,size=32m','--security-opt','no-new-privileges:true','--env-file',str(env),'-v',mount,'-p','127.0.0.1::8080',image)
         port=docker('port',name,'8080/tcp').rsplit(':',1)[1]
         origin='http://127.0.0.1:'+port
         client=urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
@@ -81,7 +89,7 @@ with tempfile.TemporaryDirectory(prefix='fiftyapi-docker-') as directory:
         if automatic:
             docker('stop','--time','60',name)
             docker('rm',name)
-            docker('run','-d','--name',name,'--read-only','--tmpfs','/tmp:rw,noexec,nosuid,size=32m','--security-opt','no-new-privileges:true','--env-file',str(env),'-v',volume+':/data','-p','127.0.0.1::8080',image)
+            docker('run','-d','--name',name,'--read-only','--tmpfs','/tmp:rw,noexec,nosuid,size=32m','--security-opt','no-new-privileges:true','--env-file',str(env),'-v',mount,'-p','127.0.0.1::8080',image)
         else:docker('restart',name)
         origin='http://127.0.0.1:'+docker('port',name,'8080/tcp').rsplit(':',1)[1]
         for attempt in range(100):
@@ -111,12 +119,18 @@ with tempfile.TemporaryDirectory(prefix='fiftyapi-docker-') as directory:
         logs=json.load(request('/api/admin/logs?page=1&page_size=20'))
         assert logs['items']==[] and logs['total']==0
 
-        assert docker('exec',name,'id','-u')=='10001'
+        if bind_mount:
+            assert docker('exec','--user','10001:10001',name,'stat','-c','%u:%g:%a','/data/ownership-fixture')=='10001:10001:600'
+        status=docker('exec',name,'cat','/proc/1/status')
+        assert next(line.split()[1:] for line in status.splitlines() if line.startswith('Uid:'))==['10001']*4
+        assert next(line.split()[1:] for line in status.splitlines() if line.startswith('Gid:'))==['10001']*4
         assert docker('inspect','--format','{{.HostConfig.ReadonlyRootfs}}',name)=='true'
         docker('exec',name,'test','-f','/app/licenses/index.json')
-        docker('exec',name,'test','-w','/data')
+        docker('exec','--user','10001:10001',name,'test','-w','/data')
         docker('exec',name,'test','-f','/data/fiftyapi.db')
         print(('Automatic persisted secrets: ' if automatic else 'FiftyAPI variables: ')+'Docker smoke passed: embedded UI, setup, persisted restart, login, UID 10001, read-only root, writable data and dependency notices, encrypted email settings, account import/routing persistence/deletion, stale connection save preserves scheduling, authenticated WebSocket routes/Origin isolation and paginated logs. Temporary resources removed.')
     finally:
-        for args in [('rm','-f',name),('volume','rm',volume)]:
-            subprocess.run(['docker',*args],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        subprocess.run(['docker','rm','-f',name],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        if bind_mount:
+            subprocess.run(['docker','run','--rm','--user','0:0','--entrypoint','sh','-v',mount,image,'-c','find /data -mindepth 1 -delete'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        subprocess.run(['docker','volume','rm',volume],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)

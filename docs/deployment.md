@@ -13,7 +13,7 @@ go build -buildvcs=false -o bin/fiftyapi ./cmd/fiftyapi
 
 制作发布包使用 `./scripts/build-release.sh`（需要 Node 24+），生成 `CGO_ENABLED=0` 二进制。发布脚本默认 `GOAMD64=v1`，避免发行版工具链的 v2 默认值提高 x86-64 CPU 要求；可以通过环境变量显式覆盖。普通 `go build` 仍使用系统工具链默认值。升级 Go 后需要重新构建二进制才能使用新的运行时和标准库。
 
-Rocky Linux 启用 SELinux 时，Compose 默认 named volume 可继续使用；若改用专属数据目录的 bind mount，使用 `./data:/data:Z`，并确保容器 UID/GID 10001 可写。默认仅监听回环地址的部署无需开放外部端口；对外提供服务时按实际入口配置 firewalld。
+Rocky Linux 启用 SELinux 时，Compose 默认 named volume 可继续使用；若改用专属数据目录的 bind mount，使用 `./data:/data:Z`，入口脚本会自动准备目录权限，再以 UID/GID 10001 运行服务。默认仅监听回环地址的部署无需开放外部端口；对外提供服务时按实际入口配置 firewalld。
 
 本机脚本在 `.local/` 首次创建主密钥和部署口令，以后复用。读取 `.local/setup-token` 填入网页初始化表单，设置管理员用户名和密码；随后正常登录。登录页提供注册入口，邮箱、真实姓名和密码必填；新用户两种额度均为 0，由管理员分配。不要重新生成旧数据库的主密钥。
 
@@ -38,7 +38,7 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-`.env` 中两个密钥可留空，程序会在数据卷中自动生成 `/data/master.key` 和 `/data/setup-token`（权限 0600），重启、重建容器时复用。读取初始化口令：`docker compose exec fiftyapi cat /data/setup-token`。不要把两个值统一设为 `fiftyapi`；显式配置的环境变量优先，仍需满足长度和格式要求。依赖网络受限时可设置 `GOPROXY=https://goproxy.cn,direct` 再构建。Compose 默认只绑定 `127.0.0.1:8080`；数据存于 named volume `data`。镜像 UID/GID 为 10001，根目录只读；若改用 bind mount，需要让 10001 对数据目录可写。
+`.env` 中两个密钥可留空，程序会在数据卷中自动生成 `/data/master.key` 和 `/data/setup-token`（权限 0600），重启、重建容器时复用。读取初始化口令：`docker compose exec fiftyapi cat /data/setup-token`。不要把两个值统一设为 `fiftyapi`；显式配置的环境变量优先，仍需满足长度和格式要求。依赖网络受限时可设置 `GOPROXY=https://goproxy.cn,direct` 再构建。Compose 默认只绑定 `127.0.0.1:8080`；数据存于 named volume `data`。入口脚本以 root 准备数据目录权限后，切换到 UID/GID 10001 运行服务；Compose 根目录只读。bind mount 同样会自动处理数据目录及已有文件的归属；显式指定非 root `--user` 时需自行保证目录可写。
 
 首次访问、OAuth 和模型启用流程与二进制一致。`GET /healthz` 检查数据库连接；Docker 配置了健康检查。升级前先备份；新版本启动自动迁移，拒绝比程序更新的数据库 schema。
 
