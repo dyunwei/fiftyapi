@@ -459,7 +459,7 @@
   "；保留上次快照": "; previous snapshot retained",
   "更新于 ": "Updated at ",
   "尚无额度快照": "No quota snapshot yet",
-  "本页每 5 分钟自动查询": "Automatically queried every 5 minutes on this page",
+  "本页每 10 秒错峰查询一个账号，同一账号至少间隔 5 分钟": "Queries one account every 10 seconds, at least 5 minutes apart per account",
   "额度随上游请求返回时更新": "Updated when upstream requests report quota",
   "调度与健康": "Scheduling & health",
   "查看模型": "View models",

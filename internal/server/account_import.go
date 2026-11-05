@@ -109,13 +109,13 @@ func (a *API) queryAccountQuota(w http.ResponseWriter, r *http.Request, id ident
 		writeError(w, 400, err.Error())
 		return
 	}
-	if !a.allowAttempt(r, "account-quota", 10) {
+	if !a.allowAttempt(r, "account-quota", 60) {
 		writeError(w, 429, "查询过于频繁，请稍后重试")
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()
-	result, err := a.accounts.QueryOpenAIQuota(ctx, target)
+	result, err := a.accounts.CachedQuota(ctx, target)
 	if err != nil {
 		writeError(w, 502, err.Error())
 		return

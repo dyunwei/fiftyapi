@@ -29,6 +29,7 @@ type Service struct {
 	locks          sync.Map
 	oauthMu        sync.Mutex
 	oauth          map[string]*oauthPending
+	quotaQueries   sync.Map
 	checked        sync.Map
 	policyChecked  sync.Map
 	refreshMu      sync.Mutex

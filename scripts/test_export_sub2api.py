@@ -31,13 +31,18 @@ class ExportTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             target = Path(folder) / 'migration.json'
             completed = type('Process', (), {'stdout': json.dumps({k: [] for k in exporter.FIELDS}).encode()})()
-            with patch('sys.argv', ['export-sub2api.py', '--source', 'site', '--output', str(target)]), patch.object(exporter.subprocess, 'run', return_value=completed) as run:
+            with patch('sys.argv', ['export-sub2api.py', '--source', 'site', '--output', str(target)]), patch.object(exporter.subprocess, 'run', return_value=completed) as run, redirect_stdout(StringIO()):
                 self.assertEqual(exporter.main(), 0)
                 self.assertEqual(stat.S_IMODE(os.stat(target).st_mode), 0o600)
                 sql = run.call_args.args[0][-1]
                 self.assertIn('REPEATABLE READ READ ONLY', sql)
-                with self.assertRaises(SystemExit):
+                original = target.read_bytes()
+                errors = StringIO()
+                with redirect_stderr(errors), self.assertRaises(SystemExit) as raised:
                     exporter.main()
+                self.assertEqual(raised.exception.code, 2)
+                self.assertIn('output already exists; choose a new path', errors.getvalue())
+                self.assertEqual(target.read_bytes(), original)
                 self.assertEqual(run.call_count, 1)
 
 

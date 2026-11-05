@@ -13,6 +13,39 @@ import (
 	"time"
 )
 
+// CachedQuota serializes queries per account across browser tabs and reuses
+// successful snapshots for five minutes. Failures back off for one minute.
+func (s *Service) CachedQuota(ctx context.Context, id int64) (store.AccountHealth, error) {
+	value, _ := s.quotaQueries.LoadOrStore(id, &quotaQuery{gate: make(chan struct{}, 1)})
+	q := value.(*quotaQuery)
+	select {
+	case q.gate <- struct{}{}:
+	case <-ctx.Done():
+		return store.AccountHealth{}, ctx.Err()
+	}
+	defer func() { <-q.gate }()
+	if time.Now().Before(q.next) {
+		if q.err != nil {
+			return store.AccountHealth{}, q.err
+		}
+		return s.store.AccountHealth(ctx, id)
+	}
+	health, err := s.QueryOpenAIQuota(ctx, id)
+	q.err = err
+	delay := 5 * time.Minute
+	if err != nil {
+		delay = time.Minute
+	}
+	q.next = time.Now().Add(delay)
+	return health, err
+}
+
+type quotaQuery struct {
+	gate chan struct{}
+	next time.Time
+	err  error
+}
+
 func (s *Service) QueryOpenAIQuota(ctx context.Context, id int64) (health store.AccountHealth, outcome error) {
 	defer s.runtimeOutcome(ctx, id, "quota_query", "上游额度查询", time.Now(), &outcome)
 	c, err := s.Access(ctx, id)

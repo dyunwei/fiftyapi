@@ -131,9 +131,11 @@ func TestAuthImportIgnoresEndpointsAndPreservesWorkspace(t *testing.T) {
 	}
 }
 func TestQuotaQueryValidatesAndPreservesPriorSnapshot(t *testing.T) {
+	var requests atomic.Int32
 	var body atomic.Value
 	body.Store(`{"rate_limit":{"primary_window":{"used_percent":100,"reset_after_seconds":60},"secondary_window":null}}`)
 	upstream := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
 		if r.URL.Path != "/backend-api/wham/usage" || r.Header.Get("chatgpt-account-id") != "fixture-workspace" {
 			t.Error("quota identity/path incorrect")
 		}
@@ -157,9 +159,35 @@ func TestQuotaQueryValidatesAndPreservesPriorSnapshot(t *testing.T) {
 	if e != nil || health.PrimaryUsed == nil || *health.PrimaryUsed != 100 || health.PrimaryReset == nil || len(health.Cooldowns) != 1 {
 		t.Fatal("authoritative quota was not persisted")
 	}
+	// Concurrent page queries share a single upstream request.
+	var wg sync.WaitGroup
+	before := requests.Load()
+	for range 8 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if _, err := service.CachedQuota(ctx, id); err != nil {
+				t.Error(err)
+			}
+		}()
+	}
+	wg.Wait()
+	if requests.Load() != before+1 {
+		t.Fatal("duplicate quota requests were not merged")
+	}
 	body.Store(`{"rate_limit":{"primary_window":{"used_percent":-10}}}`)
 	if _, e = service.QueryOpenAIQuota(ctx, id); e == nil {
 		t.Fatal("invalid quota accepted")
+	}
+	service.quotaQueries.Delete(id)
+	before = requests.Load()
+	for range 2 {
+		if _, err := service.CachedQuota(ctx, id); err == nil {
+			t.Fatal("invalid quota should fail")
+		}
+	}
+	if requests.Load() != before+1 {
+		t.Fatal("failed quota queries did not back off")
 	}
 	health, _ = s.AccountHealth(ctx, id)
 	if health.PrimaryUsed == nil || *health.PrimaryUsed != 100 {

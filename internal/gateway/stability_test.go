@@ -7,7 +7,9 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -153,6 +155,21 @@ func TestAntigravityClientCancellationReleasesSlot(t *testing.T) {
 }
 
 func TestAntigravityConcurrentGatewayLoad(t *testing.T) {
+	// Optional capacity runs retain the same accounting correctness checks.
+	param := func(name string, fallback int) int {
+		t.Helper()
+		if raw := os.Getenv(name); raw != "" {
+			n, err := strconv.Atoi(raw)
+			if err != nil || n < 1 || n > 100 {
+				t.Fatalf("invalid %s", name)
+			}
+			return n
+		}
+		return fallback
+	}
+	clients := param("FIFTYAPI_LOAD_CLIENTS", 50)
+	turns := param("FIFTYAPI_LOAD_TURNS", 4)
+	capacity := param("FIFTYAPI_LOAD_CAPACITY", 8)
 	var calls, active, peak atomic.Int64
 	upstream := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
@@ -173,14 +190,13 @@ func TestAntigravityConcurrentGatewayLoad(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	policy.Concurrency = 8
+	policy.Concurrency = capacity
 	if err = g.s.SetAccountPolicy(context.Background(), g.user, g.account, policy); err != nil {
 		t.Fatal(err)
 	}
 	if err = g.s.AccountState(context.Background(), g.account, "catalog_ready", ""); err != nil {
 		t.Fatal(err)
 	}
-	const clients = 50
 	users := make([]int64, clients)
 	tokens := make([]string, clients)
 	for i := 0; i < clients; i++ {
@@ -195,13 +211,14 @@ func TestAntigravityConcurrentGatewayLoad(t *testing.T) {
 	}
 	var wg sync.WaitGroup
 	var success, rejected, unexpected atomic.Int64
-	timings := make(chan time.Duration, clients*4)
+	timings := make(chan time.Duration, clients*turns)
+	statsBefore := g.s.DB.Stats()
 	start := time.Now()
 	for client := 0; client < clients; client++ {
 		wg.Add(1)
 		go func(index int) {
 			defer wg.Done()
-			for turn := 0; turn < 4; turn++ {
+			for turn := 0; turn < turns; turn++ {
 				request := httptest.NewRequest("POST", "/v1/messages", strings.NewReader(agRequest))
 				request.Header.Set("Authorization", "Bearer "+tokens[index])
 				request.Header.Set("session_id", fmt.Sprintf("load-%d", index))
@@ -221,14 +238,16 @@ func TestAntigravityConcurrentGatewayLoad(t *testing.T) {
 		}(client)
 	}
 	wg.Wait()
+	elapsed := time.Since(start)
+	statsAfter := g.s.DB.Stats()
 	close(timings)
-	if unexpected.Load() != 0 || success.Load() == 0 || calls.Load() != success.Load() || peak.Load() > 8 {
+	if unexpected.Load() != 0 || success.Load() == 0 || calls.Load() != success.Load() || peak.Load() > int64(capacity) {
 		t.Fatalf("bad concurrent result: successes=%d rejected=%d unexpected=%d calls=%d peak=%d", success.Load(), rejected.Load(), unexpected.Load(), calls.Load(), peak.Load())
 	}
 	var reconciled int64
 	for _, user := range users {
 		logs, e := g.s.Logs(context.Background(), user, false, 0, "", 0)
-		if e != nil || len(logs) != 4 {
+		if e != nil || len(logs) != turns {
 			t.Fatal("per-user request isolation failed")
 		}
 		var amount int64
@@ -253,7 +272,7 @@ func TestAntigravityConcurrentGatewayLoad(t *testing.T) {
 		t.Fatal("total and per-user amount mismatch")
 	}
 	var count int
-	if err = g.s.DB.QueryRow("SELECT count(*) FROM request_logs").Scan(&count); err != nil || count != clients*4 {
+	if err = g.s.DB.QueryRow("SELECT count(*) FROM request_logs").Scan(&count); err != nil || count != clients*turns {
 		t.Fatal("concurrent log count mismatch")
 	}
 	pending, err := g.s.PendingCharges(context.Background())
@@ -265,5 +284,6 @@ func TestAntigravityConcurrentGatewayLoad(t *testing.T) {
 		durations = append(durations, d)
 	}
 	sort.Slice(durations, func(i, j int) bool { return durations[i] < durations[j] })
-	t.Logf("mock load: clients=%d requests=%d success=%d capacity_503=%d peak_upstream=%d elapsed=%s p95=%s; both quota windows/logs reconciled", clients, count, success.Load(), rejected.Load(), peak.Load(), time.Since(start).Round(time.Millisecond), durations[len(durations)*95/100].Round(time.Millisecond))
+	t.Logf("throughput=%.1f req/s p50=%s p99=%s db_waits=%d db_wait_total=%s", float64(count)/elapsed.Seconds(), durations[len(durations)*50/100].Round(time.Millisecond), durations[len(durations)*99/100].Round(time.Millisecond), statsAfter.WaitCount-statsBefore.WaitCount, (statsAfter.WaitDuration - statsBefore.WaitDuration).Round(time.Millisecond))
+	t.Logf("mock load: clients=%d requests=%d success=%d capacity_503=%d peak_upstream=%d elapsed=%s p95=%s; both quota windows/logs reconciled", clients, count, success.Load(), rejected.Load(), peak.Load(), elapsed.Round(time.Millisecond), durations[len(durations)*95/100].Round(time.Millisecond))
 }

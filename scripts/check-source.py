@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 import re
+import subprocess
 
 root=Path(__file__).resolve().parents[1]
 excluded={'.git','.local','data','bin','dist','node_modules','__pycache__','.aws','.agents','.codex','test-results','playwright-report'}
@@ -14,8 +15,15 @@ patterns={
  'gateway-key':rb'sk-[A-Za-z0-9_-]{43}',
 }
 errors=[]
-for file in root.rglob('*'):
- if not file.is_file() or file.is_symlink() or any(p in excluded for p in file.relative_to(root).parts):continue
+files=[file for file in root.rglob('*') if file.is_file() and not file.is_symlink() and not any(p in excluded for p in file.relative_to(root).parts)]
+# Respect local ignore rules without excluding tracked files, even when a
+# tracked credential file also matches .gitignore. Never read ignored contents.
+result=subprocess.run(['git','check-ignore','--stdin','-z'],cwd=root,
+ input=b''.join(str(file.relative_to(root)).encode() + b'\0' for file in files),capture_output=True)
+if result.returncode not in (0,1):raise SystemExit('Cannot determine Git ignore rules; source checks stopped.')
+ignored=set(result.stdout.split(b'\0'))
+for file in files:
+ if str(file.relative_to(root)).encode() in ignored:continue
  if file.name in {'.env','setup-token'} or file.suffix in {'.db','.session','.key'}:errors.append(f'Runtime file outside ignored directories: {file.relative_to(root)}');continue
  if file.suffix in {'.png','.jpg','.sum'}:continue
  for label,pattern in patterns.items():
@@ -30,4 +38,4 @@ for file in ['web/package.json','web/package-lock.json']:
  if package['version']!=version:errors.append(f'Version mismatch: {file}')
  if 'packages' in package and package['packages']['']['version']!=version:errors.append(f'Package version mismatch: {file}')
 if errors:raise SystemExit('\n'.join(errors))
-print(f'Source checks passed: version {version}, documentation links and credential patterns. Ignored runtime directories were not inspected.')
+print(f'Source checks passed: version {version}, documentation links and credential patterns. Ignored runtime directories and Git-ignored files were not inspected.')
