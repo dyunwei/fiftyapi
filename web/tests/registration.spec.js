@@ -48,7 +48,9 @@ test('邮箱和真实姓名注册、零额度登录及管理员查看',async({pa
  await expect(page.getByRole('heading',{name:'登录工作空间'})).toBeVisible()
  await expect(page.getByLabel('用户名',{exact:true})).toHaveValue('new.member@example.com')
  await expect(page.getByLabel('密码',{exact:true})).toHaveValue('')
- await page.getByLabel('密码',{exact:true}).fill('registration-member-password')
+ // Password managers can change the DOM value without Vue input events.
+ await page.getByLabel('用户名',{exact:true}).evaluate(input=>{input.value='new.member@example.com'})
+ await page.getByLabel('密码',{exact:true}).evaluate(input=>{input.value='registration-member-password'})
  await page.getByRole('button',{name:'登录',exact:false}).click()
  await expect(page.locator('.quota-card')).toHaveCount(2)
  const me=await (await page.request.get(baseURL+'/api/me')).json()

@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fiftyapi/internal/credentials"
 	"fmt"
-	"strings"
 	"time"
 )
 
@@ -92,7 +91,7 @@ func (s *Store) DeleteAPIKey(ctx context.Context, user, id int64) error {
 	return err
 }
 func (s *Store) AuthenticateAPIKey(ctx context.Context, token string) (User, int64, error) {
-	if !strings.HasPrefix(token, "sk-") || len(token) != 46 {
+	if !ValidAPIKeyToken(token) {
 		return User{}, 0, ErrNotFound
 	}
 	hash := sha256.Sum256([]byte(token))

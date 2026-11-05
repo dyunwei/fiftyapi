@@ -11,6 +11,7 @@ import (
 	"fiftyapi/internal/backup"
 	"fiftyapi/internal/buildinfo"
 	"fiftyapi/internal/i18n"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -107,9 +108,14 @@ func (a *API) Handler() http.Handler {
 	mux.HandleFunc("POST /api/admin/contribution-links/{id}/revoke", a.protect(true, true, a.revokeContributionLink))
 	mux.HandleFunc("POST /api/contributions/check", a.checkContributionLink)
 	mux.HandleFunc("POST /api/contributions/import", a.contributeAccounts)
+	mux.HandleFunc("POST /api/contributions/oauth/start", a.startContributionOAuth)
+	mux.HandleFunc("POST /api/contributions/oauth/complete", a.completeContributionOAuth)
 	mux.HandleFunc("GET /api/admin/accounts", a.protect(true, false, a.listAccounts))
 	mux.HandleFunc("POST /api/admin/accounts/{id}/models/test", a.protect(true, true, a.testAccountModel))
 	mux.HandleFunc("GET /api/admin/accounts/{id}/models", a.protect(true, false, a.accountModels))
+	mux.HandleFunc("GET /api/admin/migrations/sub2api/onboarding", a.protect(true, false, a.migrationOnboarding))
+	mux.HandleFunc("POST /api/admin/migrations/sub2api/complete", a.protect(true, true, a.completeMigrationOnboarding))
+	mux.HandleFunc("POST /api/admin/migrations/sub2api", a.protect(true, true, a.migrateSub2API))
 	mux.HandleFunc("POST /api/admin/accounts/import", a.protect(true, true, a.importAccounts))
 	mux.HandleFunc("POST /api/admin/accounts/{id}/quota/query", a.protect(true, true, a.queryAccountQuota))
 	mux.HandleFunc("GET /api/admin/accounts/{id}/routing", a.protect(true, false, a.accountRouting))
@@ -293,6 +299,7 @@ func (a *API) setup(w http.ResponseWriter, r *http.Request) {
 		Username   string `json:"username"`
 		Password   string `json:"password"`
 		SetupToken string `json:"setup_token"`
+		Migration  bool   `json:"migration"`
 	}
 	if !decode(w, r, &in) {
 		return
@@ -312,7 +319,7 @@ func (a *API) setup(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 500, "密码处理失败")
 		return
 	}
-	id, err := a.store.CreateAdmin(r.Context(), in.Username, string(hash))
+	id, err := a.store.CreateAdminWithMigration(r.Context(), in.Username, string(hash), in.Migration)
 	if errors.Is(err, store.ErrInitialized) {
 		writeError(w, 409, "管理员已初始化")
 		return
@@ -346,6 +353,15 @@ func (a *API) login(w http.ResponseWriter, r *http.Request) {
 	}
 	match := bcrypt.CompareHashAndPassword(hash, []byte(in.Password)) == nil
 	if err != nil || !user.Enabled || !user.PasswordSet || !match {
+		reason := "password_mismatch"
+		if err != nil {
+			reason = "lookup_failed"
+		} else if !user.Enabled {
+			reason = "disabled"
+		} else if !user.PasswordSet {
+			reason = "password_not_set"
+		}
+		a.store.RecordRuntime(r.Context(), store.RuntimeLog{Level: "warn", Module: "server", Event: "login_rejected", Message: fmt.Sprintf("user_id=%d reason=%s", user.ID, reason)})
 		writeError(w, 401, "账号或密码错误")
 		return
 	}

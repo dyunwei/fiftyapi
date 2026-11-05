@@ -9,6 +9,7 @@ Public preview: **0.1.0**. The console supports Simplified Chinese and English. 
 | [Deployment](deployment.md) | Binary, Docker, HTTPS, persistent keys, upgrades and restoration |
 | [Release quickstart](release-quickstart.md) | Running a downloaded binary package |
 | [Clients](clients.md) | Claude Code, Codex, Chat Completions and protocol selection |
+| [sub2api migration](sub2api-migration.md) | Import users, original API keys and supported upstream accounts |
 | [Administration](administration.md) | Upstreams, models, budgets, members, email, logs and backups |
 | [Compatibility](compatibility.md) | Protocol support, verification evidence and limitations |
 | [Maintenance](maintaining.md) | Development, translations and public releases |

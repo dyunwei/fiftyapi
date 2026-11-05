@@ -7,6 +7,9 @@ import (
 	"time"
 )
 
+// DefaultMemberBudget is $100 in each independent rolling budget window.
+const DefaultMemberBudget int64 = 100_000_000
+
 var ErrInitialized = errors.New("管理员已初始化")
 var ErrNotFound = errors.New("记录不存在")
 
@@ -33,12 +36,17 @@ func (s *Store) Initialized(ctx context.Context) (bool, error) {
 	return n > 0, err
 }
 func (s *Store) CreateAdmin(ctx context.Context, username, hash string) (int64, error) {
+	return s.CreateAdminWithMigration(ctx, username, hash, false)
+}
+
+// CreateAdminWithMigration persists onboarding intent in the same transaction.
+func (s *Store) CreateAdminWithMigration(ctx context.Context, username, hash string, migration bool) (int64, error) {
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, err
 	}
 	defer tx.Rollback()
-	r, err := tx.ExecContext(ctx, `INSERT INTO users(username,password_hash,role,created_at) SELECT ?,?,'admin',? WHERE NOT EXISTS(SELECT 1 FROM users WHERE role='admin')`, username, hash, time.Now().Unix())
+	r, err := tx.ExecContext(ctx, `INSERT INTO users(username,password_hash,role,created_at,limit_5h,limit_7d) SELECT ?,?,'admin',?,?,? WHERE NOT EXISTS(SELECT 1 FROM users WHERE role='admin')`, username, hash, time.Now().Unix(), DefaultMemberBudget, DefaultMemberBudget)
 	if err != nil {
 		return 0, err
 	}
@@ -47,6 +55,11 @@ func (s *Store) CreateAdmin(ctx context.Context, username, hash string) (int64, 
 		return 0, ErrInitialized
 	}
 	id, _ := r.LastInsertId()
+	if migration {
+		if _, err = tx.ExecContext(ctx, "INSERT INTO settings(key,value) VALUES('sub2api_onboarding_pending','1') ON CONFLICT(key) DO UPDATE SET value=excluded.value"); err != nil {
+			return 0, err
+		}
+	}
 	if err = audit(ctx, tx, id, "setup_admin", id); err != nil {
 		return 0, err
 	}

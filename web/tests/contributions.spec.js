@@ -45,6 +45,16 @@ test('管理员分享临时链接，成员匿名导入后停用，再撤销入�
  await contributor.goto(url)
  await expect(contributor.getByRole('heading',{name:'贡献账号',exact:true})).toBeVisible()
  await expect(contributor.getByLabel('授权文件',{exact:true})).toBeVisible()
+ await contributor.getByRole('button',{name:'通过链接授权',exact:true}).click()
+ await contributor.getByLabel('账号名称',{exact:true}).fill('浏览器授权账号')
+ await contributor.getByRole('button',{name:'生成授权链接',exact:true}).click()
+ await expect(contributor.getByRole('link',{name:'打开授权页面 ↗'})).toHaveAttribute('href',/^https:\/\/auth\.openai\.com\//)
+ await contributor.getByLabel('授权结果',{exact:true}).fill('wrong#state')
+ await contributor.getByRole('button',{name:'提交账号',exact:true}).click()
+ await expect(contributor.getByRole('alert')).toContainText('授权未完成')
+ await expect(contributor.getByLabel('授权结果',{exact:true})).toHaveCount(0)
+ await contributor.getByRole('button',{name:'导入授权文件',exact:true}).click()
+
  const guide=contributor.getByLabel('授权文件操作说明')
  await guide.getByRole('button',{name:'Windows',exact:true}).click()
  await expect(guide).toContainText('%USERPROFILE%\\.codex')
@@ -126,4 +136,31 @@ test('管理员分享临时链接，成员匿名导入后停用，再撤销入�
  }
  await context.close()
  expect(errors).toEqual([])
+})
+
+// Mock only the provider exchange response; the account persistence path is covered in Go.
+test('贡献授权完成后清除回调结果并显示提交成功', async({page})=>{
+ const token='c'.repeat(43)
+ await page.route('**/api/contributions/check',route=>route.fulfill({json:{provider:'openai',expires_at:Math.floor(Date.now()/1000)+3600}}))
+ await page.route('**/api/contributions/oauth/start',route=>{
+  expect(route.request().postDataJSON()).toEqual({token,name:'链接授权账号'})
+  return route.fulfill({json:{session_id:'test-session',auth_url:'https://auth.openai.com/authorize',expires_at:Math.floor(Date.now()/1000)+600}})
+ })
+ await page.route('**/api/contributions/oauth/complete',route=>{
+  expect(route.request().postDataJSON()).toEqual({token,session_id:'test-session',result:'test-code#test-state'})
+  return route.fulfill({status:201,json:{ok:true}})
+ })
+ await page.goto(baseURL+'/#contribute='+token)
+ await page.getByRole('button',{name:'通过链接授权',exact:true}).click()
+ await expect(page.getByRole('button',{name:'生成授权链接',exact:true})).toBeDisabled()
+ await page.getByLabel('账号名称',{exact:true}).fill('链接授权账号')
+ await page.getByRole('button',{name:'生成授权链接',exact:true}).click()
+ await expect(page.getByRole('button',{name:'提交账号',exact:true})).toBeDisabled()
+ await page.getByLabel('授权结果',{exact:true}).fill('test-code#test-state')
+ await page.setViewportSize({width:390,height:844})
+ await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
+ await page.getByRole('button',{name:'提交账号',exact:true}).click()
+ await expect(page.getByText('账号已提交，等待管理员配置并启用。',{exact:true})).toBeVisible()
+ await expect(page.getByLabel('授权结果',{exact:true})).toHaveCount(0)
+ await expect(page.getByRole('button',{name:'提交账号',exact:true})).toHaveCount(0)
 })

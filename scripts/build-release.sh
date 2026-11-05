@@ -13,7 +13,7 @@ sed 's#(en/release-quickstart.md)#(QUICKSTART.en.md)#g' docs/release-quickstart.
 sed 's#(../release-quickstart.md)#(QUICKSTART.md)#g' docs/en/release-quickstart.md > dist/QUICKSTART.en.md
 mkdir -p dist/docs dist/scripts
 cp -R docs/. dist/docs/
-cp scripts/backup-offline.py dist/scripts/
+cp scripts/backup-offline.py scripts/export-sub2api.py scripts/migrate-sub2api.sh dist/scripts/
 python3 scripts/dependency-notices.py
 (cd dist && sha256sum fiftyapi > SHA256SUMS)
 printf '%s\n' 'Local release files are ready in dist/. Nothing has been published.'

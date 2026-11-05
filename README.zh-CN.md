@@ -28,6 +28,7 @@
 | 功能 | 说明 |
 | --- | --- |
 | 🔑&nbsp;**上游账号** | Claude Code、OpenAI Codex、Antigravity OAuth 授权、令牌刷新、模型目录同步 |
+| 📦&nbsp;**sub2api 迁移** | 导入用户、原 API Key 和受支持的上游账号，支持预览与重复导入 |
 | 🔌&nbsp;**API&nbsp;网关** | 接入 Sub2Api、New API、其他 FiftyAPI 及兼容上游，支持模型别名 |
 | 🧭&nbsp;**原生协议** | Chat Completions、Messages、Responses（HTTP / SSE / WebSocket） |
 | 💰&nbsp;**美元额度** | 每人 5 小时与 7 天窗口，所有 Key 和供应商共享 |
@@ -60,6 +61,18 @@ docker run -d \
 > 主密钥自动生成并保存在 `fiftyapi-data` 数据卷中。请保留数据卷，并单独备份 `/data/master.key`：数据库备份不包含主密钥，丢失后已加密的凭据无法恢复。
 
 Compose、HTTPS、升级与恢复见 [部署说明](docs/deployment.md)。
+
+## 从 sub2api 迁移
+
+首次创建管理员时选择「**从 sub2api Docker 迁移**」，网页会逐步引导你导出、上传、检查并导入**用户、原 API Key 和受支持的上游账号**，无需先阅读文档。旧站宿主机只需运行一条命令，无需手输数据库密码或安装 Python/psql：
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/dyunwei/fiftyapi/main/scripts/migrate-sub2api.sh | sudo bash
+```
+
+网页也提供脚本直接下载。成员保留邮箱、密码和 Key；完成模型同步、定价和服务地址切换后即可使用。迁移仅在首次初始化向导中提供，完成或跳过后关闭导入功能。
+
+新迁入用户、邀请成员和首次创建的管理员，5 小时与 7 天预算默认均为 **$100**；自助注册用户为 **$0**。不迁移旧站余额、套餐和历史记录；网页默认将旧 Key 转为 FiftyAPI 权限和预算规则，可取消勾选以保持受限 Key 停用；旧站停用或已过期的 Key 始终保持停用。现有用户预算不变。详见 [迁移指南](docs/sub2api-migration.md)。
 
 ## 客户端接入
 

@@ -8,10 +8,13 @@ import (
 	"errors"
 	"fiftyapi/internal/credentials"
 	"fiftyapi/internal/providers"
+	"fiftyapi/internal/store"
+	"strings"
 	"time"
 )
 
 type oauthPending struct {
+	linkID  int64
 	owner   int64
 	name    string
 	target  int64
@@ -27,6 +30,18 @@ type OAuthStart struct {
 }
 
 func (s *Service) StartOAuth(ctx context.Context, actor int64, provider, name string, target int64) (OAuthStart, error) {
+	return s.startOAuth(ctx, actor, provider, name, target, 0)
+}
+
+func (s *Service) StartContributedOAuth(ctx context.Context, actor int64, provider, name string, linkID int64) (OAuthStart, error) {
+	if linkID <= 0 {
+		return OAuthStart{}, errors.New("贡献链接无效")
+	}
+	return s.startOAuth(ctx, actor, provider, name, 0, linkID)
+}
+
+func (s *Service) startOAuth(ctx context.Context, actor int64, provider, name string, target, linkID int64) (OAuthStart, error) {
+	name = strings.TrimSpace(name)
 	c, err := providers.DefaultConfig(provider)
 	if err != nil {
 		return OAuthStart{}, err
@@ -80,17 +95,29 @@ func (s *Service) StartOAuth(ctx context.Context, actor int64, provider, name st
 		return OAuthStart{}, errors.New("未完成授权过多，请稍后重试")
 	}
 	expires := now.Add(10 * time.Minute)
-	s.oauth[id] = &oauthPending{owner: actor, name: name, target: target, config: c, session: session, expires: expires}
+	s.oauth[id] = &oauthPending{linkID: linkID, owner: actor, name: name, target: target, config: c, session: session, expires: expires}
 	return OAuthStart{SessionID: id, AuthURL: authURL, RedirectURI: c.RedirectURI, ExpiresAt: expires.Unix()}, nil
 }
 func (s *Service) CompleteOAuth(ctx context.Context, actor int64, id, result string, onboard bool) (int64, string, error) {
+	return s.completeOAuth(ctx, actor, id, result, onboard, 0)
+}
+
+func (s *Service) CompleteContributedOAuth(ctx context.Context, actor int64, id, result string, linkID int64) (int64, error) {
+	if linkID <= 0 {
+		return 0, errors.New("贡献链接无效")
+	}
+	account, _, err := s.completeOAuth(ctx, actor, id, result, false, linkID)
+	return account, err
+}
+
+func (s *Service) completeOAuth(ctx context.Context, actor int64, id, result string, onboard bool, linkID int64) (int64, string, error) {
 	s.oauthMu.Lock()
 	pending, ok := s.oauth[id]
-	if ok && pending.owner == actor {
+	if ok && pending.owner == actor && pending.linkID == linkID {
 		delete(s.oauth, id)
 	}
 	s.oauthMu.Unlock()
-	if !ok || pending.owner != actor || !time.Now().Before(pending.expires) {
+	if !ok || pending.owner != actor || pending.linkID != linkID || !time.Now().Before(pending.expires) {
 		return 0, "", errors.New("授权会话已过期、已使用或不属于当前管理员")
 	}
 	client := s.client
@@ -103,6 +130,10 @@ func (s *Service) CompleteOAuth(ctx context.Context, actor int64, id, result str
 		return 0, "", err
 	}
 	c := Credential{Config: pending.config, Token: token, ExpiresAt: time.Now().Add(time.Duration(token.ExpiresIn) * time.Second)}
+	if linkID > 0 {
+		accountID, err := s.importWithOrigin(ctx, actor, pending.name, c, store.AccountOrigin{LinkID: linkID, Fingerprint: authFingerprint(c)})
+		return accountID, "", err
+	}
 	accountID := pending.target
 	if accountID == 0 {
 		accountID, err = s.Import(ctx, actor, pending.name, c)

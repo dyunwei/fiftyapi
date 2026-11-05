@@ -85,6 +85,22 @@ func TestPublicContributionBoundary(t *testing.T) {
 	if w = request("/api/contributions/check", body, "", ""); w.Code != 200 || strings.Contains(w.Body.String(), "team") {
 		t.Fatal("public check failed or exposed metadata")
 	}
+	// Public OAuth uses only the link's provider and cannot reauthorize existing accounts.
+	oauthStart := `{"token":"` + token + `","name":"browser-owner"}`
+	for _, extra := range []string{`,"provider":"claude"`, `,"account_id":1`, `,"enabled":true`} {
+		if w = request("/api/contributions/oauth/start", strings.TrimSuffix(oauthStart, "}")+extra+"}", "", ""); w.Code != 400 {
+			t.Fatal("public OAuth accepted advanced fields")
+		}
+	}
+	w = request("/api/contributions/oauth/start", oauthStart, "", "")
+	var started accounts.OAuthStart
+	if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &started) != nil || !strings.Contains(started.AuthURL, "auth.openai.com") {
+		t.Fatalf("public OAuth start failed: %s", w.Body.String())
+	}
+	oauthComplete := `{"token":"` + token + `","session_id":"` + started.SessionID + `","result":"wrong#state"}`
+	if w = request("/api/contributions/oauth/complete", oauthComplete, "", ""); w.Code != 400 || strings.Contains(w.Body.String(), "wrong#state") {
+		t.Fatal("invalid OAuth result accepted or exposed")
+	}
 	auth := `{"refresh_token":"test-contribution-refresh","proxy_url":"http://unsafe.test","max_concurrency":99,"enabled":true}`
 	submit := `{"token":"` + token + `","accounts":[{"name":"owner-account","auth":` + auth + `}]}`
 	if w = request("/api/contributions/import", strings.TrimSuffix(submit, "}")+`,"enabled":true}`, "", ""); w.Code != 400 {
@@ -114,6 +130,15 @@ func TestPublicContributionBoundary(t *testing.T) {
 	}
 	if w = request("/api/contributions/import", submit, "", ""); w.Code != 410 {
 		t.Fatal("revoked link accepted")
+	}
+	for _, path := range []string{"/api/contributions/oauth/start", "/api/contributions/oauth/complete"} {
+		payload := oauthStart
+		if strings.HasSuffix(path, "complete") {
+			payload = oauthComplete
+		}
+		if w = request(path, payload, "", ""); w.Code != 410 {
+			t.Fatal("revoked link accepted for OAuth")
+		}
 	}
 	if w = request("/api/contributions/check", `{"token":"`+strings.Repeat("z", 43)+`"}`, "", ""); w.Code != 410 {
 		t.Fatal("unknown link accepted")

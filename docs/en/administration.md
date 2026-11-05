@@ -4,7 +4,7 @@
 
 ## Members and budgets
 
-Initialize the administrator with the deployment setup token. Afterwards members can register with email, real name and an 8–72-byte password. Registration requires no SMTP and does not verify email ownership. New members always start with zero budget; they cannot choose their own role or limits. Administrators allocate budgets and can send email invitations instead.
+Initialize the administrator with the deployment setup token. Afterwards members can register with email, real name and an 8–72-byte password. Registration requires no SMTP and does not verify email ownership. Self-registered members start with zero budget; they cannot choose their own role or limits. Administrators allocate budgets and can send email invitations instead. Newly invited/imported members and the initial administrator default to $100 in each window; existing users are unchanged. See [sub2api migration](sub2api-migration.md).
 
 Every user's keys and providers share two dollar budgets: 5 hours and 7 days. The first positive-cost settlement starts a window; unused budget does not accumulate. Increasing a limit does not reset usage. Explicit window resets are audited, and accepted requests still settle against their original windows.
 

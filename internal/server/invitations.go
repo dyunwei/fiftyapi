@@ -43,16 +43,24 @@ func (a *API) inviteUser(w http.ResponseWriter, r *http.Request, id identity) {
 	var in struct {
 		Email  string `json:"email"`
 		Name   string `json:"display_name"`
-		Limit5 int64  `json:"limit_5h_microusd"`
-		Limit7 int64  `json:"limit_7d_microusd"`
+		Limit5 *int64 `json:"limit_5h_microusd"`
+		Limit7 *int64 `json:"limit_7d_microusd"`
 	}
 	if !decode(w, r, &in) {
 		return
 	}
+	if in.Limit5 == nil {
+		v := store.DefaultMemberBudget
+		in.Limit5 = &v
+	}
+	if in.Limit7 == nil {
+		v := store.DefaultMemberBudget
+		in.Limit7 = &v
+	}
 	in.Email = strings.ToLower(strings.TrimSpace(in.Email))
 	in.Name = strings.TrimSpace(in.Name)
 	email, err := mail.ParseAddress(in.Email)
-	if err != nil || email.Address != in.Email || len(in.Email) > 254 || strings.ContainsAny(in.Email, "\r\n") || utf8.RuneCountInString(in.Name) > 80 || strings.ContainsAny(in.Name, "\r\n") || in.Limit5 < 0 || in.Limit7 < 0 || in.Limit5 > 1000000000000000 || in.Limit7 > 1000000000000000 {
+	if err != nil || email.Address != in.Email || len(in.Email) > 254 || strings.ContainsAny(in.Email, "\r\n") || utf8.RuneCountInString(in.Name) > 80 || strings.ContainsAny(in.Name, "\r\n") || *in.Limit5 < 0 || *in.Limit7 < 0 || *in.Limit5 > 1000000000000000 || *in.Limit7 > 1000000000000000 {
 		writeError(w, 400, "邮箱、显示名称或额度格式无效")
 		return
 	}
@@ -62,7 +70,7 @@ func (a *API) inviteUser(w http.ResponseWriter, r *http.Request, id identity) {
 		return
 	}
 	hash := sha256.Sum256([]byte(token))
-	user, err := a.store.CreateInvitedUser(r.Context(), id.user.ID, in.Email, in.Name, in.Limit5, in.Limit7, hash[:], time.Now())
+	user, err := a.store.CreateInvitedUser(r.Context(), id.user.ID, in.Email, in.Name, *in.Limit5, *in.Limit7, hash[:], time.Now())
 	if err != nil {
 		writeError(w, 409, "无法创建用户，请检查邮箱或账号是否已存在")
 		return

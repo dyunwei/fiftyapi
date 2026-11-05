@@ -58,7 +58,7 @@ func (s *Store) CreateAccountWithOrigin(ctx context.Context, actor int64, name, 
 	defer tx.Rollback()
 	now := time.Now().Unix()
 	var linkID any
-	enabled := true
+	enabled := !origin.Disabled
 	if origin.LinkID != 0 {
 		var valid int
 		if err = tx.QueryRowContext(ctx, `SELECT count(*) FROM account_contribution_links l JOIN users u ON u.id=l.actor_id WHERE l.id=? AND l.actor_id=? AND l.provider=? AND l.revoked_at IS NULL AND l.expires_at>? AND u.enabled=1 AND u.role='admin'`, origin.LinkID, actor, provider, now).Scan(&valid); err != nil {
@@ -84,6 +84,15 @@ func (s *Store) CreateAccountWithOrigin(ctx context.Context, actor int64, name, 
 	}
 	if _, err = tx.ExecContext(ctx, "INSERT INTO account_policies(account_id,concurrency) VALUES(?,?)", id, DefaultAccountPolicy().Concurrency); err != nil {
 		return 0, err
+	}
+	if origin.Policy != nil {
+		if err = origin.Policy.Validate(); err != nil {
+			return 0, err
+		}
+		p := origin.Policy
+		if _, err = tx.ExecContext(ctx, "UPDATE account_policies SET initialized=1,priority=?,weight=?,concurrency=?,max_queue=?,wait_ms=? WHERE account_id=?", p.Priority, p.Weight, p.Concurrency, p.MaxQueue, p.WaitMS, id); err != nil {
+			return 0, err
+		}
 	}
 	if _, err = tx.ExecContext(ctx, "INSERT INTO account_health(account_id) VALUES(?)", id); err != nil {
 		return 0, err

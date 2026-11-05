@@ -16,6 +16,7 @@
 
 | 文档 | 内容 |
 | --- | --- |
+| [sub2api-migration.md](sub2api-migration.md) | 从 sub2api 迁移用户、原 Key 和上游账号 |
 | [gateway-upstreams.md](gateway-upstreams.md) | 接入 Sub2Api / FiftyAPI / New API 上游网关、模型映射与定价 |
 | [model-protocols.md](model-protocols.md) | 同一模型的多协议（Chat / Messages / Responses）配置 |
 | [account-models.md](account-models.md) | 上游账号模型目录与同步 |

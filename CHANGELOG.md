@@ -56,5 +56,4 @@ See [compatibility](docs/en/compatibility.md) for details.
 
 </details>
 
-[Unreleased]: https://github.com/dyunwei/fiftyapi/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/dyunwei/fiftyapi/releases/tag/v0.1.0

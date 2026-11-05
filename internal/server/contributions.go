@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
@@ -145,4 +146,63 @@ func (a *API) contributeAccounts(w http.ResponseWriter, r *http.Request) {
 		imported++
 	}
 	writeJSON(w, 200, map[string]any{"items": out, "imported": imported, "total": len(out)})
+}
+
+func (a *API) startContributionOAuth(w http.ResponseWriter, r *http.Request) {
+	a.contributionOAuth(w, r, false)
+}
+func (a *API) completeContributionOAuth(w http.ResponseWriter, r *http.Request) {
+	a.contributionOAuth(w, r, true)
+}
+func (a *API) contributionOAuth(w http.ResponseWriter, r *http.Request, complete bool) {
+	if a.accounts == nil {
+		writeError(w, 503, "账号服务不可用")
+		return
+	}
+	if !a.allowAttempt(r, "contribution-oauth", 6) {
+		writeError(w, 429, "请求过于频繁，请稍后重试")
+		return
+	}
+	// Separate request types keep provider, target account and runtime settings server-controlled.
+	var token, name, sessionID, result string
+	if complete {
+		var in struct {
+			Token     string `json:"token"`
+			SessionID string `json:"session_id"`
+			Result    string `json:"result"`
+		}
+		if !decode(w, r, &in) {
+			return
+		}
+		token, sessionID, result = in.Token, in.SessionID, in.Result
+	} else {
+		var in struct {
+			Token string `json:"token"`
+			Name  string `json:"name"`
+		}
+		if !decode(w, r, &in) {
+			return
+		}
+		token, name = in.Token, in.Name
+	}
+	link, ok := a.contributionLink(w, r, token)
+	if !ok {
+		return
+	}
+	if !complete {
+		started, err := a.accounts.StartContributedOAuth(r.Context(), link.ActorID, link.Provider, name, link.ID)
+		if err != nil {
+			writeError(w, 400, "无法生成授权链接，请检查账号名称或稍后重试")
+			return
+		}
+		writeJSON(w, 200, started)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
+	defer cancel()
+	if _, err := a.accounts.CompleteContributedOAuth(ctx, link.ActorID, sessionID, result, link.ID); err != nil {
+		writeError(w, 400, "授权未完成：请检查授权结果，重新生成链接并重试")
+		return
+	}
+	writeJSON(w, 201, map[string]bool{"ok": true})
 }

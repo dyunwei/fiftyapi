@@ -25,13 +25,22 @@ func (s *Service) ImportContributedAuth(ctx context.Context, actor int64, name, 
 	return s.importAuth(ctx, actor, name, provider, raw, linkID)
 }
 func (s *Service) importAuth(ctx context.Context, actor int64, name, provider string, raw json.RawMessage, linkID int64) (int64, error) {
-	cfg, err := providers.DefaultConfig(provider)
+	c, fingerprint, err := ParseAuth(provider, raw)
 	if err != nil {
 		return 0, err
 	}
+	return s.importWithOrigin(ctx, actor, name, c, store.AccountOrigin{LinkID: linkID, Fingerprint: fingerprint})
+}
+
+// ParseAuth validates authorization fields without persisting or contacting upstreams.
+func ParseAuth(provider string, raw json.RawMessage) (Credential, []byte, error) {
+	cfg, err := providers.DefaultConfig(provider)
+	if err != nil {
+		return Credential{}, nil, err
+	}
 	var root map[string]json.RawMessage
 	if json.Unmarshal(raw, &root) != nil || root == nil {
-		return 0, errors.New("授权文件不是 JSON 对象")
+		return Credential{}, nil, errors.New("授权文件不是 JSON 对象")
 	}
 	source := raw
 	if nested, ok := root["tokens"]; ok {
@@ -50,7 +59,7 @@ func (s *Service) importAuth(ctx context.Context, actor int64, name, provider st
 		ExpiresAt        json.RawMessage `json:"expires_at"`
 	}
 	if json.Unmarshal(source, &fields) != nil {
-		return 0, errors.New("授权字段格式无效")
+		return Credential{}, nil, errors.New("授权字段格式无效")
 	}
 	// Claude Code's native credential file uses camelCase fields and a
 	// millisecond timestamp inside claudeAiOauth. Only extract OAuth fields.
@@ -61,7 +70,7 @@ func (s *Service) importAuth(ctx context.Context, actor int64, name, provider st
 			ExpiresAt int64  `json:"expiresAt"`
 		}
 		if json.Unmarshal(native, &oauth) != nil {
-			return 0, errors.New("Claude 授权字段格式无效")
+			return Credential{}, nil, errors.New("Claude 授权字段格式无效")
 		}
 		fields.Access, fields.Refresh = oauth.Access, oauth.Refresh
 		if oauth.ExpiresAt > 0 {
@@ -70,11 +79,11 @@ func (s *Service) importAuth(ctx context.Context, actor int64, name, provider st
 	}
 	for _, v := range []string{fields.Access, fields.Refresh, fields.ID} {
 		if len(v) > 32<<10 || strings.ContainsAny(v, "\r\n") {
-			return 0, errors.New("授权字段超出限制或包含换行")
+			return Credential{}, nil, errors.New("授权字段超出限制或包含换行")
 		}
 	}
 	if fields.Access == "" && fields.Refresh == "" {
-		return 0, errors.New("文件缺少访问令牌或刷新令牌")
+		return Credential{}, nil, errors.New("文件缺少访问令牌或刷新令牌")
 	}
 	expires := time.Time{}
 	if len(fields.ExpiresAt) > 0 && string(fields.ExpiresAt) != "null" {
@@ -115,13 +124,13 @@ func (s *Service) importAuth(ctx context.Context, actor int64, name, provider st
 	}
 	if expires.IsZero() {
 		if fields.Refresh == "" {
-			return 0, errors.New("无法确定授权有效期，请提供 expires_at 或可刷新授权")
+			return Credential{}, nil, errors.New("无法确定授权有效期，请提供 expires_at 或可刷新授权")
 		}
 		expires = time.Now().Add(-time.Second)
 	}
 	if fields.ClientID != "" {
 		if len(fields.ClientID) > 256 || strings.ContainsAny(fields.ClientID, "\r\n ") {
-			return 0, errors.New("OAuth client_id 无效")
+			return Credential{}, nil, errors.New("OAuth client_id 无效")
 		}
 		cfg.ClientID = fields.ClientID
 	}
@@ -131,13 +140,18 @@ func (s *Service) importAuth(ctx context.Context, actor int64, name, provider st
 			cfg.OpenAIAccountID = fields.AccountID
 		}
 	}
-	identity := fields.Refresh
+	c := Credential{Config: cfg, Token: providers.Token{AccessToken: fields.Access, RefreshToken: fields.Refresh, IDToken: fields.ID}, ExpiresAt: expires}
+	return c, authFingerprint(c), nil
+}
+
+func authFingerprint(c Credential) []byte {
+	identity := c.Token.RefreshToken
 	if identity == "" {
-		identity = fields.Access
+		identity = c.Token.AccessToken
 	}
-	if cfg.OpenAIAccountID != "" {
-		identity = "account:" + cfg.OpenAIAccountID
+	if c.Config.OpenAIAccountID != "" {
+		identity = "account:" + c.Config.OpenAIAccountID
 	}
-	fingerprint := sha256.Sum256([]byte(provider + "\x00" + identity))
-	return s.importWithOrigin(ctx, actor, name, Credential{Config: cfg, Token: providers.Token{AccessToken: fields.Access, RefreshToken: fields.Refresh, IDToken: fields.ID}, ExpiresAt: expires}, store.AccountOrigin{LinkID: linkID, Fingerprint: fingerprint[:]})
+	fingerprint := sha256.Sum256([]byte(c.Config.Provider + "\x00" + identity))
+	return fingerprint[:]
 }

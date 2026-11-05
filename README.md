@@ -28,6 +28,7 @@ English | [简体中文](README.zh-CN.md)
 | Feature | Description |
 | --- | --- |
 | 🔑&nbsp;**Upstream&nbsp;accounts** | Claude Code, OpenAI Codex and Antigravity OAuth with token refresh and model sync |
+| 📦&nbsp;**sub2api&nbsp;migration** | Import users, original API keys and supported upstream accounts, with preview and safe retries |
 | 🔌&nbsp;**API&nbsp;gateways** | Connect Sub2Api, New API, another FiftyAPI or compatible upstreams, with model aliases |
 | 🧭&nbsp;**Native&nbsp;protocols** | Chat Completions, Messages, Responses (HTTP / SSE / WebSocket) |
 | 💰&nbsp;**Dollar&nbsp;budgets** | Per-user 5-hour and 7-day windows shared across all keys and providers |
@@ -60,6 +61,18 @@ docker run -d \
 > The master key is generated automatically and stored in the `fiftyapi-data` volume. Keep the volume and back up `/data/master.key` separately – database backups do not include it, and encrypted credentials cannot be recovered without it.
 
 Compose, HTTPS, upgrades and restore: see the [deployment guide](docs/en/deployment.md).
+
+## Migrate from sub2api
+
+Choose **Migrate from sub2api Docker** during administrator setup. The web wizard guides export, upload, review and import of **users, original API keys and supported upstream accounts**, without requiring a separate guide. On the source Docker host, run:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/dyunwei/fiftyapi/main/scripts/migrate-sub2api.sh | sudo bash
+```
+
+No manual database password or host Python/psql installation is needed. The wizard also offers a direct script download. Members retain their email, password and keys; verify models, configure prices and switch the service URL before use. Migration is available only during initial setup; completing or skipping the wizard closes the import capability.
+
+Imported users, invited members and the initial administrator receive **$100** budgets in each of the 5-hour and 7-day windows; self-registration starts at **$0**. Existing budgets are unchanged. Balances, plans and history are excluded. The wizard preselects conversion to FiftyAPI access and budget rules; uncheck it to keep restricted keys disabled. Source-disabled or expired keys remain disabled. See the [migration guide](docs/en/sub2api-migration.md).
 
 ## Connect a client
 

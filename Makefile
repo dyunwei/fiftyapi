@@ -11,6 +11,8 @@ test:
 	go test -race -timeout=3m ./...
 	npm --prefix web run test:unit
 	go vet ./...
+	python3 scripts/test_export_sub2api.py
+	python3 scripts/test_migrate_sub2api.py
 	python3 scripts/check-source.py
 
 test-ui: build

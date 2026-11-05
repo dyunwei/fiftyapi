@@ -1,0 +1,21 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "调试 sub2api 真实文件导入",
+      "type": "go",
+      "request": "launch",
+      "mode": "test",
+      "program": "${workspaceFolder}/internal/server",
+      "cwd": "${workspaceFolder}",
+      "args": [
+        "-test.run",
+        "^TestSub2APIProvidedBundleOffline$",
+        "-test.v"
+      ],
+      "env": {
+        "FIFTYAPI_SUB2API_TEST_BUNDLE": "/tmp/sub2api-migration.json"
+      }
+    }
+  ]
+}

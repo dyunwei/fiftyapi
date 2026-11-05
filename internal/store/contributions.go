@@ -20,6 +20,8 @@ type ContributionLink struct {
 type AccountOrigin struct {
 	LinkID      int64
 	Fingerprint []byte
+	Disabled    bool
+	Policy      *AccountPolicy
 }
 
 func (s *Store) CreateContributionLink(ctx context.Context, actor int64, hash []byte, provider, note string, expires time.Time) (int64, error) {

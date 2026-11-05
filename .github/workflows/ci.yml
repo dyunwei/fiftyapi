@@ -33,6 +33,8 @@ jobs:
         run: |
           go test -race -timeout=3m ./...
           go vet ./...
+          python3 scripts/test_export_sub2api.py
+          python3 scripts/test_migrate_sub2api.py
           python3 scripts/check-source.py
       - name: Form logic tests
         run: npm --prefix web run test:unit
