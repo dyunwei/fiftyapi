@@ -4,6 +4,7 @@ COPY web/package.json web/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY web/ ./
 COPY internal/i18n/en.json /src/internal/i18n/en.json
+COPY scripts/migrate-sub2api.sh /src/scripts/migrate-sub2api.sh
 RUN npm run build
 
 FROM golang:1.26.10-alpine AS build
