@@ -5,6 +5,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 English | 中文说明见各版本下方折叠区域
 
+## [Unreleased]
+
+### Added
+
+- Offline `fiftyapi restore` command, included in Docker images, with archive checksums, SQLite integrity and original master key validation, supported schema upgrades, and restoration to a new directory.
+- Program and database version metadata in backup manifests; Docker Compose recovery instructions.
+
+### Fixed
+
+- Allow HTTP backup endpoints for local and private S3-compatible storage.
+
 ## [0.1.0] - 2026-11-04
 
 First public preview.

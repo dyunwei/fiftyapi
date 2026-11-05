@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -18,6 +19,7 @@ import (
 	"time"
 
 	"fiftyapi/internal/accounts"
+	"fiftyapi/internal/backup"
 	"fiftyapi/internal/buildinfo"
 	"fiftyapi/internal/configenv"
 	"fiftyapi/internal/credentials"
@@ -57,8 +59,11 @@ func run() error {
 		fmt.Printf("FiftyAPI %s (%s)\n", buildinfo.Version(), buildinfo.Commit)
 		return nil
 	}
+	if command == "restore" {
+		return restoreBackup(args)
+	}
 	if command != "serve" && command != "import-antigravity" {
-		return errors.New("用法：fiftyapi [serve | import-antigravity | version]")
+		return errors.New("用法：fiftyapi [serve | import-antigravity | restore | version]")
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -276,5 +281,48 @@ func importAccount(ctx context.Context, args []string, s *store.Store, service *
 		return errors.New("导入失败，请检查配置、密钥和账号名称是否重复")
 	}
 	fmt.Printf("账号已导入 SQLite，ID=%d；凭据已使用服务主密钥重新加密，状态 authorized。\n", id)
+	return nil
+}
+
+func restoreBackup(args []string) error {
+	flags := flag.NewFlagSet("restore", flag.ContinueOnError)
+	source := flags.String("from", "", "备份 tar.gz 文件")
+	output := flags.String("output", "", "恢复到不存在的新目录")
+	keyFile := flags.String("key-file", "", "原 master.key 文件（可选，否则读取现有环境或数据目录）")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if *source == "" || *output == "" || flags.NArg() != 0 {
+		return errors.New("用法：fiftyapi restore --from backup.tar.gz --output 新目录 [--key-file 原master.key]")
+	}
+	path, err := databasePath()
+	if err != nil {
+		return err
+	}
+	unlock, err := store.LockServerPath(path)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	var key []byte
+	if *keyFile != "" {
+		var value string
+		value, err = readSecret(*keyFile)
+		if err == nil {
+			key, err = base64.StdEncoding.DecodeString(value)
+		}
+	} else {
+		key, err = masterKey(path, false)
+	}
+	if err != nil {
+		return err
+	}
+	defer clear(key)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	if err = backup.Restore(ctx, *source, *output, key); err != nil {
+		return err
+	}
+	fmt.Printf("恢复完成：%s。原数据库未覆盖；原主密钥已保存到恢复目录。启动前切换 FIFTYAPI_DB_PATH，并检查备份计划和上游授权。\n", *output)
 	return nil
 }

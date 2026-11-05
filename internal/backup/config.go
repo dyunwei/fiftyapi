@@ -35,8 +35,8 @@ func (c Config) Validate() error {
 		return errors.New("端点地址过长")
 	}
 	u, err := url.Parse(c.Endpoint)
-	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.RawPath != "" || strings.Trim(u.Path, "/") != "" {
-		return errors.New("端点地址需为 HTTPS 源站地址，不含路径、查询参数或凭据")
+	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.RawPath != "" || strings.Trim(u.Path, "/") != "" {
+		return errors.New("端点地址需为 HTTP 或 HTTPS 源站地址，不含路径、查询参数或凭据")
 	}
 	if !regexp.MustCompile(`^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$`).MatchString(c.Bucket) || strings.Contains(c.Bucket, "..") {
 		return errors.New("存储桶名称无效")

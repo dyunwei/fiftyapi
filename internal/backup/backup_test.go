@@ -268,6 +268,37 @@ func TestFailedUploadAndConcurrentBackup(t *testing.T) {
 	}
 }
 
+func TestHTTPEndpoint(t *testing.T) {
+	for _, endpoint := range []string{"http://localhost:9000", "http://192.168.1.10:9000", "http://[::1]:9000", "https://storage.example.com"} {
+		if err := config(endpoint).Validate(); err != nil {
+			t.Fatalf("endpoint %q rejected: %v", endpoint, err)
+		}
+	}
+	for _, endpoint := range []string{"ftp://localhost:9000", "http://", "http://user:password@localhost:9000", "http://localhost:9000/path", "http://localhost:9000?query=1", "http://localhost:9000#fragment"} {
+		if err := config(endpoint).Validate(); err == nil {
+			t.Fatalf("invalid endpoint %q accepted", endpoint)
+		}
+	}
+	s, actor := setup(t)
+	var methods []string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		methods = append(methods, r.Method)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer upstream.Close()
+	c := config(upstream.URL)
+	ctx := context.Background()
+	if err := s.SaveConfig(ctx, actor, c); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Test(ctx, c); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(methods, ",") != "PUT,DELETE" {
+		t.Fatalf("unexpected connection test requests: %v", methods)
+	}
+}
+
 func TestSettingsRetentionAndScheduleValidation(t *testing.T) {
 	s, actor := setup(t)
 	ctx := context.Background()
@@ -286,7 +317,7 @@ func TestSettingsRetentionAndScheduleValidation(t *testing.T) {
 	if err != nil || saved.SecretKey != "test-secret" || saved.RetentionDays != 21 || saved.DailyTime != "07:35" {
 		t.Fatal("settings did not preserve secrets/schedule", err)
 	}
-	for _, modify := range []func(*Config){func(c *Config) { c.Endpoint = "http://storage.example.com" }, func(c *Config) { c.Endpoint = "https://user:password@storage.example.com" }, func(c *Config) { c.RetentionDays = 0 }, func(c *Config) { c.DailyTime = "25:00" }, func(c *Config) { c.Prefix = "../other/" }} {
+	for _, modify := range []func(*Config){func(c *Config) { c.Endpoint = "ftp://storage.example.com" }, func(c *Config) { c.Endpoint = "https://user:password@storage.example.com" }, func(c *Config) { c.RetentionDays = 0 }, func(c *Config) { c.DailyTime = "25:00" }, func(c *Config) { c.Prefix = "../other/" }} {
 		invalid := saved
 		modify(&invalid)
 		if invalid.Validate() == nil {

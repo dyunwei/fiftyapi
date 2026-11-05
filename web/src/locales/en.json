@@ -673,7 +673,6 @@
   "本次备份保留天数": "Retention days for this backup",
   "创建备份": "Create backup",
   "刷新记录": "Refresh history",
-  "备份包含数据库一致性快照及校验清单，不包含主密钥。请单独保管原 FIFTYAPI_MASTER_KEY；恢复时需先停止服务。文件使用单个 tar.gz 压缩包，最大 5 GiB。": "Backups include a consistent database snapshot and checksums, excluding the master key. Keep the original FIFTYAPI_MASTER_KEY separately and stop the service before restoring. A single tar.gz archive is used, up to 5 GiB.",
   "正在读取备份记录…": "Loading backup history…",
   "暂无备份记录": "No backups yet",
   "ID / 文件名": "ID / filename",
@@ -940,5 +939,18 @@
   "通过链接授权": "Authorize via link",
   "可通过链接授权或导入授权文件贡献账号。账号默认停用，由管理员配置并启用后接入团队服务。": "Contribute an account by authorizing via a link or importing an authorization file. Accounts are disabled until an administrator configures and enables them.",
   "无法生成授权链接，请检查账号名称或稍后重试": "Unable to generate an authorization link. Check the account name or try again later.",
-  "授权未完成：请检查授权结果，重新生成链接并重试": "Authorization did not complete. Check the result, generate a new link, and try again."
+  "授权未完成：请检查授权结果，重新生成链接并重试": "Authorization did not complete. Check the result, generate a new link, and try again.",
+  "备份包含整个数据库快照及校验清单，不包含主密钥。请单独备份原 master.key 或保管原 FIFTYAPI_MASTER_KEY，丢失后无法恢复加密凭据。文件使用单个 tar.gz 压缩包，最大 5 GiB。": "Backups contain the entire database snapshot and checksums, excluding the master key. Back up the original master.key or keep the original FIFTYAPI_MASTER_KEY separately; encrypted credentials cannot be recovered without it. A single tar.gz archive is used, up to 5 GiB.",
+  "如何恢复备份？": "How do I restore a backup?",
+  "恢复需在服务器上离线执行，Docker 镜像已内置恢复命令，无需安装 Python。网页暂不提供直接还原。": "Restore offline on the server. The Docker image includes the restore command; Python is not required. Direct restoration from this page is not available.",
+  "下载备份 tar.gz 文件，并准备原主密钥。": "Download the backup tar.gz file and have the original master key ready.",
+  "停止原服务，按部署文档执行 fiftyapi restore，将备份恢复到新目录。命令会验证备份、主密钥和数据库版本，保留原数据库。": "Stop the original service and follow the deployment guide to run fiftyapi restore into a new directory. The command validates the backup, master key and database version, preserving the original database.",
+  "将数据库路径切换到恢复目录后启动，检查用户、Key、预算、备份计划和上游授权。快照之后的数据不会恢复，已轮换的 OAuth 令牌可能需要重新授权。": "Switch the database path to the restored directory and start the service. Check users, API keys, budgets, backup schedules and upstream authorization. Changes after the snapshot are not restored; rotated OAuth tokens may require reauthorization.",
+  "查看完整恢复步骤（Docker / 命令行）": "View full restore instructions (Docker / CLI)",
+  "初始化口令（Setup token）": "Setup token",
+  "粘贴从服务器获取的初始化口令": "Paste the setup token retrieved from the server",
+  "初始化口令用于确认你有服务器访问权限，仅首次创建管理员时使用，不是登录密码或主密钥。": "The setup token confirms that you have access to the server. It is used only to create the first administrator, and is separate from your login password and master key.",
+  "Docker 部署：在服务器终端执行以下命令，将输出的口令填入上方。容器名称不同时请替换 fiftyapi。": "Docker: run this command in your server terminal, then paste the output above. Replace fiftyapi if your container has a different name.",
+  "按快速开始部署时，也可读取宿主机 ./data/setup-token。直接运行程序时，读取数据库同目录的 setup-token；使用本地启动脚本时为 .local/setup-token。若设置了 FIFTYAPI_SETUP_TOKEN，则使用该环境变量的值。": "With the Quick Start deployment, you can also read ./data/setup-token on the host. For a standalone binary, read setup-token in the database directory; the local startup script uses .local/setup-token. If FIFTYAPI_SETUP_TOKEN is set, use its value instead.",
+  "按快速开始使用 Docker 部署时，主密钥位于宿主机 ./data/master.key（容器内 /data/master.key）。请单独备份此文件，恢复时使用原文件；若设置了 FIFTYAPI_MASTER_KEY，则保管该环境变量的原值。": "With the Docker Quick Start deployment, the master key is at ./data/master.key on the host (/data/master.key in the container). Back up this file separately and use the original file when restoring. If FIFTYAPI_MASTER_KEY is set, keep its original value."
 }

@@ -94,3 +94,16 @@ func TestDatabasePathDefaultAndExplicitOverride(t *testing.T) {
 		t.Fatal("explicit choice ignored", path, err)
 	}
 }
+
+func TestRestoreCommandRefusesRunningServer(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "db")
+	t.Setenv("FIFTYAPI_DB_PATH", path)
+	unlock, err := store.LockServerPath(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer unlock()
+	if err = restoreBackup([]string{"--from", "missing.tar.gz", "--output", filepath.Join(t.TempDir(), "restored")}); err == nil || !strings.Contains(err.Error(), "已有服务实例") {
+		t.Fatal(err)
+	}
+}

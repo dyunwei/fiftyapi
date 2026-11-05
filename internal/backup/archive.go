@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fiftyapi/internal/buildinfo"
 	"fiftyapi/internal/store"
 	"io"
 	"os"
@@ -32,6 +33,10 @@ func archive(ctx context.Context, s *store.Store, dir string) (string, int64, st
 	}
 	var check string
 	err = db.QueryRowContext(ctx, "PRAGMA quick_check").Scan(&check)
+	var schema int
+	if err == nil {
+		err = db.QueryRowContext(ctx, "SELECT COALESCE(MAX(version),0) FROM schema_migrations").Scan(&schema)
+	}
 	db.Close()
 	if err != nil || check != "ok" {
 		return "", 0, "", errors.New("数据库快照完整性检查失败")
@@ -49,7 +54,7 @@ func archive(ctx context.Context, s *store.Store, dir string) (string, int64, st
 	if _, err = io.Copy(sum, contextReader{ctx: ctx, reader: input}); err != nil {
 		return "", 0, "", err
 	}
-	manifest, _ := json.Marshal(map[string]any{"format": 1, "files": map[string]string{"fiftyapi.db": hex.EncodeToString(sum.Sum(nil))}})
+	manifest, _ := json.Marshal(archiveManifest{Format: 1, Files: map[string]string{"fiftyapi.db": hex.EncodeToString(sum.Sum(nil))}, Version: buildinfo.Version(), SchemaVersion: schema})
 	if _, err = input.Seek(0, 0); err != nil {
 		return "", 0, "", err
 	}

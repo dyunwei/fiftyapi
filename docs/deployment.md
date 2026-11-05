@@ -54,14 +54,21 @@ docker compose up -d --no-build
 无需源码也可直接运行镜像：
 
 ```sh
-docker run -d --name fiftyapi --restart unless-stopped --stop-timeout 60 \
-  -p 28080:8080 -v fiftyapi-data:/data dyunwei/fiftyapi
+mkdir -p data
+docker run -d \
+  --name fiftyapi \
+  --restart unless-stopped \
+  --stop-timeout 60 \
+  -p 28080:8080 \
+  -e TZ=Asia/Shanghai \
+  -v "$(pwd)/data:/data" \
+  dyunwei/fiftyapi
 docker exec fiftyapi cat /data/setup-token
 ```
 
 无需提前配置两个密钥。打开 `http://服务器内网IP:28080`，填入上一步读取的口令并设置管理员。`FIFTYAPI_PUBLIC_URL` 只需在发送邀请时配置为收件人能访问的 HTTP 或 HTTPS 站点地址，例如 `http://192.168.1.10:28080`，也可在网页邮件配置中填写。HTTP 部署保持 `FIFTYAPI_COOKIE_SECURE=false`。宿主机端口为 28080，容器内仍监听 8080。
 
-自动生成的主密钥必须与数据卷一起保留，并另行备份；在线数据库备份仍不包含它。已有数据库丢失 `master.key` 且未提供原 `FIFTYAPI_MASTER_KEY` 时会拒绝启动，不生成替代密钥。恢复旧数据库须先恢复原主密钥；自定义数据库路径时，自动密钥文件位于该数据库所在目录。
+上述命令将数据保存到宿主机 `./data` 目录。请保留该目录，并单独备份其中自动生成的 `master.key`；在线数据库备份仍不包含它。已有数据库丢失 `master.key` 且未提供原 `FIFTYAPI_MASTER_KEY` 时会拒绝启动，不生成替代密钥。恢复旧数据库须先恢复原主密钥；自定义数据库路径时，自动密钥文件位于该数据库所在目录。
 
 ## HTTPS 反向代理
 
@@ -240,7 +247,41 @@ Access Key ID 与 Secret Access Key 使用原系统主密钥加密保存，读�
 
 每 30 秒尝试清理过期文件，失败保留记录并重试，详情写入「运行日志 → 备份」。停机期间不能清理，启动后继续执行；对于启用版本控制的存储桶，删除当前对象不保证历史版本被物理清除，需在存储侧配置版本生命周期。运行中被中断的任务会在重启后标记失败。上传成功后如果本地结果落库失败，记录仍保留其对象地址；检查数据库并重启后，记录会标记失败，随后可删除或到期清理。
 
-下载备份后，在可信本机解压并使用现有离线恢复脚本恢复到**新目录**，不会覆盖现有数据库：
+### Docker 恢复（推荐）
+
+镜像内置 `fiftyapi restore`，直接读取在线备份的 `tar.gz`，不需要 Python 或手动解压。必须先停止原服务和导入任务；命令会检查当前 `FIFTYAPI_DB_PATH` 的服务锁。恢复目录必须不存在，原数据库不会被覆盖。
+
+在 Compose 项目目录执行（将备份文件放到当前目录，命名为 `backup.tar.gz`）：
+
+```sh
+docker compose stop fiftyapi
+docker compose run --rm --no-deps --user 0:0 \
+  --entrypoint /app/fiftyapi \
+  -v "$PWD/backup.tar.gz:/backup.tar.gz:ro" \
+  fiftyapi restore --from /backup.tar.gz --output /data/restored
+```
+
+该维护命令绕过常规入口，通过 `--user 0:0` 以 root 用户读取挂载的私有备份和数据卷；正常启动仍由入口切换为 app 用户，并修正数据卷文件所有权。命令继承 Compose 的原主密钥环境变量；未配置时读取当前数据库同目录的原 `master.key`。从其他服务器迁移时，先恢复原主密钥到环境变量，或挂载原密钥文件并使用 `--key-file /path/to/master.key`（文件权限须为 0600）。不会生成替代密钥。
+
+命令验证文件 SHA-256、SQLite 完整性和主密钥；在临时副本上执行现有数据库升级，拒绝比当前程序更新的数据库。新备份清单记录程序和数据库版本；兼容旧版 format 1 清单，从数据库读取实际版本。缺少主密钥校验记录的早期数据库会被拒绝。解压后总大小上限 32 GiB，数据卷需为解压文件和升级预留空间。失败时清理临时副本；强制断电可能留下 `.fiftyapi-restore-*` 或不完整的目标目录，确认后删除并使用新目录重试。
+
+恢复成功后，目录中包含数据库和从本次提供的原密钥生成的私有 `master.key`。在 `.env` 设置：
+
+```dotenv
+FIFTYAPI_DB_PATH=/data/restored/fiftyapi.db
+```
+
+然后执行 `docker compose up -d --force-recreate fiftyapi`。检查登录、Key、模型与价格、预算、备份计划及上游账号授权；OAuth 令牌可能在快照后已经轮换，需要重新授权。不要同时运行原实例和恢复实例。需要回退时先停服，将 `FIFTYAPI_DB_PATH` 改回原路径再重建容器；原数据仍保留，但恢复实例启动后的写入不会合并回旧库。
+
+非 Docker 部署可运行：
+
+```sh
+fiftyapi restore --from backup.tar.gz --output restored-data --key-file data/master.key
+```
+
+### Python 离线工具
+
+下载备份后，也可在可信本机解压并使用原离线恢复脚本恢复到**新目录**，不会覆盖现有数据库：
 
 ```sh
 mkdir /secure/backup-extracted

@@ -4,6 +4,7 @@ import {ref,computed,onMounted,onBeforeUnmount} from 'vue'
 const props=defineProps({api:{type:Function,required:true},notify:{type:Function,required:true}})
 const config=ref({endpoint:'',region:'auto',bucket:'',prefix:'backups/',access_key:'',secret_key:'',path_style:true,auto_enabled:false,daily_time:'03:00',retention_days:14})
 const accessSet=ref(false),secretSet=ref(false),editable=ref(false),timezone=ref(''),nextRun=ref(null),busy=ref(false),loading=ref(false),error=ref(''),recordsError=ref(''),items=ref([]),total=ref(0),page=ref(1),size=ref(20),manualDays=ref(14)
+const restoreDocs=computed(()=>locale.value==='en'?'https://github.com/dyunwei/fiftyapi/blob/main/docs/en/deployment.md#backups-and-restoration':'https://github.com/dyunwei/fiftyapi/blob/main/docs/deployment.md#docker-恢复推荐')
 const pages=computed(()=>Math.max(1,Math.ceil(total.value/size.value)))
 const running=computed(()=>items.value.some(r=>r.status==='running'))
 const statusNames=computed(()=>({running:t('备份中'),completed:t('已完成'),failed:t('失败'),deleted:t('已删除'),expired:t('已过期清理')}))
@@ -55,7 +56,17 @@ onBeforeUnmount(()=>{disposed=true;request++;clearTimeout(timer)})
    </fieldset></form>
   </section>
   <section class="panel backup-panel"><div class="backup-record-heading"><div><h2>{{ t('备份记录') }}</h2><p class="subtle">{{ t('创建手动备份，查看进度并下载已有备份。') }}</p></div><form class="backup-record-actions" @submit.prevent="create"><label>{{ t('本次保留天数') }}<input v-model.number="manualDays" :aria-label="t('本次备份保留天数')" type="number" min="1" max="3650" step="1" required></label><button class="primary" :disabled="busy||running||!editable">{{ t('创建备份') }}</button><button type="button" class="secondary" :disabled="busy||loading" @click="loadRecords">{{ t('刷新记录') }}</button></form></div>
-   <p class="notice">{{ t('备份包含数据库一致性快照及校验清单，不包含主密钥。请单独保管原 FIFTYAPI_MASTER_KEY；恢复时需先停止服务。文件使用单个 tar.gz 压缩包，最大 5 GiB。') }}</p>
+   <p class="notice">{{ t('备份包含整个数据库快照及校验清单，不包含主密钥。请单独备份原 master.key 或保管原 FIFTYAPI_MASTER_KEY，丢失后无法恢复加密凭据。文件使用单个 tar.gz 压缩包，最大 5 GiB。') }}</p>
+   <p class="subtle">{{ t('按快速开始使用 Docker 部署时，主密钥位于宿主机 ./data/master.key（容器内 /data/master.key）。请单独备份此文件，恢复时使用原文件；若设置了 FIFTYAPI_MASTER_KEY，则保管该环境变量的原值。') }}</p>
+   <details class="backup-restore"><summary>{{ t('如何恢复备份？') }}</summary>
+    <p>{{ t('恢复需在服务器上离线执行，Docker 镜像已内置恢复命令，无需安装 Python。网页暂不提供直接还原。') }}</p>
+    <ol>
+     <li>{{ t('下载备份 tar.gz 文件，并准备原主密钥。') }}</li>
+     <li>{{ t('停止原服务，按部署文档执行 fiftyapi restore，将备份恢复到新目录。命令会验证备份、主密钥和数据库版本，保留原数据库。') }}</li>
+     <li>{{ t('将数据库路径切换到恢复目录后启动，检查用户、Key、预算、备份计划和上游授权。快照之后的数据不会恢复，已轮换的 OAuth 令牌可能需要重新授权。') }}</li>
+    </ol>
+    <a :href="restoreDocs" target="_blank" rel="noopener noreferrer">{{ t('查看完整恢复步骤（Docker / 命令行）') }} ↗</a>
+   </details>
    <p v-if="recordsError" class="alert error" role="alert">{{ t(recordsError) }} <button type="button" class="text-button" @click="loadRecords">{{ t('重试') }}</button></p>
    <p v-if="loading" class="subtle" role="status">{{ t('正在读取备份记录…') }}</p>
    <div v-if="!loading&&!recordsError&&!items.length" class="empty">{{ t('暂无备份记录') }}</div>
@@ -66,6 +77,11 @@ onBeforeUnmount(()=>{disposed=true;request++;clearTimeout(timer)})
 </template>
 <style scoped>
 .backup-settings{min-width:0}
+.backup-restore{margin:16px 0 22px;line-height:1.7}
+.backup-restore summary{cursor:pointer;font-weight:600}
+.backup-restore p{margin:12px 0}
+.backup-restore ol{padding-left:24px;margin:12px 0}
+.backup-restore li+li{margin-top:8px}
 .backup-panel{padding:24px}
 .backup-panel h2{margin-bottom:8px}
 .backup-panel>p.subtle{margin-bottom:22px}

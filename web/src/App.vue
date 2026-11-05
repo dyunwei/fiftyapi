@@ -305,7 +305,13 @@ const modalTitle=computed(()=>({'key-usage':t('使用 API 密钥'),'contribution
    <template v-else>
     <label>{{ t('用户名') }}<input v-model="auth.username" name="username" autocomplete="username" required :minlength="initialized?1:3" :maxlength="initialized?254:64" :placeholder="initialized?t('邮箱或原有用户名'):t('管理员用户名')"></label>
     <label>{{ t('密码') }}<input v-model="auth.password" name="password" type="password" :autocomplete="initialized?'current-password':'new-password'" required :minlength="initialized?1:8" maxlength="72" :placeholder="initialized?t('输入密码'):t('至少 8 个字符')"></label>
-    <label v-if="!initialized">{{ t('部署口令') }}<input v-model="auth.setup_token" name="setup_token" type="password" required autocomplete="off" :placeholder="t('部署时设置的初始化口令')"></label>
+    <label v-if="!initialized">{{ t('初始化口令（Setup token）') }}<input v-model="auth.setup_token" name="setup_token" type="password" required autocomplete="off" aria-describedby="setup-token-help" :placeholder="t('粘贴从服务器获取的初始化口令')"></label>
+    <div v-if="!initialized" id="setup-token-help" class="setup-token-help">
+     <p>{{ t('初始化口令用于确认你有服务器访问权限，仅首次创建管理员时使用，不是登录密码或主密钥。') }}</p>
+     <p>{{ t('Docker 部署：在服务器终端执行以下命令，将输出的口令填入上方。容器名称不同时请替换 fiftyapi。') }}</p>
+     <pre><code>docker exec fiftyapi cat /data/setup-token</code></pre>
+     <p>{{ t('按快速开始部署时，也可读取宿主机 ./data/setup-token。直接运行程序时，读取数据库同目录的 setup-token；使用本地启动脚本时为 .local/setup-token。若设置了 FIFTYAPI_SETUP_TOKEN，则使用该环境变量的值。') }}</p>
+    </div>
    </template>
    <div v-if="error" class="alert error" role="alert">{{ t(error) }}</div>
    <button class="primary wide" :disabled="busy">{{ busy?t('正在处理…'):initialized?(registering?t('注册'):t('登录')):(setupMode==='migration'?t('创建管理员并开始迁移'):t('创建管理员')) }} <span>→</span></button>

@@ -50,14 +50,21 @@ The command above builds from source. To use the published Docker Hub image, fol
 The published image is [`dyunwei/fiftyapi` on Docker Hub](https://hub.docker.com/r/dyunwei/fiftyapi). With the repository's Compose configuration, set `FIFTYAPI_IMAGE=dyunwei/fiftyapi` in `.env`, then run `docker compose pull` followed by `docker compose up -d --no-build`. Without a source checkout, run the image directly:
 
 ```sh
-docker run -d --name fiftyapi --restart unless-stopped --stop-timeout 60 \
-  -p 28080:8080 -v fiftyapi-data:/data dyunwei/fiftyapi
+mkdir -p data
+docker run -d \
+  --name fiftyapi \
+  --restart unless-stopped \
+  --stop-timeout 60 \
+  -p 28080:8080 \
+  -e TZ=Asia/Shanghai \
+  -v "$(pwd)/data:/data" \
+  dyunwei/fiftyapi
 docker exec fiftyapi cat /data/setup-token
 ```
 
 No key variables are required for a new installation. Open `http://SERVER_LAN_IP:28080` and initialize your administrator with the generated token. Configure the public URL only when needed for invitations, in environment variables or web email settings. The host port is 28080; the container continues to listen on port 8080.
 
-Persist the data volume and separately back up the generated master key. Online database archives still exclude it. If a database already exists and its original key is unavailable, startup fails without generating a replacement key. Restore the original key before restoring an existing database. Custom database paths use key files in the same directory as that database.
+The command stores data in the host `./data` directory. Keep this directory and separately back up its generated `master.key`. Online database archives still exclude it. If a database already exists and its original key is unavailable, startup fails without generating a replacement key. Restore the original key before restoring an existing database. Custom database paths use key files in the same directory as that database.
 
 ## HTTPS reverse proxy
 
@@ -104,6 +111,22 @@ python3 scripts/backup-offline.py restore --from backups/first-snapshot --output
 Output directories must not already exist. The tool checks service locks and checksums and does not copy the master key. Start the restored database using `FIFTYAPI_DB_PATH=restored-data/fiftyapi.db` and the original key. Do not run the original and restored instances against the same upstream credentials or remote backup objects simultaneously.
 
 Online S3/R2 backups create a consistent SQLite snapshot, including committed WAL data, and a checksum manifest. Archives do not contain the master key. See [backup administration](administration.md#backups) for schedules, storage permissions and restoration steps.
+
+The Docker image now includes `fiftyapi restore`; no Python or manual extraction is required for online backup archives. From the Compose project directory:
+
+```sh
+docker compose stop fiftyapi
+docker compose run --rm --no-deps --user 0:0 \
+  --entrypoint /app/fiftyapi \
+  -v "$PWD/backup.tar.gz:/backup.tar.gz:ro" \
+  fiftyapi restore --from /backup.tar.gz --output /data/restored
+```
+
+The maintenance command uses explicit `--user 0:0` to read private mounted files. Normal startup fixes data-volume ownership and runs as app. It reads the original key from Compose environment or the current database directory's `master.key`; `--key-file` accepts an explicitly mounted original key (0600 permissions). It never generates a replacement key.
+
+Restoration verifies SHA-256 checksums, SQLite integrity and the original key, then runs supported migrations on a staging copy. Newer database schemas are rejected. Version metadata is included in new archives; existing format 1 archives remain supported using the database's schema version. Early databases without a master-key verification record are rejected. Unpacked data is limited to 32 GiB; allow additional disk space for migration. Existing output paths are rejected. Interrupted operations may leave staging or incomplete output directories; inspect and remove them before retrying into a new directory.
+
+After success, set `FIFTYAPI_DB_PATH=/data/restored/fiftyapi.db` in `.env`, then run `docker compose up -d --force-recreate fiftyapi`. The new directory includes a private copy of the supplied original master key. Check login, API keys, budgets, models, backup schedules and upstream authorization; OAuth tokens may have rotated since the snapshot. Keep the original instance stopped. To roll back, stop the restored instance and switch the database path back; subsequent writes are not merged. For binary deployments, use `fiftyapi restore --from backup.tar.gz --output restored-data --key-file data/master.key`.
 
 ## Diagnostics
 
