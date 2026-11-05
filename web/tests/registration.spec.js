@@ -31,7 +31,7 @@ test('邮箱和真实姓名注册、零额度登录及管理员查看',async({pa
  await expect(page.getByRole('button',{name:'注册账号',exact:true})).toHaveCount(0)
  await page.getByLabel('用户名',{exact:true}).fill('admin')
  await page.getByLabel('密码',{exact:true}).fill(adminPassword)
- await page.getByLabel('部署口令',{exact:true}).fill(setupToken)
+ await page.getByLabel('初始化口令（Setup token）',{exact:true}).fill(setupToken)
  await page.getByRole('button',{name:'创建管理员',exact:false}).click()
  await page.getByRole('button',{name:'注册账号',exact:true}).click()
  await expect(page.getByRole('heading',{name:'注册账号',exact:true})).toBeVisible()

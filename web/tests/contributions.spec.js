@@ -26,7 +26,7 @@ test('管理员分享临时链接，成员匿名导入后停用，再撤销入�
  await page.goto(baseURL)
  await page.getByLabel('用户名',{exact:true}).fill('admin')
  await page.getByLabel('密码',{exact:true}).fill(password)
- await page.getByLabel('部署口令',{exact:true}).fill(setupToken)
+ await page.getByLabel('初始化口令（Setup token）',{exact:true}).fill(setupToken)
  await page.getByRole('button',{name:'创建管理员',exact:false}).click()
  await expect(page.getByRole('heading',{name:'登录工作空间'})).toBeVisible()
  await page.getByRole('button',{name:'登录',exact:false}).click()

@@ -60,7 +60,8 @@ test('管理员初始化、密钥一次性显示、成员权限与退出',async(
  await expect(page.locator('.brand-name').first()).toContainText('FiftyAPI')
  await page.getByLabel('用户名',{exact:true}).fill('admin')
  await page.getByLabel('密码',{exact:true}).fill(password)
- await page.getByLabel('部署口令',{exact:true}).fill(setupToken)
+ await expect(page.locator('#setup-token-help')).toContainText('docker exec fiftyapi cat /data/setup-token')
+ await page.getByLabel('初始化口令（Setup token）',{exact:true}).fill(setupToken)
  await page.getByRole('button',{name:'创建管理员'}).click()
  await expect(page.getByRole('heading',{name:'登录工作空间'})).toBeVisible()
  await page.getByRole('button',{name:'登录',exact:false}).click()
@@ -130,7 +131,7 @@ test('管理员初始化、密钥一次性显示、成员权限与退出',async(
 })
 test('手机布局与初始化关闭',async({page})=>{
  await page.setViewportSize({width:390,height:844});await page.goto(baseURL)
- await expect(page.getByLabel('部署口令')).toHaveCount(0)
+ await expect(page.getByLabel('初始化口令（Setup token）')).toHaveCount(0)
  await page.getByLabel('用户名',{exact:true}).fill('admin');await page.getByLabel('密码',{exact:true}).fill(password)
  await page.getByRole('button',{name:'登录',exact:false}).click()
  await expect(page.getByRole('heading',{name:'管理控制台',exact:true})).toBeVisible()

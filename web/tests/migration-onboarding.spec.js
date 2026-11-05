@@ -28,7 +28,7 @@ test('first setup guides Docker export, upload, review, import and model setup; 
  await page.getByRole('radio',{name:/从 sub2api Docker 迁移/}).check()
  await page.getByLabel('用户名',{exact:true}).fill('admin')
  await page.getByLabel('密码',{exact:true}).fill(password)
- await page.getByLabel('部署口令',{exact:true}).fill(setupToken)
+ await page.getByLabel('初始化口令（Setup token）',{exact:true}).fill(setupToken)
  await page.getByRole('button',{name:'创建管理员并开始迁移',exact:false}).click()
  await expect(page.getByRole('heading',{name:'迁移你的 sub2api 工作空间'})).toBeVisible()
  await expect(page.locator('.migration-command')).toContainText('curl -fsSL https://raw.githubusercontent.com/dyunwei/fiftyapi/main/scripts/migrate-sub2api.sh | sudo bash')
