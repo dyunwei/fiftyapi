@@ -10,8 +10,8 @@ const labels={openai:'OpenAI Codex',claude:'Claude',antigravity:'Antigravity'}
 const status=link=>link.revoked_at?'revoked':link.expires_at*1000<=now.value?'expired':'active'
 const statusLabels=computed(()=>({active:t('有效'),revoked:t('已停用'),expired:t('已过期')}))
 const filtered=computed(()=>links.value.filter(link=>filter.value==='all'||status(link)===filter.value))
-const pages=computed(()=>Math.max(1,Math.ceil(filtered.value.length/5)))
-const visible=computed(()=>filtered.value.slice((page.value-1)*5,page.value*5))
+const pages=computed(()=>Math.max(1,Math.ceil(filtered.value.length/10)))
+const visible=computed(()=>filtered.value.slice((page.value-1)*10,page.value*10))
 watch(filter,()=>page.value=1)
 watch(pages,value=>page.value=Math.min(page.value,value))
 async function load(){links.value=await props.api('/admin/contribution-links')}
@@ -30,6 +30,6 @@ const date=n=>new Date(n*1000).toLocaleString(locale.value,{hour12:false})
  <div class="contribution-list-heading"><h3>{{ t('已创建的链接') }} <span class="subtle">{{ links.length }}</span></h3><label>{{ t('链接状态') }}<select v-model="filter" :disabled="busy"><option value="all">{{ t('全部状态') }}</option><option value="active">{{ t('有效') }}</option><option value="revoked">{{ t('已停用') }}</option><option value="expired">{{ t('已过期') }}</option></select></label></div>
  <p v-if="!filtered.length" class="subtle contribution-list-empty">{{ links.length?t('暂无符合条件的链接。'):t('尚未创建贡献链接。') }}</p>
  <div v-else class="contribution-list" role="list" :aria-label="t('已创建的贡献链接')"><article v-for="link in visible" :key="link.id" class="contribution-link-row" role="listitem"><div class="contribution-link-name"><strong>#{{ link.id }} · {{ labels[link.provider] }}</strong><span class="subtle">{{ link.note||t('无备注') }}</span></div><div class="contribution-link-expiry"><span class="subtle">{{ t('有效至') }}</span><time :datetime="new Date(link.expires_at*1000).toISOString()">{{ date(link.expires_at) }}</time></div><span class="contribution-link-count">{{ t('已贡献') }} {{ link.contributed_count }} {{ t('个账号') }}</span><div class="contribution-link-actions"><span :class="['pill',{'muted-pill':status(link)!=='active'}]">{{ statusLabels[status(link)] }}</span><button v-if="status(link)==='active'" type="button" class="danger-text" :disabled="busy" @click="revoke(link)">{{ t('停用链接') }}</button></div></article></div>
- <nav class="model-pagination contribution-pagination" :aria-label="t('贡献链接分页')"><span>{{ t('共 {0} 条 · 每页 5 条 · 第 {1} / {2} 页',[filtered.length,page,pages]) }}</span><div class="actions"><button type="button" class="secondary" :disabled="busy||page<=1" @click="page--">{{ t('上一页') }}</button><button type="button" class="secondary" :disabled="busy||page>=pages" @click="page++">{{ t('下一页') }}</button></div></nav>
+ <nav class="model-pagination contribution-pagination" :aria-label="t('贡献链接分页')"><span>{{ t('共 {0} 条 · 每页 10 条 · 第 {1} / {2} 页',[filtered.length,page,pages]) }}</span><div class="actions"><button type="button" class="secondary" :disabled="busy||page<=1" @click="page=1">{{ t('首页') }}</button><button type="button" class="secondary" :disabled="busy||page<=1" @click="page--">{{ t('上一页') }}</button><button type="button" class="secondary" :disabled="busy||page>=pages" @click="page++">{{ t('下一页') }}</button><button type="button" class="secondary" :disabled="busy||page>=pages" @click="page=pages">{{ t('末页') }}</button></div></nav>
  </div>
 </template>

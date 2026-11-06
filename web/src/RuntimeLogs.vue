@@ -3,7 +3,7 @@ import { t, locale } from './i18n.js'
 import {ref,computed,onMounted,onBeforeUnmount} from 'vue'
 const props=defineProps({api:{type:Function,required:true}})
 const newFilter=()=>({level:'',module:'',account_id:'',since:'',until:''})
-const filter=ref(newFilter()),applied=ref(newFilter()),items=ref([]),page=ref(1),size=ref(20),total=ref(0),loading=ref(false),error=ref('')
+const filter=ref(newFilter()),applied=ref(newFilter()),items=ref([]),page=ref(1),size=ref(10),total=ref(0),loading=ref(false),error=ref('')
 const pages=computed(()=>Math.max(1,Math.ceil(total.value/size.value)))
 const modules=computed(()=>({server:t('服务运行'),scheduler:t('定时任务'),accounts:t('账号维护'),database:t('数据库'),backup:t('备份')}))
 const levels=computed(()=>({info:t('信息'),warn:t('警告'),error:t('错误')}))
@@ -43,7 +43,7 @@ onBeforeUnmount(()=>request++)
   <p v-if="loading" class="subtle" role="status">{{ t('正在读取运行日志…') }}</p>
   <div v-if="!loading&&!error&&!items.length" class="empty"><h3>{{ t('暂无符合条件的运行日志') }}</h3></div>
   <div v-if="!error&&items.length" class="table-wrap"><table class="runtime-table"><thead><tr><th>{{ t('最近发生时间') }}</th><th>{{ t('级别') }}</th><th>{{ t('模块 / 事件') }}</th><th>{{ t('账号') }}</th><th>{{ t('运行摘要') }}</th><th>{{ t('状态 / 耗时') }}</th><th>{{ t('次数') }}</th></tr></thead><tbody><tr v-for="item in items" :key="item.id"><td :title="t('首次发生：')+date(item.created_at)">{{ date(item.last_at) }}</td><td><span :class="['pill',{'bad-pill':item.level==='error','runtime-warning':item.level==='warn'}]">{{ levels[item.level]||item.level }}</span></td><td>{{ modules[item.module]||item.module }}<small class="cell-note">{{ item.event }}</small></td><td>{{ item.account_id?'#'+item.account_id:'—' }}</td><td class="runtime-message">{{ t(item.message) }}</td><td>{{ item.status?'HTTP '+item.status:'—' }}<small class="cell-note">{{ item.duration_ms }} ms</small></td><td>{{ item.occurrences }}</td></tr></tbody></table></div>
-  <div class="model-pagination"><span>{{ t('共 {0} 项 · 第 {1} / {2} 页',[total,page,pages]) }}</span><div class="actions"><label class="page-size">{{ t('每页') }}<select v-model.number="size" :aria-label="t('运行日志每页条数')" :disabled="loading" @change="page=1;reload()"><option :value="10">10</option><option :value="20">20</option><option :value="50">50</option><option :value="100">100</option></select></label><button type="button" class="secondary" :disabled="loading||page<=1" @click="move(-1)">{{ t('上一页') }}</button><button type="button" class="secondary" :disabled="loading||page>=pages" @click="move(1)">{{ t('下一页') }}</button></div></div>
+  <div class="model-pagination"><span>{{ t('共 {0} 项 · 第 {1} / {2} 页',[total,page,pages]) }}</span><div class="actions"><label class="page-size">{{ t('每页') }}<select v-model.number="size" :aria-label="t('运行日志每页条数')" :disabled="loading" @change="page=1;reload()"><option :value="10">10</option><option :value="20">20</option><option :value="50">50</option><option :value="100">100</option></select></label><button type="button" class="secondary" :disabled="loading||page<=1" @click="move(1-page)">{{ t('首页') }}</button><button type="button" class="secondary" :disabled="loading||page<=1" @click="move(-1)">{{ t('上一页') }}</button><button type="button" class="secondary" :disabled="loading||page>=pages" @click="move(1)">{{ t('下一页') }}</button><button type="button" class="secondary" :disabled="loading||page>=pages" @click="move(pages-page)">{{ t('末页') }}</button></div></div>
  </section>
 </template>
 <style scoped>
