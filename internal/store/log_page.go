@@ -89,6 +89,7 @@ func (s *Store) LogListPage(ctx context.Context, f LogFilter, page, size int) (L
 	// ordered sources using time indexes; only this page needs full-row reads.
 	query := `WITH page_ids AS (SELECT l.id,l.created_at` + normal + ` UNION ALL SELECT c.id,c.created_at` + missing + ` ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?)
  SELECT p.id,COALESCE(l.user_id,c.user_id),COALESCE(l.key_id,c.key_id,0),l.account_id,COALESCE(l.model,c.model_id),COALESCE(l.provider,m.provider,''),COALESCE(l.status,0),l.input_tokens,l.output_tokens,l.cached_tokens,l.cache_write_tokens,l.amount,COALESCE(l.duration_ms,0),CASE WHEN l.id IS NULL THEN '结算日志未完整保存，请核查账本记录' ELSE l.error END,p.created_at,COALESCE(c.status,''),CASE WHEN c.status='pending' THEN c.reservation ELSE NULL END
+ ,COALESCE(l.reasoning_effort,''),COALESCE(l.thinking_type,''),l.thinking_budget_tokens,COALESCE(l.speed,''),COALESCE(l.service_tier,'')
  FROM page_ids p LEFT JOIN request_logs l ON l.id=p.id LEFT JOIN request_charges c ON c.id=p.id LEFT JOIN models m ON m.id=c.model_id ORDER BY p.created_at DESC,p.id DESC`
 	rows, err := tx.QueryContext(ctx, query, append(args, size, (page-1)*size)...)
 	if err != nil {
@@ -96,7 +97,7 @@ func (s *Store) LogListPage(ctx context.Context, f LogFilter, page, size int) (L
 	}
 	for rows.Next() {
 		var l RequestLog
-		if err = rows.Scan(&l.ID, &l.UserID, &l.KeyID, &l.AccountID, &l.Model, &l.Provider, &l.Status, &l.Input, &l.Output, &l.Cached, &l.CacheWrite, &l.Amount, &l.DurationMS, &l.Error, &l.CreatedAt, &l.SettlementStatus, &l.Reservation); err != nil {
+		if err = rows.Scan(&l.ID, &l.UserID, &l.KeyID, &l.AccountID, &l.Model, &l.Provider, &l.Status, &l.Input, &l.Output, &l.Cached, &l.CacheWrite, &l.Amount, &l.DurationMS, &l.Error, &l.CreatedAt, &l.SettlementStatus, &l.Reservation, &l.ReasoningEffort, &l.ThinkingType, &l.ThinkingBudgetTokens, &l.Speed, &l.ServiceTier); err != nil {
 			rows.Close()
 			return out, err
 		}

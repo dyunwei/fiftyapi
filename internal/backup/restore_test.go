@@ -21,8 +21,13 @@ func TestRestoreArchive(t *testing.T) {
 	if err := s.store.CheckMasterKey(ctx, key); err != nil {
 		t.Fatal(err)
 	}
-	// Simulate a schema-13 backup; restore must apply migration 14 only to its copy.
-	if _, err := s.store.DB.Exec("DROP TABLE imported_users; DELETE FROM schema_migrations WHERE version=14"); err != nil {
+	// Simulate a schema-13 backup; restore must upgrade only its copy.
+	for _, column := range []string{"reasoning_effort", "thinking_type", "thinking_budget_tokens", "speed", "service_tier"} {
+		if _, err := s.store.DB.Exec("ALTER TABLE request_logs DROP COLUMN " + column); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := s.store.DB.Exec("DROP TABLE imported_users; DELETE FROM schema_migrations WHERE version>=14"); err != nil {
 		t.Fatal(err)
 	}
 	source, _, _, err := archive(ctx, s.store, t.TempDir())

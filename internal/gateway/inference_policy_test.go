@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"testing"
+	"time"
 )
 
 func TestInferencePolicy(t *testing.T) {
@@ -101,6 +102,30 @@ func TestInferencePolicyWebSocket(t *testing.T) {
 		if event := readWSTerminal(t, conn); string(event["type"]) != `"response.completed"` {
 			t.Fatalf("WS request failed: %v", event)
 		}
+	}
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		logs, err := g.s.Logs(context.Background(), g.user, false, 0, "", 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(logs) == 2 {
+			seen := map[string]bool{}
+			for _, entry := range logs {
+				if entry.ServiceTier != "fast" {
+					t.Fatalf("WS requested tier lost: %+v", entry.RequestInference)
+				}
+				seen[entry.ReasoningEffort] = true
+			}
+			if !seen["xhigh"] || !seen["max"] {
+				t.Fatalf("WS turn settings mixed: %v", seen)
+			}
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("WS inference logs missing")
+		}
+		time.Sleep(5 * time.Millisecond)
 	}
 }
 

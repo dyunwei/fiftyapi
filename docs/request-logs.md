@@ -16,6 +16,14 @@
 
 ## API
 
+### 推理与速度参数
+
+模型下方显示客户端请求的推理设置和速度档位：Codex Responses（含 WebSocket）的 `reasoning.effort`、Chat Completions 的 `reasoning_effort`，以及 Claude Code Messages 的 `output_config.effort`、`thinking.type`、`thinking.budget_tokens`、`speed`。各协议同时记录 `service_tier`，保留原始档位名称，不把不同厂商的档位或思考预算强行换算。
+
+日志 API 增加可选字段 `reasoning_effort`、`thinking_type`、`thinking_budget_tokens`、`speed`、`service_tier`，分页和旧数组接口均返回这些字段。只提取顶层请求配置，不保存消息内容或逐消息配置。未指定、不可识别的参数与历史日志显示“未指定”；不会猜测模型默认值。记录的是账号策略调整前的客户端请求值，不代表上游最终采用的设置，也不是实测速率（tokens/s）。此功能仅观察参数，不改变请求转发和已有档位限制。
+
+### 接口列表
+
 - `GET /api/logs?page=1&page_size=20`：自己的日志。
 - `GET /api/admin/logs?page=1&page_size=20&settlement=pending`：管理员结算异常。
 - 可选 `model`、`request_id`、`status`、`since`；管理员还可选择 `settlement=pending/settled/inflight`。

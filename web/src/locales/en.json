@@ -1,4 +1,9 @@
 {
+  "请求推理": "Requested reasoning",
+  "请求速度": "Requested speed",
+  "未指定": "Unspecified",
+  "预算 {0} tokens": "Budget {0} tokens",
+  "客户端请求参数；账号策略可能调整，上游实际执行档位未确认。历史日志无此信息。": "Client request settings; account policies may adjust them. Actual upstream settings are unconfirmed. Unavailable for historical logs.",
   "使用默认值": "Use default",
   "启用": "Enabled",
   "关闭": "Close",

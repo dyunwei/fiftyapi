@@ -149,6 +149,7 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Request-ID", id)
 	recorded := false
 	logModel, logProvider := "", ""
+	var logInference store.RequestInference
 	tracked := &statusWriter{ResponseWriter: w}
 	w = tracked
 	defer func() {
@@ -160,7 +161,7 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 			if status == 0 {
 				status = 500
 			}
-			h.store.LogRequest(ctx, store.RequestLog{ID: id, UserID: user.ID, KeyID: key, Model: logModel, Provider: logProvider, Status: status, Amount: &zero, DurationMS: time.Since(start).Milliseconds(), Error: "请求未发送到上游", CreatedAt: start.Unix()})
+			h.store.LogRequest(ctx, store.RequestLog{RequestInference: logInference, ID: id, UserID: user.ID, KeyID: key, Model: logModel, Provider: logProvider, Status: status, Amount: &zero, DurationMS: time.Since(start).Milliseconds(), Error: "请求未发送到上游", CreatedAt: start.Unix()})
 		}
 	}()
 	if _, err := providers.NextRelayChain(r.Header.Get(providers.RelayChainHeader), h.instanceID); err != nil {
@@ -177,6 +178,13 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 		failure(w, 400, "请求 JSON 无效")
 		return
 	}
+	requestedProtocol := "messages"
+	if strings.Contains(r.URL.Path, "responses") {
+		requestedProtocol = "responses"
+	} else if strings.HasSuffix(r.URL.Path, "/chat/completions") {
+		requestedProtocol = "chat"
+	}
+	logInference = requestInference(request, requestedProtocol)
 	if raw := request["stream_id"]; len(raw) > 0 && r.Context().Value(websocketStateKey{}) == nil {
 		failure(w, 400, "stream_id 仅用于 Responses WebSocket")
 		return
@@ -192,12 +200,6 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		failure(w, 400, "模型未启用、未定价或没有可用账号")
 		return
-	}
-	requestedProtocol := "messages"
-	if strings.Contains(r.URL.Path, "responses") {
-		requestedProtocol = "responses"
-	} else if strings.HasSuffix(r.URL.Path, "/chat/completions") {
-		requestedProtocol = "chat"
 	}
 	isResponses := requestedProtocol == "responses"
 	if isResponses {
@@ -266,7 +268,7 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 	}
 	recorded = true
 	w.Header().Set("X-Request-ID", id)
-	logEntry := store.RequestLog{ID: id, UserID: user.ID, KeyID: key, Model: m.ID, Provider: m.Provider, CreatedAt: start.Unix()}
+	logEntry := store.RequestLog{RequestInference: logInference, ID: id, UserID: user.ID, KeyID: key, Model: m.ID, Provider: m.Provider, CreatedAt: start.Unix()}
 	finish := func(out result) {
 		saveCtx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 5*time.Second)
 		defer cancel()

@@ -10,6 +10,11 @@ import (
 // Legacy migration tests must remove the later schema before replaying it.
 func removeContributionSchema(t *testing.T, s *Store) {
 	t.Helper()
+	for _, column := range []string{"reasoning_effort", "thinking_type", "thinking_budget_tokens", "speed", "service_tier"} {
+		if _, err := s.DB.Exec("ALTER TABLE request_logs DROP COLUMN " + column); err != nil {
+			t.Fatal(err)
+		}
+	}
 	for _, q := range []string{"ALTER TABLE api_keys DROP COLUMN suffix", "ALTER TABLE api_keys DROP COLUMN token_encrypted", "DROP TABLE backup_records", "DROP TABLE runtime_logs", "DROP INDEX account_auth_fingerprint", "ALTER TABLE upstream_accounts DROP COLUMN auth_fingerprint", "ALTER TABLE upstream_accounts DROP COLUMN contribution_link_id", "DROP TABLE account_contribution_links", "DELETE FROM schema_migrations WHERE version>=10"} {
 		if _, err := s.DB.Exec(q); err != nil {
 			t.Fatal(err)

@@ -8,7 +8,18 @@ import (
 	"time"
 )
 
+// RequestInference records client settings before account inference policies.
+// Empty values mean unspecified (or unavailable for historical logs).
+type RequestInference struct {
+	ReasoningEffort      string `json:"reasoning_effort,omitempty"`
+	ThinkingType         string `json:"thinking_type,omitempty"`
+	ThinkingBudgetTokens *int64 `json:"thinking_budget_tokens,omitempty"`
+	Speed                string `json:"speed,omitempty"`
+	ServiceTier          string `json:"service_tier,omitempty"`
+}
+
 type RequestLog struct {
+	RequestInference
 	ID               string `json:"id"`
 	UserID           int64  `json:"user_id"`
 	KeyID            int64  `json:"key_id"`
@@ -28,10 +39,10 @@ type RequestLog struct {
 	Reservation      *int64 `json:"reservation,omitempty"`
 }
 
-const insertRequestLog = `INSERT OR IGNORE INTO request_logs(id,user_id,key_id,account_id,model,provider,status,input_tokens,output_tokens,cached_tokens,cache_write_tokens,amount,duration_ms,error,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+const insertRequestLog = `INSERT OR IGNORE INTO request_logs(id,user_id,key_id,account_id,model,provider,status,input_tokens,output_tokens,cached_tokens,cache_write_tokens,amount,duration_ms,error,created_at,reasoning_effort,thinking_type,thinking_budget_tokens,speed,service_tier) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
 
 func logArguments(l RequestLog) []any {
-	return []any{l.ID, l.UserID, l.KeyID, l.AccountID, l.Model, l.Provider, l.Status, l.Input, l.Output, l.Cached, l.CacheWrite, l.Amount, l.DurationMS, l.Error, l.CreatedAt}
+	return []any{l.ID, l.UserID, l.KeyID, l.AccountID, l.Model, l.Provider, l.Status, l.Input, l.Output, l.Cached, l.CacheWrite, l.Amount, l.DurationMS, l.Error, l.CreatedAt, l.ReasoningEffort, l.ThinkingType, l.ThinkingBudgetTokens, l.Speed, l.ServiceTier}
 }
 
 func (s *Store) LogRequest(ctx context.Context, l RequestLog) error {
@@ -42,7 +53,7 @@ func (s *Store) Logs(ctx context.Context, user int64, admin bool, before int64, 
 	return s.LogsPage(ctx, user, admin, before, model, status, "", 0)
 }
 func (s *Store) LogsPage(ctx context.Context, user int64, admin bool, before int64, model string, status int, beforeID string, since int64, requestIDs ...string) ([]RequestLog, error) {
-	query := `SELECT id,user_id,key_id,account_id,model,provider,status,input_tokens,output_tokens,cached_tokens,cache_write_tokens,amount,duration_ms,error,created_at FROM request_logs WHERE 1=1`
+	query := `SELECT id,user_id,key_id,account_id,model,provider,status,input_tokens,output_tokens,cached_tokens,cache_write_tokens,amount,duration_ms,error,created_at,reasoning_effort,thinking_type,thinking_budget_tokens,speed,service_tier FROM request_logs WHERE 1=1`
 	args := []any{}
 	if len(requestIDs) > 0 && requestIDs[0] != "" {
 		query += " AND id=?"
@@ -82,7 +93,7 @@ func (s *Store) LogsPage(ctx context.Context, user int64, admin bool, before int
 	result := []RequestLog{}
 	for rows.Next() {
 		var l RequestLog
-		if err = rows.Scan(&l.ID, &l.UserID, &l.KeyID, &l.AccountID, &l.Model, &l.Provider, &l.Status, &l.Input, &l.Output, &l.Cached, &l.CacheWrite, &l.Amount, &l.DurationMS, &l.Error, &l.CreatedAt); err != nil {
+		if err = rows.Scan(&l.ID, &l.UserID, &l.KeyID, &l.AccountID, &l.Model, &l.Provider, &l.Status, &l.Input, &l.Output, &l.Cached, &l.CacheWrite, &l.Amount, &l.DurationMS, &l.Error, &l.CreatedAt, &l.ReasoningEffort, &l.ThinkingType, &l.ThinkingBudgetTokens, &l.Speed, &l.ServiceTier); err != nil {
 			return nil, err
 		}
 		result = append(result, l)
