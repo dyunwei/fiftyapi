@@ -5,9 +5,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 English | 中文说明见各版本下方折叠区域
 
-## 0.1.0 (Unreleased)
+## 0.1.0 (2026-11-09)
 
-Planned first public preview. The release date will be recorded when published.
+First public preview.
 
 ### Added
 
@@ -34,7 +34,7 @@ See [compatibility](docs/en/compatibility.md) for details.
 <details>
 <summary>中文说明</summary>
 
-计划中的首个公开预览版，正式发布时再记录发布日期。
+首个公开预览版。
 
 **新增**
 
