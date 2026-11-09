@@ -18,7 +18,7 @@ func GatewayProvider(account int64, protocol string) string {
 func Protocol(provider string) string {
 	if strings.HasPrefix(provider, "gateway/") {
 		parts := strings.Split(provider, "/")
-		if len(parts) == 3 && (parts[2] == "messages" || parts[2] == "responses" || parts[2] == "chat") {
+		if len(parts) >= 3 && (parts[2] == "messages" || parts[2] == "responses" || parts[2] == "chat") {
 			return parts[2]
 		}
 		return ""

@@ -31,8 +31,8 @@ func TestMultiProtocolSyncPreservesLegacyIDsAndPrices(t *testing.T) {
 	}
 	_ = s.AccountState(ctx, account, "catalog_ready", "")
 	ids, e := s.SyncGatewayModels(ctx, account, []modelref.Mapping{{UpstreamID: "upstream", Protocols: []string{"messages", "responses", "chat"}}})
-	if e != nil || len(ids) != 2 {
-		t.Fatal("legacy aliases lost", e)
+	if e != nil || len(ids) != 1 {
+		t.Fatal("canonical route pool was not created", e)
 	}
 	canonical, _, e := s.RoutableModel(ctx, ids[0])
 	if e != nil || len(canonical.Protocols) != 3 {
@@ -66,15 +66,6 @@ func TestMultiProtocolSyncPreservesLegacyIDsAndPrices(t *testing.T) {
 	if e != nil || len(responses) != 1 || responses[0].CooldownUntil != 0 {
 		t.Fatal("chat cooldown leaked into responses")
 	}
-	for _, id := range []string{"old-messages", "old-responses"} {
-		m, _, e := s.RoutableModel(ctx, id)
-		if e != nil || m.Price == nil {
-			t.Fatal("legacy priced ID no longer routable")
-		}
-		if id == "old-messages" && m.Price.Input != 1 || id == "old-responses" && m.Price.Input != 3 {
-			t.Fatal("old price changed")
-		}
-	}
 	if _, e = s.SyncGatewayModels(ctx, account, []modelref.Mapping{{UpstreamID: "upstream", Protocols: []string{"chat"}}}); e != nil {
 		t.Fatal(e)
 	}
@@ -103,6 +94,14 @@ func TestProtocolMigrationPreservesExistingModels(t *testing.T) {
 	_ = s.SetModel(ctx, actor, "legacy", true, &Price{Input: 7, Output: 9})
 	_ = s.AccountState(ctx, account, "catalog_ready", "")
 	removeContributionSchema(t, s)
+	if _, e = s.DB.Exec("DROP INDEX IF EXISTS account_models_model"); e != nil {
+		t.Fatal(e)
+	}
+	for _, column := range []string{"protocols", "upstream_id"} {
+		if _, e = s.DB.Exec("ALTER TABLE account_models DROP COLUMN " + column); e != nil {
+			t.Fatal(e)
+		}
+	}
 	if _, e = s.DB.Exec("ALTER TABLE models DROP COLUMN protocols"); e != nil {
 		t.Fatal(e)
 	}

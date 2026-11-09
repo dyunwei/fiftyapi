@@ -58,6 +58,9 @@ func TestGatewayAccountMigrationPreservesParentReferences(t *testing.T) {
 	if _, ids, err := s.RoutableModel(ctx, "model"); err != nil || len(ids) != 1 || ids[0] != 9 {
 		t.Fatal("model relation lost")
 	}
+	if route, err := s.AccountModel(ctx, 9, "model"); err != nil || route.UpstreamID != "model" || len(route.Protocols) != 1 || route.Protocols[0] != "messages" {
+		t.Fatal("legacy membership was not backfilled into a concrete route")
+	}
 	if id, err := s.GatewaySession(ctx, []byte{1}); err != nil || id != 9 {
 		t.Fatal("session relation lost")
 	}
@@ -89,10 +92,13 @@ func TestGatewayAccountMigrationPreservesParentReferences(t *testing.T) {
 	if price, err := s.Price(ctx, "renamed"); err != nil || price.Input != 1000 {
 		t.Fatal("rename lost local pricing")
 	}
-	if _, err = s.SyncGatewayModels(ctx, id, []modelref.Mapping{{ID: "model", UpstreamID: "target", Protocol: "messages"}}); err == nil {
-		t.Fatal("alias collision allowed")
+	if _, err = s.SyncGatewayModels(ctx, id, []modelref.Mapping{{ID: "model", UpstreamID: "target", Protocol: "messages"}}); err != nil {
+		t.Fatal("shared route pool rejected", err)
 	}
 	if _, candidates, err := s.RoutableModel(ctx, "model"); err != nil || candidates[0] != 9 {
-		t.Fatal("collision changed original source")
+		t.Fatal("joining a route pool changed the ready source")
+	}
+	if route, err := s.AccountModel(ctx, id, "model"); err != nil || route.UpstreamID != "target" {
+		t.Fatal("account-specific upstream mapping was not saved")
 	}
 }

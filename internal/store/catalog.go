@@ -61,41 +61,103 @@ func (s *Store) SyncModels(ctx context.Context, account int64, provider string, 
 	if err = tx.QueryRowContext(ctx, "SELECT 1 FROM upstream_accounts WHERE id=? AND deleted_at IS NULL", account).Scan(&exists); err != nil {
 		return ErrNotFound
 	}
+	affected := map[string]bool{}
+	old, err := tx.QueryContext(ctx, "SELECT model_id FROM account_models WHERE account_id=?", account)
+	if err != nil {
+		return err
+	}
+	for old.Next() {
+		var id string
+		if err = old.Scan(&id); err != nil {
+			old.Close()
+			return err
+		}
+		affected[id] = true
+	}
+	err = old.Err()
+	old.Close()
+	if err != nil {
+		return err
+	}
 	if _, err = tx.ExecContext(ctx, "DELETE FROM account_models WHERE account_id=?", account); err != nil {
 		return err
 	}
+	protocol := modelref.Protocol(provider)
+	encoded, _ := json.Marshal([]string{protocol})
 	for _, upstream := range ids {
-		var id string
-		err = tx.QueryRowContext(ctx, "SELECT id FROM models WHERE provider=? AND upstream_id=?", provider, upstream).Scan(&id)
+		// The upstream ID is the canonical public pool name for native accounts.
+		// If another source already owns that pool, attach this account to it.
+		id := upstream
+		var existing string
+		err = tx.QueryRowContext(ctx, "SELECT id FROM models WHERE id=?", id).Scan(&existing)
 		if errors.Is(err, sql.ErrNoRows) {
-			id = upstream
-			var n int
-			tx.QueryRowContext(ctx, "SELECT count(*) FROM models WHERE id=?", id).Scan(&n)
-			if n > 0 {
-				id = provider + "/" + upstream
-			}
-			if _, err = tx.ExecContext(ctx, "INSERT INTO models(id,provider,upstream_id,synced_at) VALUES(?,?,?,?)", id, provider, upstream, time.Now().Unix()); err != nil {
+			if _, err = tx.ExecContext(ctx, "INSERT INTO models(id,provider,upstream_id,synced_at,protocols) VALUES(?,?,?,?,?)", id, provider, upstream, time.Now().Unix(), string(encoded)); err != nil {
 				return err
 			}
 		} else if err != nil {
 			return err
 		}
-		if _, err = tx.ExecContext(ctx, "UPDATE models SET synced_at=?,protocols=? WHERE id=?", time.Now().Unix(), `["`+modelref.Protocol(provider)+`"]`, id); err != nil {
+		if _, err = tx.ExecContext(ctx, "UPDATE models SET synced_at=? WHERE id=?", time.Now().Unix(), id); err != nil {
 			return err
 		}
-		if _, err = tx.ExecContext(ctx, "INSERT OR IGNORE INTO account_models(account_id,model_id) VALUES(?,?)", account, id); err != nil {
+		if _, err = tx.ExecContext(ctx, "INSERT INTO account_models(account_id,model_id,upstream_id,protocols) VALUES(?,?,?,?)", account, id, upstream, string(encoded)); err != nil {
 			return err
 		}
+		affected[id] = true
 		if p, ok := builtinPrice(upstream); ok {
 			if _, err = tx.ExecContext(ctx, "INSERT INTO model_prices(model_id,input,output,cached,cache_write,created_at) SELECT ?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM model_prices WHERE model_id=?)", id, p.Input, p.Output, p.Cached, p.CacheWrite, time.Now().Unix(), id); err != nil {
 				return err
 			}
 		}
 	}
+	for id := range affected {
+		if err = refreshModelProtocols(ctx, tx, id); err != nil {
+			return err
+		}
+	}
 	if _, err = tx.ExecContext(ctx, "UPDATE upstream_accounts SET models_synced_at=? WHERE id=?", time.Now().Unix(), account); err != nil {
 		return err
 	}
 	return tx.Commit()
+}
+
+// refreshModelProtocols maintains the public pool capability union. Selection
+// still checks account_models.protocols, so a route is never sent a protocol it
+// did not advertise.
+func refreshModelProtocols(ctx context.Context, tx *sql.Tx, model string) error {
+	rows, err := tx.QueryContext(ctx, "SELECT protocols FROM account_models WHERE model_id=?", model)
+	if err != nil {
+		return err
+	}
+	set := map[string]bool{}
+	for rows.Next() {
+		var raw string
+		if err = rows.Scan(&raw); err != nil {
+			rows.Close()
+			return err
+		}
+		var values []string
+		_ = json.Unmarshal([]byte(raw), &values)
+		for _, value := range values {
+			if modelref.ValidProtocol(value) {
+				set[value] = true
+			}
+		}
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return err
+	}
+	ordered := []string{}
+	for _, value := range []string{"chat", "messages", "responses"} {
+		if set[value] {
+			ordered = append(ordered, value)
+		}
+	}
+	raw, _ := json.Marshal(ordered)
+	_, err = tx.ExecContext(ctx, "UPDATE models SET protocols=? WHERE id=?", string(raw), model)
+	return err
 }
 func (s *Store) Models(ctx context.Context) ([]Model, error) {
 	rows, err := s.DB.QueryContext(ctx, "SELECT m.id,m.provider,m.upstream_id,m.enabled,m.synced_at,m.protocols,EXISTS(SELECT 1 FROM account_models am JOIN upstream_accounts a ON a.id=am.account_id WHERE am.model_id=m.id AND a.enabled=1 AND a.state IN ('catalog_ready','ready')) FROM models m ORDER BY m.provider,m.id")
@@ -194,6 +256,33 @@ func (s *Store) RoutableModel(ctx context.Context, id string) (Model, []int64, e
 	}
 	m.Available = true
 	return m, ids, rows.Err()
+}
+
+// AccountModelAliases returns the public names exposed through one concrete
+// account. It is used for account-sourced metadata such as the Codex manifest.
+func (s *Store) AccountModelAliases(ctx context.Context, account int64, protocol string) (map[string]string, error) {
+	rows, err := s.DB.QueryContext(ctx, `SELECT am.upstream_id,m.id
+	 FROM account_models am JOIN models m ON m.id=am.model_id
+	 JOIN upstream_accounts a ON a.id=am.account_id
+	 WHERE am.account_id=? AND m.enabled=1 AND a.enabled=1 AND a.state IN ('catalog_ready','ready')
+	 AND EXISTS(SELECT 1 FROM model_prices p WHERE p.model_id=m.id)
+	 AND EXISTS(SELECT 1 FROM json_each(am.protocols) WHERE value=?)
+	 ORDER BY m.id`, account, protocol)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]string{}
+	for rows.Next() {
+		var upstream, public string
+		if err = rows.Scan(&upstream, &public); err != nil {
+			return nil, err
+		}
+		if _, exists := out[upstream]; !exists {
+			out[upstream] = public
+		}
+	}
+	return out, rows.Err()
 }
 
 func (m *Model) setProtocols(raw string) {

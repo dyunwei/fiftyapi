@@ -27,6 +27,14 @@ func TestRestoreArchive(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	if _, err := s.store.DB.Exec("DROP INDEX IF EXISTS account_models_model"); err != nil {
+		t.Fatal(err)
+	}
+	for _, column := range []string{"protocols", "upstream_id"} {
+		if _, err := s.store.DB.Exec("ALTER TABLE account_models DROP COLUMN " + column); err != nil {
+			t.Fatal(err)
+		}
+	}
 	if _, err := s.store.DB.Exec("DROP TABLE imported_users; DELETE FROM schema_migrations WHERE version>=14"); err != nil {
 		t.Fatal(err)
 	}
@@ -50,6 +58,9 @@ func TestRestoreArchive(t *testing.T) {
 	var migrated int
 	if err = db.DB.QueryRow("SELECT count(*) FROM schema_migrations WHERE version=14").Scan(&migrated); err != nil || migrated != 1 {
 		t.Fatal("missing schema upgrade", err)
+	}
+	if err = db.DB.QueryRow("SELECT count(*) FROM schema_migrations WHERE version=16").Scan(&migrated); err != nil || migrated != 1 {
+		t.Fatal("missing model route schema upgrade", err)
 	}
 	if err = s.store.DB.QueryRow("SELECT count(*) FROM schema_migrations WHERE version=14").Scan(&migrated); err != nil || migrated != 0 {
 		t.Fatal("source database changed", err)

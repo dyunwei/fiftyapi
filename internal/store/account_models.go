@@ -60,14 +60,14 @@ func (s *Store) AccountModelsPage(ctx context.Context, account int64, page, size
 	from := ` FROM account_models am JOIN models m ON m.id=am.model_id WHERE am.account_id=?`
 	args := []any{account}
 	if q := strings.TrimSpace(search); q != "" {
-		from += ` AND (instr(lower(m.id),lower(?))>0 OR instr(lower(m.upstream_id),lower(?))>0)`
+		from += ` AND (instr(lower(m.id),lower(?))>0 OR instr(lower(am.upstream_id),lower(?))>0)`
 		args = append(args, q, q)
 	}
 	if err = tx.QueryRowContext(ctx, "SELECT count(*)"+from, args...).Scan(&out.Total); err != nil {
 		return out, err
 	}
 	params := append(append([]any{}, args...), size, (page-1)*size)
-	rows, err := tx.QueryContext(ctx, `SELECT m.id,m.upstream_id,m.provider,m.protocols,m.enabled,EXISTS(SELECT 1 FROM model_prices p WHERE p.model_id=m.id)`+from+` ORDER BY m.id LIMIT ? OFFSET ?`, params...)
+	rows, err := tx.QueryContext(ctx, `SELECT m.id,am.upstream_id,m.provider,am.protocols,m.enabled,EXISTS(SELECT 1 FROM model_prices p WHERE p.model_id=m.id)`+from+` ORDER BY m.id LIMIT ? OFFSET ?`, params...)
 	if err != nil {
 		return out, err
 	}
@@ -141,7 +141,7 @@ func (s *Store) AccountModelsPage(ctx context.Context, account int64, page, size
 func (s *Store) AccountModel(ctx context.Context, account int64, id string) (AccountModel, error) {
 	var m AccountModel
 	var provider, protocols string
-	err := s.DB.QueryRowContext(ctx, `SELECT m.id,m.upstream_id,m.provider,m.protocols,m.enabled
+	err := s.DB.QueryRowContext(ctx, `SELECT m.id,am.upstream_id,m.provider,am.protocols,m.enabled
  FROM account_models am JOIN models m ON m.id=am.model_id
  JOIN upstream_accounts a ON a.id=am.account_id
  WHERE am.account_id=? AND m.id=? AND a.deleted_at IS NULL`, account, id).Scan(&m.ID, &m.UpstreamID, &provider, &protocols, &m.Enabled)

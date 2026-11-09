@@ -112,6 +112,7 @@ func (h *Handler) slot(id int64) *accountSlot {
 
 type selection struct {
 	ID         int64
+	Route      store.RouteCandidate
 	Credential accounts.Credential
 	Release    func()
 	Previous   int64
@@ -218,12 +219,12 @@ func (h *Handler) selectAccount(ctx context.Context, user int64, model, scope st
 		return selection{}, &scheduleUnavailable{until: earliest, message: "没有可用账号：账号可能已限流、冷却、停用或需重新授权"}
 	}
 	score := func(c store.RouteCandidate) float64 {
-		active, waiting := h.slot(c.ID).load()
 		hash := sha256.Sum256([]byte(fmt.Sprintf("%s:%d", seed, c.ID)))
 		u := (float64(binary.BigEndian.Uint64(hash[:8])>>11) + 1) / (1<<53 + 1)
-		load := float64(active) / float64(c.Policy.Concurrency)
-		health := c.ErrorRate*2 + math.Min(c.FirstOutputMS/10000, 2)
-		return -math.Log(u) / float64(c.Policy.Weight) * (1 + load*4 + float64(waiting)*.25 + health)
+		// Priority forms a strict layer. Within one layer, weighted exponential
+		// racing gives every new session exactly the configured share over time.
+		// Capacity and cooldown are gates, not hidden weight multipliers.
+		return -math.Log(u) / float64(c.Policy.Weight)
 	}
 	scores := map[int64]float64{}
 	for _, c := range candidates {
@@ -278,6 +279,7 @@ func (h *Handler) selectAccount(ctx context.Context, user int64, model, scope st
 		valid = false
 		for _, row := range fresh {
 			if row.ID == c.ID && row.CooldownUntil <= time.Now().Unix() {
+				c = row
 				active, _ := slot.load()
 				valid = active <= row.Policy.Concurrency
 				break
@@ -301,7 +303,7 @@ func (h *Handler) selectAccount(ctx context.Context, user int64, model, scope st
 				return selection{}, false
 			}
 		}
-		return selection{ID: c.ID, Credential: credential, Release: release, Previous: previous, Layer: layer}, true
+		return selection{ID: c.ID, Route: c, Credential: credential, Release: release, Previous: previous, Layer: layer}, true
 	}
 	// Healthy affinity gets a bounded wait, then portable requests may escape.
 	for _, c := range candidates {

@@ -133,6 +133,14 @@ func TestAccountCatalogMigrationPreservesLegacyMembership(t *testing.T) {
 	}
 	removeContributionSchema(t, s)
 	// Recreate the exact pre-007 shape. The added column is the only schema delta.
+	if _, e = s.DB.Exec("DROP INDEX IF EXISTS account_models_model"); e != nil {
+		t.Fatal(e)
+	}
+	for _, column := range []string{"protocols", "upstream_id"} {
+		if _, e = s.DB.Exec("ALTER TABLE account_models DROP COLUMN " + column); e != nil {
+			t.Fatal(e)
+		}
+	}
 	if _, e = s.DB.Exec("ALTER TABLE upstream_accounts DROP COLUMN models_synced_at"); e != nil {
 		t.Fatal(e)
 	}

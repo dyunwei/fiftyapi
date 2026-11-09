@@ -2,11 +2,48 @@ package store
 
 import (
 	"context"
+	"fiftyapi/internal/modelref"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 )
+
+func TestLogicalModelPoolKeepsPerAccountRoutes(t *testing.T) {
+	ctx := context.Background()
+	s, err := Open(ctx, filepath.Join(t.TempDir(), "db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	actor, _ := s.CreateAdmin(ctx, "admin", "hash")
+	native, _ := s.CreateAccount(ctx, actor, "codex", "openai", func(int64) ([]byte, error) { return []byte("native"), nil })
+	relay, _ := s.CreateAccount(ctx, actor, "sub2api", "gateway", func(int64) ([]byte, error) { return []byte("relay"), nil }, "sub2api")
+	if err = s.SyncModels(ctx, native, "openai", []string{"gpt-6.1-sol"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.SyncGatewayModels(ctx, relay, []modelref.Mapping{{ID: "gpt-6.1-sol", UpstreamID: "remote-sol", Protocols: []string{"responses"}}}); err != nil {
+		t.Fatal(err)
+	}
+	_ = s.AccountState(ctx, native, "catalog_ready", "")
+	_ = s.AccountState(ctx, relay, "catalog_ready", "")
+	nativePolicy, relayPolicy := DefaultAccountPolicy(), DefaultAccountPolicy()
+	nativePolicy.Priority = 10
+	relayPolicy.Priority = 50
+	_ = s.SetAccountPolicy(ctx, actor, native, nativePolicy)
+	_ = s.SetAccountPolicy(ctx, actor, relay, relayPolicy)
+
+	routes, err := s.RouteCandidates(ctx, "gpt-6.1-sol", "generate/responses:gpt-6.1-sol", "responses")
+	if err != nil || len(routes) != 2 {
+		t.Fatalf("shared pool candidates missing: %#v %v", routes, err)
+	}
+	if routes[0].ID != native || routes[0].Provider != "openai" || routes[0].UpstreamID != "gpt-6.1-sol" || routes[0].Policy.Priority != 10 {
+		t.Fatalf("native route corrupted: %#v", routes[0])
+	}
+	if routes[1].ID != relay || routes[1].Provider != "gateway" || routes[1].UpstreamID != "remote-sol" || routes[1].Policy.Priority != 50 {
+		t.Fatalf("gateway route corrupted: %#v", routes[1])
+	}
+}
 
 func TestRoutingHealthPersistenceAndDeletedAccountCannotRevive(t *testing.T) {
 	ctx := context.Background()

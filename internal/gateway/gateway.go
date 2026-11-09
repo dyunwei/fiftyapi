@@ -291,9 +291,12 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	fingerprint := sessionHash(r, user.ID, m.Provider, request)
+	// Affinity belongs to the logical model pool and protocol, not to whichever
+	// provider happened to create the pool first.
+	affinityNamespace := m.ID + "\x00" + requestedProtocol
+	fingerprint := sessionHash(r, user.ID, affinityNamespace, request)
 	portable := historyPortable(request)
-	legacy := legacySessionHash(r, user.ID, m.Provider, request)
+	legacy := legacySessionHash(r, user.ID, affinityNamespace, request)
 	if len(fingerprint) > 0 && !bytes.Equal(fingerprint, legacy) {
 		if _, e := h.store.GatewaySession(r.Context(), fingerprint); e != nil {
 			if owner, e := h.store.GatewaySession(r.Context(), legacy); e == nil {
@@ -335,13 +338,18 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		logEntry.AccountID = &chosen.ID
+		logEntry.Provider = chosen.Route.Provider
 		started := time.Now()
 		attemptRequest := make(map[string]json.RawMessage, len(request))
 		for k, v := range request {
 			attemptRequest[k] = v
 		}
 		writer := newAttemptWriter(w)
-		out = h.forward(writer, r, body, attemptRequest, m, chosen.Credential, output)
+		attemptModel := m
+		attemptModel.Provider = chosen.Route.Provider
+		attemptModel.UpstreamID = chosen.Route.UpstreamID
+		attemptModel.Protocols = append([]string(nil), chosen.Route.Protocols...)
+		out = h.forward(writer, r, body, attemptRequest, attemptModel, chosen.Credential, output)
 		// Successful responses may still be buffered (for example, an empty
 		// completion). Deliver them before classifying a downstream disconnect.
 		if out.complete && out.err == nil && !writer.committed {

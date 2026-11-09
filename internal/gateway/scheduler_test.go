@@ -3,6 +3,9 @@ package gateway
 import (
 	"context"
 	"encoding/json"
+	"fiftyapi/internal/accounts"
+	"fiftyapi/internal/modelref"
+	"fiftyapi/internal/providers"
 	"fiftyapi/internal/store"
 	"fmt"
 	"io"
@@ -14,6 +17,74 @@ import (
 	"testing"
 	"time"
 )
+
+func TestMixedOAuthAndGatewayPoolPriorityWeightAndStickyRoute(t *testing.T) {
+	var nativeCalls, relayCalls atomic.Int64
+	native := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		nativeCalls.Add(1)
+		var body map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		if body["model"] != "model" || r.Header.Get("Authorization") != "Bearer upstream-private-token" {
+			t.Error("native route mapping or credential incorrect")
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, schedulerSuccess)
+	}))
+	defer native.Close()
+	relay := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		relayCalls.Add(1)
+		var body map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		if r.URL.Path != "/v1/responses" || body["model"] != "remote-sol" || r.Header.Get("Authorization") != "Bearer relay-key" {
+			t.Error("gateway route mapping or credential incorrect")
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, schedulerSuccess)
+	}))
+	defer relay.Close()
+
+	g := setupGateway(t, "openai", native)
+	relayConfig := providers.Config{Provider: "gateway", Gateway: &providers.GatewayConfig{Platform: "sub2api", BaseURL: relay.URL, Protocols: []string{"responses"}, Discovery: "manual", AuthMode: "bearer", Models: []providers.GatewayModel{{ID: "gpt-6.1-sol", UpstreamID: "remote-sol", Protocols: []string{"responses"}}}}}
+	relayID, err := g.h.accounts.Import(context.Background(), g.user, "sub2api", accounts.Credential{Config: relayConfig, APIKey: "relay-key"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = g.s.SyncGatewayModels(context.Background(), relayID, []modelref.Mapping{{ID: "model", UpstreamID: "remote-sol", Protocols: []string{"responses"}}}); err != nil {
+		t.Fatal(err)
+	}
+	_ = g.s.AccountState(context.Background(), relayID, "catalog_ready", "")
+	g.h.client = func(config providers.Config) *http.Client {
+		if config.Provider == "gateway" {
+			return relay.Client()
+		}
+		return native.Client()
+	}
+
+	nativePolicy, relayPolicy := store.DefaultAccountPolicy(), store.DefaultAccountPolicy()
+	nativePolicy.Priority = 50
+	relayPolicy.Priority = 10
+	_ = g.s.SetAccountPolicy(context.Background(), g.user, g.account, nativePolicy)
+	_ = g.s.SetAccountPolicy(context.Background(), g.user, relayID, relayPolicy)
+	if out := poolRequest(g, "sticky-mixed", `{"model":"model","input":"first"}`); out.Code != 200 {
+		t.Fatalf("relay request failed: %d %s", out.Code, out.Body.String())
+	}
+
+	// Changing priority affects new sessions but must not move a healthy bound
+	// conversation away from its original source.
+	nativePolicy.Priority = 0
+	relayPolicy.Priority = 80
+	_ = g.s.SetAccountPolicy(context.Background(), g.user, g.account, nativePolicy)
+	_ = g.s.SetAccountPolicy(context.Background(), g.user, relayID, relayPolicy)
+	if out := poolRequest(g, "sticky-mixed", `{"model":"model","input":"second"}`); out.Code != 200 {
+		t.Fatalf("sticky request failed: %d %s", out.Code, out.Body.String())
+	}
+	if out := poolRequest(g, "fresh-mixed", `{"model":"model","input":"fresh"}`); out.Code != 200 {
+		t.Fatalf("new session request failed: %d %s", out.Code, out.Body.String())
+	}
+	if relayCalls.Load() != 2 || nativeCalls.Load() != 1 {
+		t.Fatalf("priority/sticky routing mismatch: relay=%d native=%d", relayCalls.Load(), nativeCalls.Load())
+	}
+}
 
 const schedulerSuccess = "event: response.created\ndata: {\"type\":\"response.created\",\"response\":{\"id\":\"good-response\"}}\n\nevent: response.completed\ndata: {\"type\":\"response.completed\",\"response\":{\"id\":\"good-response\",\"status\":\"completed\",\"output\":[{\"type\":\"message\",\"content\":[{\"type\":\"output_text\",\"text\":\"OK\"}]}],\"usage\":{\"input_tokens\":10,\"output_tokens\":2,\"input_tokens_details\":{\"cached_tokens\":4}}}}\n\n"
 
@@ -130,7 +201,7 @@ func TestPoolFailoverAndPersistentCooldown(t *testing.T) {
 			if e != nil || q[0].Used != 9 || q[1].Used != 9 || q[0].Reserved != 0 {
 				t.Fatal("logical request billed more than once")
 			}
-			bound, e := g.s.GatewaySession(context.Background(), sessionHash(httptest.NewRequest("POST", "/", nil), g.user, "openai", map[string]json.RawMessage{"input": json.RawMessage(`"hello"`)}))
+			bound, e := g.s.GatewaySession(context.Background(), sessionHash(httptest.NewRequest("POST", "/", nil), g.user, "model\x00responses", map[string]json.RawMessage{"input": json.RawMessage(`"hello"`)}))
 			_ = bound
 			_ = e
 			health, e := g.s.AccountHealth(context.Background(), g.account)
@@ -182,7 +253,7 @@ func TestPortableBindingMovesAndOpaqueBindingStays(t *testing.T) {
 			req.Header.Set("session_id", "stable-session")
 			var parsed map[string]json.RawMessage
 			json.Unmarshal([]byte(body), &parsed)
-			bound, e := g.s.GatewaySession(context.Background(), sessionHash(req, g.user, "openai", parsed))
+			bound, e := g.s.GatewaySession(context.Background(), sessionHash(req, g.user, "model\x00responses", parsed))
 			if e != nil {
 				t.Fatal(e)
 			}
@@ -201,6 +272,23 @@ func TestWeightedSelectionAndCanceledQueue(t *testing.T) {
 	defer upstream.Close()
 	g := setupGateway(t, "openai", upstream)
 	second := addPoolAccount(t, g)
+	// A large weight must never jump across a priority boundary.
+	lower := store.DefaultAccountPolicy()
+	lower.Priority = 50
+	lower.Weight = 100
+	if e := g.s.SetAccountPolicy(context.Background(), g.user, second, lower); e != nil {
+		t.Fatal(e)
+	}
+	for i := 0; i < 30; i++ {
+		selected, e := g.h.selectAccount(context.Background(), g.user, "model", "model", nil, true, map[int64]bool{}, "priority-"+fmt.Sprint(i))
+		if e != nil {
+			t.Fatal(e)
+		}
+		if selected.ID != g.account {
+			t.Fatal("weight crossed a strict priority layer")
+		}
+		selected.Release()
+	}
 	p := store.DefaultAccountPolicy()
 	p.Concurrency = 2 // This test saturates two slots independently of the default.
 	p.WaitMS = 100

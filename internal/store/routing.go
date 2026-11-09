@@ -77,6 +77,9 @@ type AccountCooldown struct {
 }
 type RouteCandidate struct {
 	ID                       int64
+	Provider                 string
+	UpstreamID               string
+	Protocols                []string
 	Policy                   AccountPolicy
 	Failures                 int
 	ErrorRate, FirstOutputMS float64
@@ -92,9 +95,9 @@ func (s *Store) RouteCandidates(ctx context.Context, model, scope string, protoc
 	if len(protocol) > 0 {
 		requested = protocol[0]
 	}
-	rows, err := s.DB.QueryContext(ctx, `SELECT a.id,p.priority,p.weight,p.concurrency,p.max_queue,p.wait_ms,h.failures,h.error_rate,h.first_output_ms,COALESCE((SELECT max(until_at) FROM account_cooldowns c WHERE c.account_id=a.id AND c.scope IN ('',?,?)),0)
+	rows, err := s.DB.QueryContext(ctx, `SELECT a.id,a.provider,am.upstream_id,am.protocols,p.priority,p.weight,p.concurrency,p.max_queue,p.wait_ms,h.failures,h.error_rate,h.first_output_ms,COALESCE((SELECT max(until_at) FROM account_cooldowns c WHERE c.account_id=a.id AND c.scope IN ('',?,?)),0)
  FROM upstream_accounts a JOIN account_models am ON am.account_id=a.id JOIN models m ON m.id=am.model_id AND m.enabled=1 JOIN account_policies p ON p.account_id=a.id JOIN account_health h ON h.account_id=a.id
- WHERE am.model_id=? AND a.enabled=1 AND a.state IN ('catalog_ready','ready') AND (?='' OR EXISTS(SELECT 1 FROM json_each(m.protocols) WHERE value=?)) ORDER BY p.priority,a.id`, scope, legacyScope, model, requested, requested)
+ WHERE am.model_id=? AND a.enabled=1 AND a.state IN ('catalog_ready','ready') AND (?='' OR EXISTS(SELECT 1 FROM json_each(am.protocols) WHERE value=?)) ORDER BY p.priority,a.id`, scope, legacyScope, model, requested, requested)
 	if err != nil {
 		return nil, err
 	}
@@ -102,9 +105,11 @@ func (s *Store) RouteCandidates(ctx context.Context, model, scope string, protoc
 	out := []RouteCandidate{}
 	for rows.Next() {
 		var c RouteCandidate
-		if err = rows.Scan(&c.ID, &c.Policy.Priority, &c.Policy.Weight, &c.Policy.Concurrency, &c.Policy.MaxQueue, &c.Policy.WaitMS, &c.Failures, &c.ErrorRate, &c.FirstOutputMS, &c.CooldownUntil); err != nil {
+		var protocols string
+		if err = rows.Scan(&c.ID, &c.Provider, &c.UpstreamID, &protocols, &c.Policy.Priority, &c.Policy.Weight, &c.Policy.Concurrency, &c.Policy.MaxQueue, &c.Policy.WaitMS, &c.Failures, &c.ErrorRate, &c.FirstOutputMS, &c.CooldownUntil); err != nil {
 			return nil, err
 		}
+		_ = json.Unmarshal([]byte(protocols), &c.Protocols)
 		out = append(out, c)
 	}
 	return out, rows.Err()

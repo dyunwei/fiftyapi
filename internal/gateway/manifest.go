@@ -16,35 +16,40 @@ func (h *Handler) codexManifest(w http.ResponseWriter, r *http.Request, models [
 		return errors.New("Codex 客户端版本无效")
 	}
 	allowed := map[string]string{}
-	var ids []int64
-	source := ""
+	var accountID int64
 	// Prefer native Codex metadata when present. Otherwise use one configured
 	// Responses gateway; never merge catalogs from unrelated gateway accounts.
 	for _, native := range []bool{true, false} {
 		for _, m := range models {
-			if !m.Enabled || m.Price == nil || !m.Available || !m.SupportsProtocol("responses") || (native != (m.Provider == "openai")) {
+			if !m.Enabled || m.Price == nil || !m.Available || !m.SupportsProtocol("responses") {
 				continue
 			}
-			_, candidates, e := h.store.RoutableModel(r.Context(), m.ID)
-			if e == nil {
-				source = m.Provider
-				ids = candidates
+			candidates, e := h.store.RouteCandidates(r.Context(), m.ID, "manifest:"+m.ID, "responses")
+			if e != nil {
+				return e
+			}
+			for _, candidate := range candidates {
+				if native == (candidate.Provider == "openai") {
+					accountID = candidate.ID
+					break
+				}
+			}
+			if accountID != 0 {
 				break
 			}
 		}
-		if len(ids) > 0 {
+		if accountID != 0 {
 			break
 		}
 	}
-	if len(ids) == 0 {
+	if accountID == 0 {
 		return errors.New("没有已定价的 Responses 模型或可用账号")
 	}
-	for _, m := range models {
-		if m.Provider == source && m.Enabled && m.Price != nil && m.Available {
-			allowed[m.UpstreamID] = m.ID
-		}
+	allowed, err := h.store.AccountModelAliases(r.Context(), accountID, "responses")
+	if err != nil {
+		return err
 	}
-	c, err := h.accounts.Access(r.Context(), ids[0])
+	c, err := h.accounts.Access(r.Context(), accountID)
 	if err != nil {
 		return err
 	}
