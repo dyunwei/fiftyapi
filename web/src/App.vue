@@ -355,7 +355,7 @@ const modalTitle=computed(()=>({'key-usage':t('使用 API 密钥'),'contribution
    </div>
   </main>
  </div>
- <div v-if="modal" class="modal-backdrop" @click.self="close"><section :class="['modal',{'contribution-links-dialog':modal==='contribution-links','account-config-dialog':modal==='config'||modal==='gateway'||modal==='key-usage','account-model-dialog':modal==='account-models'||modal==='routing'||modal==='attempts'}]" role="dialog" aria-modal="true" :aria-label="modalTitle"><header><h2>{{ modalTitle }}</h2><button class="icon-button" :aria-label="t('关闭')" :disabled="busy" @click="close">×</button></header><form @submit.prevent="save"><div class="modal-body">
+ <div v-if="modal" class="modal-backdrop"><section :class="['modal',{'contribution-links-dialog':modal==='contribution-links','account-config-dialog':modal==='config'||modal==='gateway'||modal==='key-usage','account-model-dialog':modal==='account-models'||modal==='routing'||modal==='attempts'}]" role="dialog" aria-modal="true" :aria-label="modalTitle"><header><h2>{{ modalTitle }}</h2><button class="icon-button" :aria-label="t('关闭')" :disabled="busy" @click="close">×</button></header><form @submit.prevent="save"><div class="modal-body">
   <KeyUsage v-if="modal==='key-usage'" :api="api" :token="form.token||''" :key-name="form.name||''" @copy="copy"/>
   <ContributionLinks v-if="modal==='contribution-links'" :api="api"/>
   <AccountImport v-if="modal==='import'" ref="accountImportForm" :api="api" :busy="busy"/>
