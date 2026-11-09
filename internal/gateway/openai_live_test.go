@@ -591,8 +591,11 @@ func TestOpenAILive(t *testing.T) {
 
 }
 
-// A fixed no-tool prompt in an empty temporary home. The child receives only a
+// A fixed prompt in an empty temporary home. The child receives only a
 // disposable gateway key, never source credentials or the developer's config.
+// The optional workflow fixture remains inside the read-only temporary home and
+// proves multiple native tool turns without placing credentials or repository
+// contents in the child's working directory.
 func runNativeCodexAcceptance(t *testing.T, ctx context.Context, binary, origin, key, model string, connections *atomic.Int32, s *store.Store, user int64) {
 	t.Helper()
 	if !filepath.IsAbs(binary) {
@@ -603,12 +606,34 @@ func runNativeCodexAcceptance(t *testing.T, ctx context.Context, binary, origin,
 		t.Fatal(err)
 	}
 	output := filepath.Join(home, "answer.txt")
+	prompt := "Reply with exactly FIFTYAPI_CODEX_OK. Do not call tools, read files, run commands, or add explanation."
+	expected := "FIFTYAPI_CODEX_OK"
+	minimumRequests := 1
+	workflow := os.Getenv("FIFTYAPI_TEST_CODEX_WORKFLOW") == "1"
+	if workflow {
+		if err := os.Mkdir(filepath.Join(home, "nested"), 0700); err != nil {
+			t.Fatal(err)
+		}
+		fixtures := map[string]string{
+			"first.txt":        "Read second.txt in a new shell-tool turn. Do not guess the final marker.\n",
+			"second.txt":       "Read nested/final.txt in a new shell-tool turn. Do not guess the final marker.\n",
+			"nested/final.txt": "FIFTYAPI_CODEX_WORKFLOW_OK\n",
+		}
+		for name, content := range fixtures {
+			if err := os.WriteFile(filepath.Join(home, name), []byte(content), 0600); err != nil {
+				t.Fatal(err)
+			}
+		}
+		prompt = "Use the shell tool in separate sequential turns. First read first.txt only and follow its instruction. Do not read ahead, combine commands, or inspect any other path. After reaching the final file, reply with its verification marker exactly and no explanation."
+		expected = "FIFTYAPI_CODEX_WORKFLOW_OK"
+		minimumRequests = 4
+	}
 	config := []string{`approval_policy="never"`, `model_provider="fiftyapi_acceptance"`, `model_reasoning_effort="low"`, `model_providers.fiftyapi_acceptance.name="FiftyAPI"`, `model_providers.fiftyapi_acceptance.base_url="` + origin + `/v1"`, `model_providers.fiftyapi_acceptance.env_key="FIFTYAPI_ACCEPTANCE_KEY"`, `model_providers.fiftyapi_acceptance.wire_api="responses"`, `model_providers.fiftyapi_acceptance.requires_openai_auth=false`, `model_providers.fiftyapi_acceptance.supports_websockets=true`}
 	args := []string{"exec", "--skip-git-repo-check", "--ephemeral", "--ignore-user-config", "--ignore-rules", "--sandbox", "read-only", "-C", home, "-m", model, "-o", output}
 	for _, c := range config {
 		args = append(args, "-c", c)
 	}
-	args = append(args, "Reply with exactly FIFTYAPI_CODEX_OK. Do not call tools, read files, run commands, or add explanation.")
+	args = append(args, prompt)
 	child, stop := context.WithTimeout(ctx, 100*time.Second)
 	defer stop()
 	cmd := exec.CommandContext(child, binary, args...)
@@ -619,7 +644,7 @@ func runNativeCodexAcceptance(t *testing.T, ctx context.Context, binary, origin,
 		t.Fatalf("native Codex exited unsuccessfully (%T), websocket upgrades=%d; child output omitted", err, connections.Load())
 	}
 	answer, err := os.ReadFile(output)
-	if err != nil || strings.TrimSpace(string(answer)) != "FIFTYAPI_CODEX_OK" {
+	if err != nil || strings.TrimSpace(string(answer)) != expected {
 		t.Fatal("native Codex marker mismatch; output omitted")
 	}
 	if connections.Load() == 0 {
@@ -640,13 +665,17 @@ func runNativeCodexAcceptance(t *testing.T, ctx context.Context, binary, origin,
 		time.Sleep(20 * time.Millisecond)
 	}
 	logs, err := s.Logs(ctx, user, false, 0, "", 0)
-	if err != nil || len(logs) == 0 {
-		t.Fatal("native CLI produced no request logs")
+	if err != nil || len(logs) < minimumRequests {
+		t.Fatalf("native CLI produced too few request logs: got %d, want at least %d", len(logs), minimumRequests)
 	}
 	for _, l := range logs {
 		if l.Status != 200 || l.Amount == nil {
 			t.Fatal("native CLI request did not settle successfully")
 		}
 	}
-	t.Logf("native Codex fixed-prompt WebSocket acceptance passed: upgrades=%d, requests=%d, reservations=0; source DB unchanged", connections.Load(), len(logs))
+	if workflow {
+		t.Logf("native Codex isolated multi-tool WebSocket workflow passed: upgrades=%d, requests=%d, reservations=0; source DB unchanged", connections.Load(), len(logs))
+	} else {
+		t.Logf("native Codex fixed-prompt WebSocket acceptance passed: upgrades=%d, requests=%d, reservations=0; source DB unchanged", connections.Load(), len(logs))
+	}
 }

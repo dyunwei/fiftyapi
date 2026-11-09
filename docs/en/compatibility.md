@@ -7,11 +7,11 @@ These are the boundaries of the **0.1.0 public preview**. Implemented endpoints 
 | Source | Standard protocol | Real verification |
 | --- | --- | --- |
 | Claude OAuth | Messages | Simulated coverage; real account and native Claude Code not yet tested |
-| OpenAI Codex OAuth | Responses HTTP/SSE and native WebSocket | Imported-account discovery, text, tools, cancellation, accounting, WebSocket and a short native Codex prompt passed |
+| OpenAI Codex OAuth | Responses HTTP/SSE and native WebSocket | Imported-account discovery, text, tools, cancellation, accounting, WebSocket, a short native prompt and an isolated multi-tool Codex workflow passed |
 | Antigravity OAuth | Messages through a dedicated adapter | `gemini-3.5-flash-lite` refresh, discovery, SSE, tool calls/results and accounting passed |
 | API key gateways | Declared Chat Completions, Messages and/or Responses | Local TLS mock upstreams and chained FiftyAPI gateways; real Sub2Api/New API sites remain unverified |
 
-The compact endpoint exists, but the tested OpenAI account returned HTTP 404 with the older client identity. Compact with the newer identity remains unverified. Real OpenAI authorization-code exchange and refresh-token rotation, long-running native workflows and real Claude authorization remain outstanding.
+The compact endpoint exists, but the tested OpenAI account returned HTTP 404 with both the older 0.146.0 and newer 0.164.0 client identities. Real OpenAI authorization-code exchange and refresh-token rotation, long-duration real-project workflows and real Claude authorization remain outstanding; the bounded isolated multi-tool Codex workflow has passed.
 
 ## Protocol behavior
 

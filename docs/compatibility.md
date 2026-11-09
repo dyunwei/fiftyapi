@@ -9,8 +9,8 @@
 | 模型目录与账号状态 | 模拟验证 | 真实目录与 Codex manifest 通过 | 真实读取 26 项 |
 | HTTP/SSE 推理与用量 | 模拟验证 | gpt-5.6-luna / gpt-6.1-sol 真实通过 | 指定模型真实通过 |
 | 工具/结果闭环 | 透传；模拟验证 | 真实流式调用及结果回传通过 | Messages 转换真实通过 |
-| compact | 不适用 | 模拟通过；旧 0.146.0 身份返回 404，新身份待验收 | 不提供 Responses |
-| 原生 Claude Code / Codex 程序 | 未实测 | 0.164.0-alpha.11.1 固定短提示 WebSocket 通过 | 未实测 |
+| compact | 不适用 | 模拟通过；旧 0.146.0 与新 0.164.0 身份真实请求均返回 404 | 不提供 Responses |
+| 原生 Claude Code / Codex 程序 | 未实测 | 0.164.0-alpha.11.1 固定短提示及隔离多工具 WebSocket 工作流通过 | 未实测 |
 | 原生 Responses WebSocket | 不适用 | 连接内预热/连续响应、断开结算已验证 | 不提供 Responses |
 
 ## 真实 Antigravity 测试
@@ -40,7 +40,7 @@
 - 提供优先级/权重、有限 FIFO、健康与模型级冷却、安全切换和上下文绑定；不包含套餐、隐私订阅操作、全部自动修复和模型降级。具体边界见 [账号与网关](reliability-redesign.md)。
 - 已做 50 个独立用户的本机模拟并发测试，不能承诺固定生产并发容量；实际瓶颈取决于上游账号及请求时长，SQLite 用户总数本身不是主要限制。
 
-正式广泛使用前仍需补齐 Claude 真实账号验证，以及 OpenAI 的真实 OAuth/刷新、compact 可用性和长时间原生客户端工作流验收。OpenAI 核心真实调用已验证，见下文；不同协议及模型不能相互代替验收。
+正式广泛使用前仍需补齐 Claude 真实账号验证，以及 OpenAI 的真实 OAuth/刷新和长时间真实项目工作流验收。新版身份下 compact 再次返回 404，当前不能列为真实可用；有界隔离多工具 Codex 工作流已通过。OpenAI 核心真实调用已验证，见下文；不同协议及模型不能相互代替验收。
 
 
 2026-10-31 补充：Antigravity 连续两次工具调用、结果回传与流式追问通过，共 4 次、1967 Token；离线恢复及 50 用户模拟负载通过。
@@ -60,7 +60,7 @@ Chat Completions 只直通声明支持 Chat 的 API 上游。Claude 和 Antigrav
 
 已导入 OpenAI 账号使用 `gpt-5.6-luna` 完成真实目录、Codex manifest、JSON 文本、SSE 工具调用及历史/结果回传、客户端取消与额度结算验证。修复上游响应为 SSE 但缺少正确 Content-Type 时的 502；明确协商 Accept，对缺失或通用响应类型做有限前缀识别，仍要求有效事件及完成标记。
 
-本次 compact 返回 HTTP 404，不能宣称该账号支持；授权码换取、真实令牌轮换、原生 Codex CLI 和 WebSocket 均不在此次通过范围。完整条件、复现命令及用量边界见 [OpenAI 验收](openai-acceptance.md)。
+早期 compact 请求返回 HTTP 404；2026-11-09 使用新版身份复测仍为 404，不能宣称该账号支持。授权码换取与真实令牌轮换仍未验收；原生 Codex CLI 和 WebSocket 已在后续批次通过。完整条件、复现命令及用量边界见 [OpenAI 验收](openai-acceptance.md)。
 
 ## 目录与账号可见性
 

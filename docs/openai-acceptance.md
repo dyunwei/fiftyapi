@@ -53,18 +53,19 @@ go test -count=1 -timeout 8m -run '^TestOpenAILive$' -v ./internal/gateway
 
 使用统一的新身份和 `FIFTYAPI_TEST_OPENAI_MODEL=gpt-6.1-sol`，真实目录/manifest、JSON 文本、SSE 工具调用/历史回传和客户端取消全部通过。最终四请求批次测试内部金额 **377 microUSD**，两窗口、日志和账本一致，预占及待核算为零；取消未取得可靠用量，结算 0。与前文一样，内部测试金额不是供应商报价，也不统计此前诊断请求的消耗。
 
-此次未启用 compact 测试；前文 404 是旧 0.146.0 身份下的历史结果，新身份的 compact 可用性尚待重新验证。OAuth 换码、真实刷新、原生 CLI 和 WebSocket 不在本轮通过范围。源数据库和正式账单未修改。
+此次未启用 compact 测试；前文 404 是旧 0.146.0 身份下的历史结果。2026-11-09 使用新 0.164.0 身份复测仍返回 HTTP 404，因此当前账号不能宣称 compact 可用。OAuth 换码与真实刷新仍未验证。源数据库和正式账单未修改。
 
 ## 补充：原生 WebSocket 与客户端
 
-2026-11-02，复用同一只读源账号的有效 access token，gpt-6.1-sol 真实目录 10 项。源库不迁移、不刷新令牌、不改余额；所有测试账号、Key、账本和定价均在临时库。
+2026-11-02 起，复用同一只读源账号的有效 access token，gpt-6.1-sol 真实目录 10 项。源库不迁移、不刷新令牌、不改余额；所有测试账号、Key、账本和定价均在临时库。
 
 - HTTP 四请求重新通过：短文本、固定加法工具与结果回传、首个文本后取消。内部测试核算 377 microUSD，两窗口一致、预占 0；取消未获得可靠 usage，按既有策略为 0，这不表示供应商没有消耗。
 - 原生 WebSocket 三 turn 通过：generate:false 预热、带预热 ID 的短答、同连接前一响应 ID 延续并推断模型。内部测试核算 152 microUSD，预占 0。没有模拟历史重建或 HTTP 降级。
 - 本机 Codex **0.164.0-alpha.11.1** 使用临时 HOME/CODEX_HOME、自定义 Responses provider、supports_websockets=true，固定短提示返回指定标记。服务确认 1 次 WebSocket 接入、2 条成功请求（包含客户端预热），预占 0。子进程只持有临时网关 Key，不加载原用户配置，不执行工具或访问工作区文件。
+- 2026-11-09，同一 Codex 版本在只读临时目录完成三层文件指引的隔离多工具工作流。最终标记只能从最后一份临时夹具读取；服务确认 1 次 WebSocket 接入、5 条成功请求，预占 0，源数据库不变。该有界测试不等同于数小时的真实项目任务。
 
-上述金额来自 1 microUSD/报告 token 的内部测试价格，不是供应商报价；不含其他诊断尝试消耗。新增断开/撤销/Origin/停机排空及用户隔离由模拟竞态用例验证。真实 Claude、授权码换取、真实 refresh token 轮换、新身份 compact、长时间带工具的 Codex 工作流仍未覆盖。
+上述金额来自 1 microUSD/报告 token 的内部测试价格，不是供应商报价；不含其他诊断尝试消耗。新增断开/撤销/Origin/停机排空及用户隔离由模拟竞态用例验证。真实 Claude、授权码换取、真实 refresh token 轮换及长时间真实项目工作流仍未覆盖；新身份 compact 已复测但仍返回 404。
 
-复现：沿用上文只读源参数，模型换成 gpt-6.1-sol。额外设置 `FIFTYAPI_TEST_OPENAI_WS_LIVE=1` 会在四请求后追加三次 WS turn；设置 `FIFTYAPI_TEST_CODEX_CLI=/absolute/path/to/codex` 则只执行目录验证与原生 CLI 固定短提示，跳过四请求/WS 批次。默认全部跳过，需明确授权少量真实消耗。测试代码不输出子进程正文或凭据。
+复现：沿用上文只读源参数，模型换成 gpt-6.1-sol。额外设置 `FIFTYAPI_TEST_OPENAI_WS_LIVE=1` 会在四请求后追加三次 WS turn；设置 `FIFTYAPI_TEST_CODEX_CLI=/absolute/path/to/codex` 则只执行目录验证与原生 CLI 固定短提示，跳过四请求/WS 批次；再设置 `FIFTYAPI_TEST_CODEX_WORKFLOW=1` 会改为隔离的三层文件、多工具工作流。默认全部跳过，需明确授权少量真实消耗。测试代码不输出子进程正文或凭据。
 
 服务单连接内顺序执行，跨连接缓存不共享；不支持 steer 或显式 cancel，关闭连接会取消。接入配置与恢复方式见 [客户端](clients.md)，服务限制见 [账号与网关](reliability-redesign.md)。
