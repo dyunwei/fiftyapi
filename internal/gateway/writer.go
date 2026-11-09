@@ -20,11 +20,12 @@ func (w *statusWriter) Write(b []byte) (int, error) {
 	return w.ResponseWriter.Write(b)
 }
 func (w *statusWriter) Flush() {
+	_ = w.FlushError()
+}
+func (w *statusWriter) FlushError() error {
 	if w.status == 0 {
 		w.WriteHeader(200)
 	}
-	if f, ok := w.ResponseWriter.(http.Flusher); ok {
-		f.Flush()
-	}
+	return flushResponse(w.ResponseWriter)
 }
 func (w *statusWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }

@@ -61,8 +61,13 @@ func emitSSE(w http.ResponseWriter, event string, data []byte) error {
 	if _, err := w.Write(append(append([]byte("data: "), data...), []byte("\n\n")...)); err != nil {
 		return err
 	}
-	if flusher, ok := w.(http.Flusher); ok {
-		flusher.Flush()
+	return flushResponse(w)
+}
+
+func flushResponse(w http.ResponseWriter) error {
+	err := http.NewResponseController(w).Flush()
+	if errors.Is(err, http.ErrNotSupported) {
+		return nil
 	}
-	return nil
+	return err
 }

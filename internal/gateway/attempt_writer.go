@@ -96,22 +96,27 @@ func (w *attemptWriter) Write(b []byte) (int, error) {
 	return len(b), nil
 }
 func (w *attemptWriter) Flush() {
+	_ = w.FlushError()
+}
+func (w *attemptWriter) FlushError() error {
+	if w.writeErr != nil {
+		return w.writeErr
+	}
 	if w.committed {
-		if f, ok := w.parent.(http.Flusher); ok {
-			f.Flush()
-		}
-		return
+		w.writeErr = flushResponse(w.parent)
+		return w.writeErr
 	}
 	if time.Since(w.heartbeatAt) >= 15*time.Second {
 		for k, v := range w.header {
 			w.parent.Header()[k] = append([]string(nil), v...)
 		}
 		_, w.writeErr = io.WriteString(w.parent, ": keepalive\n\n")
-		if f, ok := w.parent.(http.Flusher); ok {
-			f.Flush()
+		if w.writeErr == nil {
+			w.writeErr = flushResponse(w.parent)
 		}
 		w.heartbeatAt = time.Now()
 	}
+	return w.writeErr
 }
 
 func semanticFrame(frame []byte) bool {

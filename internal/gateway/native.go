@@ -157,6 +157,7 @@ func (h *Handler) forward(w http.ResponseWriter, r *http.Request, body []byte, r
 func consumeProtocolResponse(w http.ResponseWriter, r *http.Request, resp *http.Response, protocolProvider string, stream bool, out result) result {
 	if nativeEventStream(resp) {
 		var final json.RawMessage
+		completed := errors.New("native stream completed")
 		err := consumeSSE(resp.Body, func(event string, payload []byte) error {
 			if string(payload) == "[DONE]" {
 				return nil
@@ -208,11 +209,18 @@ func consumeProtocolResponse(w http.ResponseWriter, r *http.Request, resp *http.
 					w.WriteHeader(200)
 					out.sent = true
 				}
-				return emitSSE(w, event, payload)
+				if err := emitSSE(w, event, payload); err != nil {
+					return err
+				}
+			}
+			// The protocol completion event ends this response. Waiting for HTTP
+			// EOF can turn a client's normal disconnect into a stream failure.
+			if out.complete {
+				return completed
 			}
 			return nil
 		})
-		if err != nil || !out.complete {
+		if !errors.Is(err, completed) || !out.complete {
 			out.complete = false
 			out.err = errors.New("上游流被中断或缺少完成事件")
 			if out.sent {
@@ -223,7 +231,10 @@ func consumeProtocolResponse(w http.ResponseWriter, r *http.Request, resp *http.
 		if !stream {
 			if protocolProvider == "openai" && len(final) > 0 {
 				w.Header().Set("Content-Type", "application/json")
-				w.Write(final)
+				if _, err := w.Write(final); err != nil {
+					out.err = errors.New("客户端响应写入失败")
+					return out
+				}
 				out.sent = true
 			} else {
 				out.err = errors.New("上游未返回所需非流式结果")

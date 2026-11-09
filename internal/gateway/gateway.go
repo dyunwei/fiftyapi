@@ -342,8 +342,23 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 		}
 		writer := newAttemptWriter(w)
 		out = h.forward(writer, r, body, attemptRequest, m, chosen.Credential, output)
+		// Successful responses may still be buffered (for example, an empty
+		// completion). Deliver them before classifying a downstream disconnect.
+		if out.complete && out.err == nil && !writer.committed {
+			err := writer.commit()
+			if err == nil {
+				err = writer.FlushError()
+			}
+			if err != nil {
+				out.complete = false
+				out.status = 502
+				out.err = errors.New("客户端响应写入失败")
+			} else {
+				out.sent = true
+			}
+		}
 		chosen.Release()
-		if r.Context().Err() != nil {
+		if r.Context().Err() != nil && !(out.complete && out.err == nil) {
 			out.status = 499
 			out.err = errors.New("客户端已取消请求")
 		}
