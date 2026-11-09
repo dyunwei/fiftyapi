@@ -5,6 +5,31 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 English | 中文说明见各版本下方折叠区域
 
+## [Unreleased]
+
+### Added
+
+- Weighted routing across OAuth accounts and API gateway sources that expose the same public model ID.
+- Compact, accessible help tips for advanced account and gateway configuration.
+
+### Changed
+
+- Gateway model mapping now supports a denser responsive editor, mapping search and bulk clearing.
+
+<details>
+<summary>中文说明</summary>
+
+**新增**
+
+- 对外模型 ID 相同时，OAuth 账号与 API 网关来源可按优先级和权重共同调度。
+- 为账号与网关的高级配置增加紧凑且支持无障碍访问的帮助提示。
+
+**变更**
+
+- 网关模型映射改为更紧凑的响应式编辑器，并支持搜索和批量清除。
+
+</details>
+
 ## [0.1.0] - 2026-11-04
 
 First public preview.
@@ -56,4 +81,5 @@ See [compatibility](docs/en/compatibility.md) for details.
 
 </details>
 
+[Unreleased]: https://github.com/dyunwei/fiftyapi/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/dyunwei/fiftyapi/releases/tag/v0.1.0

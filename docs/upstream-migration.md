@@ -91,7 +91,7 @@ Gemini 模型相关行为纳入 Antigravity 适配审查；这不自动把独立
 | AG thinking、schema、tool/signature/usage | internal/compat/antigravity → gateway/antigravity | 复用原转换器并抑制内容 debug 日志；实际工具闭环通过 |
 | 会话、并发、冷却 | gateway/scheduler、store/gateway_sessions | 持久化会话 hash、并发上限、429 冷却；不静默换模型/重放推理 |
 
-未迁移全部高级业务开关：复杂分组/权重、计费套餐、WebSocket、fast/priority tier、dateline/cache TTL 自动改写、供应商隐私/订阅修改以及所有异常修复器。默认保留客户端 cache_control；不承诺完整 sub2api 行为。需要这些能力时先补价格与回归，再对外启用。
+未迁移全部高级业务开关：计费套餐、fast/priority tier、dateline/cache TTL 自动改写、供应商隐私/订阅修改以及所有异常修复器。优先级、权重和原生 Responses WebSocket 已在后续阶段实现；默认保留客户端 cache_control，仍不承诺完整 sub2api 行为。需要其余能力时先补价格与回归，再对外启用。
 
 ## 对齐补充
 

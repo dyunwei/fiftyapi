@@ -27,7 +27,7 @@ Catalog visibility is not inference verification. Accounts can lack model or pro
 
 Prices are internal USD snapshots. Missing prices prevent calls. Reliable usage received before cancellation or interruption is settled; missing or invalid usage releases reservations at zero local cost. This does not establish that upstream execution was free or that partial usage equals the provider's final measurement.
 
-Priority, weighted health/load selection, bounded FIFO waiting, account/model cooldown and conditional session binding are implemented. Switching accounts is allowed only under safe retry conditions. Signed/encrypted histories remain bound, and requests with uncertain upstream execution are not blindly replayed.
+Priority, weighted health/load selection, bounded FIFO waiting, account/model cooldown and conditional session binding are implemented. OAuth accounts and API key gateway sources that expose the same public model ID can participate in one routing pool while retaining their own upstream model IDs. Switching accounts is allowed only under safe retry conditions. Signed/encrypted histories remain bound, and requests with uncertain upstream execution are not blindly replayed.
 
 A local simulation with 50 independent users passed; this is not a fixed production-capacity guarantee. Real capacity depends on account concurrency and request duration. Deploy one instance with SQLite on persistent local disk.
 

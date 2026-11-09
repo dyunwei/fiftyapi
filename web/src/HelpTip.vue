@@ -1,7 +1,8 @@
 <script setup>
-import { nextTick, onBeforeUnmount, ref } from 'vue'
+import { nextTick, onBeforeUnmount, ref, useId } from 'vue'
 defineProps({text:{type:String,required:true},label:{type:String,required:true}})
 const button=ref(null),tip=ref(null),shown=ref(false),position=ref({})
+const tipId=`help-tip-${useId()}`
 async function show(){
  shown.value=true
  await nextTick()
@@ -13,15 +14,15 @@ async function show(){
  if(top+box.height>window.innerHeight-pad)top=Math.max(pad,anchor.top-box.height-gap)
  position.value={left:`${left}px`,top:`${top}px`}
 }
-function hide(){shown.value=false}
+function hide(){shown.value=false;position.value={}}
 function dismiss(){hide()}
 window.addEventListener('scroll',dismiss,true)
 window.addEventListener('resize',dismiss)
 onBeforeUnmount(()=>{window.removeEventListener('scroll',dismiss,true);window.removeEventListener('resize',dismiss)})
 </script>
 <template>
- <button ref="button" type="button" class="help-tip" :aria-label="label" :aria-expanded="shown" @mouseenter="show" @mouseleave="hide" @focus="show" @blur="hide" @click.prevent.stop>?</button>
- <Teleport to="body"><div v-if="shown" ref="tip" class="help-tooltip" role="tooltip" :style="position">{{ text }}</div></Teleport>
+ <button ref="button" type="button" class="help-tip" :aria-label="label" :aria-describedby="shown?tipId:undefined" :aria-expanded="shown" @mouseenter="show" @mouseleave="hide" @focus="show" @blur="hide" @click.prevent.stop="show" @keydown.esc.stop="hide">?</button>
+ <Teleport to="body"><div v-if="shown" :id="tipId" ref="tip" class="help-tooltip" role="tooltip" :style="position">{{ text }}</div></Teleport>
 </template>
 <style scoped>
 .help-tip{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;flex:0 0 17px;padding:0;border:1px solid #98a2b3;border-radius:50%;color:#667085;font-size:11px;line-height:1}
