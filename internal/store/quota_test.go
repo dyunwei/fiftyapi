@@ -63,12 +63,20 @@ func TestWindowGenerationAndSettlement(t *testing.T) {
 	if e := s.Reserve(ctx, "first", user, key, "model", p, 100, now); e != nil {
 		t.Fatal(e)
 	}
+	users, e := s.Users(ctx)
+	if e != nil || len(users) != 1 || users[0].Reserved5h != 100 || users[0].Remaining5h != 0 || users[0].Remaining7d != 900 {
+		t.Fatalf("unexpected user quota summary after reserve: %+v", users)
+	}
 	q, _ := s.Quota(ctx, user)
 	if q[0].StartedAt != nil {
 		t.Fatal("reservation started billing window")
 	}
 	if e := s.Settle(ctx, "first", 100, now); e != nil {
 		t.Fatal(e)
+	}
+	users, _ = s.Users(ctx)
+	if users[0].Used5h != 100 || users[0].Reserved5h != 0 || users[0].Remaining5h != 0 || users[0].Used7d != 100 || users[0].Remaining7d != 900 || users[0].ExpiresAt5h == nil || users[0].ExpiresAt7d == nil {
+		t.Fatalf("unexpected user quota summary after settle: %+v", users[0])
 	}
 	if e := s.Settle(ctx, "first", 100, now); e != nil {
 		t.Fatal(e)

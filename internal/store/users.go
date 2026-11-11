@@ -27,6 +27,14 @@ type User struct {
 	Enabled             bool    `json:"enabled"`
 	Limit5h             int64   `json:"limit_5h_microusd"`
 	Limit7d             int64   `json:"limit_7d_microusd"`
+	Used5h              int64   `json:"used_5h_microusd"`
+	Reserved5h          int64   `json:"reserved_5h_microusd"`
+	Remaining5h         int64   `json:"remaining_5h_microusd"`
+	ExpiresAt5h         *int64  `json:"expires_at_5h,omitempty"`
+	Used7d              int64   `json:"used_7d_microusd"`
+	Reserved7d          int64   `json:"reserved_7d_microusd"`
+	Remaining7d         int64   `json:"remaining_7d_microusd"`
+	ExpiresAt7d         *int64  `json:"expires_at_7d,omitempty"`
 	PasswordHash        string  `json:"-"`
 }
 
@@ -84,7 +92,8 @@ func (s *Store) UserByName(ctx context.Context, name string) (User, error) {
 	return scanUser(s.DB.QueryRowContext(ctx, "SELECT "+userColumns+" FROM users WHERE username=?", name))
 }
 func (s *Store) Users(ctx context.Context) ([]User, error) {
-	rows, err := s.DB.QueryContext(ctx, "SELECT "+userColumns+",CASE WHEN i.accepted_at IS NOT NULL THEN 'accepted' WHEN i.expires_at<=? THEN 'expired' WHEN i.user_id IS NOT NULL THEN 'pending' ELSE '' END,i.expires_at,COALESCE(i.mail_state,''),COALESCE(i.mail_error,'') FROM users LEFT JOIN user_invitations i ON i.user_id=users.id ORDER BY id", time.Now().Unix())
+	now := time.Now().Unix()
+	rows, err := s.DB.QueryContext(ctx, `SELECT u.id,u.username,u.password_hash,u.role,u.enabled,u.limit_5h,u.limit_7d,u.email,u.display_name,u.password_set,CASE WHEN i.accepted_at IS NOT NULL THEN 'accepted' WHEN i.expires_at<=? THEN 'expired' WHEN i.user_id IS NOT NULL THEN 'pending' ELSE '' END,i.expires_at,COALESCE(i.mail_state,''),COALESCE(i.mail_error,''),COALESCE(w5.used,0),COALESCE(w5.reserved,0),w5.expires_at,COALESCE(w7.used,0),COALESCE(w7.reserved,0),w7.expires_at FROM users u LEFT JOIN user_invitations i ON i.user_id=u.id LEFT JOIN quota_windows w5 ON w5.user_id=u.id AND w5.kind='5h' AND w5.active=1 AND (w5.expires_at IS NULL OR w5.expires_at>?) LEFT JOIN quota_windows w7 ON w7.user_id=u.id AND w7.kind='7d' AND w7.active=1 AND (w7.expires_at IS NULL OR w7.expires_at>?) ORDER BY u.id`, now, now, now)
 	if err != nil {
 		return nil, err
 	}
@@ -92,10 +101,12 @@ func (s *Store) Users(ctx context.Context) ([]User, error) {
 	result := []User{}
 	for rows.Next() {
 		var u User
-		err := rows.Scan(append(userScan(&u), &u.InvitationState, &u.InvitationExpiresAt, &u.MailState, &u.MailError)...)
+		err := rows.Scan(append(userScan(&u), &u.InvitationState, &u.InvitationExpiresAt, &u.MailState, &u.MailError, &u.Used5h, &u.Reserved5h, &u.ExpiresAt5h, &u.Used7d, &u.Reserved7d, &u.ExpiresAt7d)...)
 		if err != nil {
 			return nil, err
 		}
+		u.Remaining5h = max(0, u.Limit5h-u.Used5h-u.Reserved5h)
+		u.Remaining7d = max(0, u.Limit7d-u.Used7d-u.Reserved7d)
 		result = append(result, u)
 	}
 	return result, rows.Err()

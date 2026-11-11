@@ -65,5 +65,6 @@ test('邮箱和真实姓名注册、零额度登录及管理员查看',async({pa
  const member=page.getByRole('row').filter({hasText:'new.member@example.com'})
  await expect(member).toContainText('注册测试姓名')
  await expect(member).toContainText('$0.00 / $0.00')
+ await expect(member.locator('.meter')).toHaveCount(2)
  expect(errors).toEqual([])
 })

@@ -973,5 +973,8 @@
   "初始化口令用于确认你有服务器访问权限，仅首次创建管理员时使用，不是登录密码或主密钥。": "The setup token confirms that you have access to the server. It is used only to create the first administrator, and is separate from your login password and master key.",
   "Docker 部署：在服务器终端执行以下命令，将输出的口令填入上方。容器名称不同时请替换 fiftyapi。": "Docker: run this command in your server terminal, then paste the output above. Replace fiftyapi if your container has a different name.",
   "按快速开始部署时，也可读取宿主机 ./data/setup-token。直接运行程序时，读取数据库同目录的 setup-token；使用本地启动脚本时为 .local/setup-token。若设置了 FIFTYAPI_SETUP_TOKEN，则使用该环境变量的值。": "With the Quick Start deployment, you can also read ./data/setup-token on the host. For a standalone binary, read setup-token in the database directory; the local startup script uses .local/setup-token. If FIFTYAPI_SETUP_TOKEN is set, use its value instead.",
-  "按快速开始使用 Docker 部署时，主密钥位于宿主机 ./data/master.key（容器内 /data/master.key）。请单独备份此文件，恢复时使用原文件；若设置了 FIFTYAPI_MASTER_KEY，则保管该环境变量的原值。": "With the Docker Quick Start deployment, the master key is at ./data/master.key on the host (/data/master.key in the container). Back up this file separately and use the original file when restoring. If FIFTYAPI_MASTER_KEY is set, keep its original value."
+  "按快速开始使用 Docker 部署时，主密钥位于宿主机 ./data/master.key（容器内 /data/master.key）。请单独备份此文件，恢复时使用原文件；若设置了 FIFTYAPI_MASTER_KEY，则保管该环境变量的原值。": "With the Docker Quick Start deployment, the master key is at ./data/master.key on the host (/data/master.key in the container). Back up this file separately and use the original file when restoring. If FIFTYAPI_MASTER_KEY is set, keep its original value.",
+  "5 小时": "5h",
+  "每周": "7d",
+  "当前剩余：5 小时 {0} / 每周 {1}（已用 {2} / {3}）": "Remaining: 5-hour {0} / weekly {1} (used {2} / {3})"
 }
