@@ -18,7 +18,7 @@ Authorization JSON imports accept up to 20 files totaling 1 MiB. Only credential
 
 **Contribution links** let account owners submit their credentials without signing in. Links are provider-specific, valid for 1–168 hours (24 by default), usable by multiple owners and revocable. Full links are shown only once. Contributions start disabled; review settings and enable accounts before verification. Expiry or revocation does not remove accounts already submitted.
 
-Connection settings include inference URL overrides, proxy, request timeout, client identity and permitted headers. Proxy passwords remain masked; preserving the mask preserves the password. Verify and sync after changing settings.
+Connection settings include inference URL overrides, proxy, request timeout, client identity and permitted headers. Proxy passwords remain masked; preserving the mask preserves the password. Verify and sync after changing settings. Background maintenance checks expiring OAuth tokens and pending recovery every minute while resynchronizing healthy model catalogs once every 24 hours.
 
 **Scheduling & health** controls priority, weight, concurrency and queue limits. Lower numeric priority wins; weights distribute new sessions among similarly healthy accounts. Waiting is bounded. Signed/encrypted context stays bound to its account; switching accounts requires a safe rejection before content is emitted. Requests with uncertain execution are not blindly replayed. Clearing cooldown is audited and does not replenish upstream quota.
 

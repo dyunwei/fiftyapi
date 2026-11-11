@@ -89,7 +89,7 @@ client_max_body_size 4m;
 
 管理员在“上游账号”添加 Claude、OpenAI 或 Antigravity。授权链接在浏览器中打开；授权完成后把结果地址粘贴回页面。localhost 回调未监听时浏览器可能提示连接失败，保留地址栏结果粘贴即可。Claude 使用其供应商回调；OAuth state、PKCE、有效期和单次消费在服务端校验。
 
-授权成功后先加密保存凭据，再发现项目与模型。`catalog_ready` 只表示目录可读；`project_pending` 可重试补全；`reauth_required` 需要重新授权。后台每分钟维护账号，目录检查有 5 分钟间隔。刷新先保存轮换令牌，避免后续目录失败丢失授权。Antigravity 初始化可在授权时明确勾选，后台不隐式执行 onboardUser。
+授权成功后先加密保存凭据，再发现项目与模型。`catalog_ready` 只表示目录可读；`project_pending` 可重试补全；`reauth_required` 需要重新授权。后台每分钟检查临期令牌与待恢复账号，健康账号的模型目录每 24 小时同步一次。刷新先保存轮换令牌，避免后续目录失败丢失授权。Antigravity 初始化可在授权时明确勾选，后台不隐式执行 onboardUser。
 
 账号“配置”提供分平台表单：网关完整 URL、代理、请求头、客户端版本、超时，以及平台适用的身份/metadata/system 设置。URL 必须 HTTPS；代理支持 HTTP/SOCKS。代理密码显示为 `***`，原样保存保留密码。自定义请求头不能覆盖认证凭据。修改后重新验证账号；通常保留默认值即可。完整支持范围见 [迁移清单](upstream-migration.md)。
 

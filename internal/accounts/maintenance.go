@@ -7,8 +7,10 @@ import (
 	"time"
 )
 
+const catalogSyncInterval = 24 * time.Hour
+
 // Maintain retries temporary failures and pending projects, refreshes expiring
-// credentials through Verify, and resynchronizes catalogs every five minutes.
+// OAuth credentials through Access, and resynchronizes healthy catalogs once a day.
 // No background task onboards accounts without an explicit OAuth consent step.
 func (s *Service) Maintain(ctx context.Context) {
 	rows, err := s.store.Accounts(ctx)
@@ -24,7 +26,9 @@ func (s *Service) Maintain(ctx context.Context) {
 		if !row.Enabled || row.State == "reauth_required" || (row.State != "catalog_ready" && row.State != "ready" && row.ModelCount == 0) {
 			continue
 		}
-		if last, ok := s.checked.Load(row.ID); ok && row.State == "catalog_ready" && time.Since(last.(time.Time)) < 5*time.Minute {
+		last, ok := s.checked.Load(row.ID)
+		needVerify := !ok || row.State != "catalog_ready" || row.LastError != "" || time.Since(last.(time.Time)) >= catalogSyncInterval
+		if !needVerify && row.Provider == "gateway" {
 			continue
 		}
 		select {
@@ -34,13 +38,17 @@ func (s *Service) Maintain(ctx context.Context) {
 		case slots <- struct{}{}:
 		}
 		wg.Add(1)
-		go func(id int64) {
+		go func(id int64, verify bool) {
 			defer wg.Done()
 			defer func() { <-slots }()
 			task, cancel := context.WithTimeout(ctx, 12*time.Second)
 			defer cancel()
-			s.Verify(task, id)
-		}(row.ID)
+			if verify {
+				s.Verify(task, id)
+				return
+			}
+			_, _ = s.Access(task, id)
+		}(row.ID, needVerify)
 	}
 	wg.Wait()
 }

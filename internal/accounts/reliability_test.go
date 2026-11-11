@@ -296,8 +296,13 @@ func TestMaintenanceDoesNotVerifyUncheckedImport(t *testing.T) {
 	}
 	defer s.Close()
 	actor, _ := s.CreateAdmin(ctx, "admin", "hash")
-	var calls atomic.Int64
+	var calls, tokenCalls atomic.Int64
 	upstream := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/token" {
+			tokenCalls.Add(1)
+			io.WriteString(w, `{"access_token":"refreshed","refresh_token":"refresh-2","expires_in":3600}`)
+			return
+		}
 		calls.Add(1)
 		io.WriteString(w, `{"models":[{"slug":"fixture-model"}]}`)
 	}))
@@ -307,7 +312,7 @@ func TestMaintenanceDoesNotVerifyUncheckedImport(t *testing.T) {
 		t.Fatal(e)
 	}
 	cfg := providers.Config{Provider: "openai", ClientID: "client", Scope: "scope", AuthorizeURL: upstream.URL + "/authorize", TokenURL: upstream.URL + "/token", TokenEncoding: "form", RedirectURI: "http://localhost/callback", ModelsURL: upstream.URL + "/models"}
-	id, e := service.Import(ctx, actor, "unchecked", Credential{Config: cfg, Token: providers.Token{AccessToken: "fixture"}, ExpiresAt: time.Now().Add(time.Hour)})
+	id, e := service.Import(ctx, actor, "unchecked", Credential{Config: cfg, Token: providers.Token{AccessToken: "fixture", RefreshToken: "refresh-1"}, ExpiresAt: time.Now().Add(time.Hour)})
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -328,6 +333,26 @@ func TestMaintenanceDoesNotVerifyUncheckedImport(t *testing.T) {
 	service.Maintain(ctx)
 	if calls.Load() != 1 {
 		t.Fatal("verified account stopped receiving maintenance")
+	}
+	// Routine maintenance within the daily window refreshes expiring tokens
+	// without re-pulling the model catalog.
+	service.checked.Store(id, time.Now().Add(-10*time.Minute))
+	service.Maintain(ctx)
+	if calls.Load() != 1 || tokenCalls.Load() != 0 {
+		t.Fatal("healthy account resynced catalog or refreshed non-expiring token inside daily window")
+	}
+	expiring, e := service.seal(id, Credential{Config: cfg, Token: providers.Token{AccessToken: "fixture", RefreshToken: "refresh-1"}, ExpiresAt: time.Now().Add(time.Minute)})
+	if e != nil || s.UpdateAccountCredentials(ctx, id, expiring) != nil {
+		t.Fatal("failed to stage expiring token")
+	}
+	service.Maintain(ctx)
+	if tokenCalls.Load() != 1 || calls.Load() != 1 {
+		t.Fatalf("expected token-only maintenance refresh, got token=%d catalog=%d", tokenCalls.Load(), calls.Load())
+	}
+	service.checked.Store(id, time.Now().Add(-catalogSyncInterval-time.Minute))
+	service.Maintain(ctx)
+	if calls.Load() != 2 {
+		t.Fatal("daily catalog sync did not run after interval elapsed")
 	}
 }
 
