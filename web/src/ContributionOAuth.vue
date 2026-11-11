@@ -1,11 +1,11 @@
 <script setup>
 import {computed,ref} from 'vue'
 import {t} from './i18n.js'
-const props=defineProps({api:{type:Function,required:true},token:{type:String,required:true},busy:Boolean})
+const props=defineProps({api:{type:Function,required:true},token:{type:String,required:true},busy:Boolean,proxyId:{type:Number,default:0},forceSendProxy:Boolean})
 const name=ref(''),session=ref(null),result=ref(''),done=ref(false)
 const ready=computed(()=>session.value?!!result.value.trim():!!name.value.trim())
 async function submit(){
- if(!session.value){session.value=await props.api('/contributions/oauth/start',{body:{token:props.token,name:name.value}});return}
+ if(!session.value){session.value=await props.api('/contributions/oauth/start',{body:{token:props.token,name:name.value,...((props.proxyId||props.forceSendProxy)?{proxy_id:props.proxyId}:{})}});return}
  const current=session.value
  try{
   await props.api('/contributions/oauth/complete',{body:{token:props.token,session_id:current.session_id,result:result.value}})

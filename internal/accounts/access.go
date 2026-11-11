@@ -42,6 +42,9 @@ func (s *Service) Access(ctx context.Context, id int64) (Credential, error) {
 	}
 	clear(raw)
 	c.Config = providers.NormalizeOpenAIConfig(c.Config)
+	if err = s.applyAccountProxy(ctx, row.ProxyID, &c.Config); err != nil {
+		return Credential{}, err
+	}
 	if err = s.ensurePolicy(ctx, id, c.Config.MaxConcurrency); err != nil {
 		return Credential{}, err
 	}

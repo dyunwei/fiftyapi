@@ -15,21 +15,31 @@ import (
 
 // ImportAuth accepts token-only files. It never trusts file-supplied endpoints,
 // proxies, headers, roles, or gateway configuration as OAuth client defaults.
-func (s *Service) ImportAuth(ctx context.Context, actor int64, name, provider string, raw json.RawMessage) (int64, error) {
-	return s.importAuth(ctx, actor, name, provider, raw, 0)
+func (s *Service) ImportAuth(ctx context.Context, actor int64, name, provider string, raw json.RawMessage, proxyID ...int64) (int64, error) {
+	return s.importAuth(ctx, actor, name, provider, raw, 0, proxyID...)
 }
-func (s *Service) ImportContributedAuth(ctx context.Context, actor int64, name, provider string, raw json.RawMessage, linkID int64) (int64, error) {
+func (s *Service) ImportContributedAuth(ctx context.Context, actor int64, name, provider string, raw json.RawMessage, linkID int64, proxyID ...int64) (int64, error) {
 	if linkID <= 0 {
 		return 0, errors.New("贡献链接无效")
 	}
-	return s.importAuth(ctx, actor, name, provider, raw, linkID)
+	return s.importAuth(ctx, actor, name, provider, raw, linkID, proxyID...)
 }
-func (s *Service) importAuth(ctx context.Context, actor int64, name, provider string, raw json.RawMessage, linkID int64) (int64, error) {
+func (s *Service) importAuth(ctx context.Context, actor int64, name, provider string, raw json.RawMessage, linkID int64, proxyID ...int64) (int64, error) {
 	c, fingerprint, err := ParseAuth(provider, raw)
 	if err != nil {
 		return 0, err
 	}
-	return s.importWithOrigin(ctx, actor, name, c, store.AccountOrigin{LinkID: linkID, Fingerprint: fingerprint})
+	origin := store.AccountOrigin{LinkID: linkID, Fingerprint: fingerprint}
+	if len(proxyID) > 0 {
+		if proxyID[0] < 0 {
+			return 0, errors.New("所选代理服务器不存在")
+		}
+		if proxyID[0] > 0 {
+			pid := proxyID[0]
+			origin.ProxyID = &pid
+		}
+	}
+	return s.importWithOrigin(ctx, actor, name, c, origin)
 }
 
 // ParseAuth validates authorization fields without persisting or contacting upstreams.

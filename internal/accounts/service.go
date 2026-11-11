@@ -58,13 +58,19 @@ func New(s *store.Store, key []byte, options ...Option) (*Service, error) {
 	for _, option := range options {
 		option(service)
 	}
+	_ = service.migrateLegacyAccountProxies(ctx)
 	return service, nil
 }
 
 // Bind encrypted credentials to their account ID.
 func binding(id int64) string { return fmt.Sprintf("fiftyapi:upstream:%d", id) }
-func (s *Service) Import(ctx context.Context, actor int64, name string, c Credential) (int64, error) {
-	return s.importWithOrigin(ctx, actor, name, c, store.AccountOrigin{})
+func (s *Service) Import(ctx context.Context, actor int64, name string, c Credential, proxyID ...int64) (int64, error) {
+	var origin store.AccountOrigin
+	if len(proxyID) > 0 && proxyID[0] > 0 {
+		pid := proxyID[0]
+		origin.ProxyID = &pid
+	}
+	return s.importWithOrigin(ctx, actor, name, c, origin)
 }
 func (s *Service) importWithOrigin(ctx context.Context, actor int64, name string, c Credential, origin store.AccountOrigin) (int64, error) {
 	if strings.TrimSpace(name) == "" || len(name) > 128 || (c.Config.Provider != "antigravity" && c.Config.Provider != "claude" && c.Config.Provider != "openai" && c.Config.Provider != "gateway") || (c.Config.Provider != "gateway" && (c.Token.AccessToken == "" || c.ExpiresAt.IsZero())) {
@@ -72,6 +78,17 @@ func (s *Service) importWithOrigin(ctx context.Context, actor int64, name string
 	}
 	if c.Config.Provider == "gateway" && (len(c.APIKey) < 1 || len(c.APIKey) > 4096 || strings.TrimSpace(c.APIKey) != c.APIKey || strings.ContainsAny(c.APIKey, "\r\n")) {
 		return 0, errors.New("API Key 无效")
+	}
+	if origin.ProxyID != nil && *origin.ProxyID > 0 {
+		if err := s.applyAccountProxy(ctx, origin.ProxyID, &c.Config); err != nil {
+			return 0, err
+		}
+	} else if strings.TrimSpace(c.Config.ProxyURL) != "" {
+		if in, ok := parseProxyURLToInput(c.Config.ProxyURL, "自动创建自账号导入"); ok {
+			if pid, err := s.findOrCreateProxy(ctx, actor, in); err == nil && pid > 0 {
+				origin.ProxyID = &pid
+			}
+		}
 	}
 	if err := c.Config.Validate(); err != nil {
 		return 0, err
@@ -135,6 +152,9 @@ func (s *Service) verify(ctx context.Context, id int64, allowOnboard bool) (mode
 		return nil, errors.New("账号凭据格式错误")
 	}
 	c.Config = providers.NormalizeOpenAIConfig(c.Config)
+	if err = s.applyAccountProxy(ctx, account.ProxyID, &c.Config); err != nil {
+		return nil, err
+	}
 	if err = s.ensurePolicy(ctx, id, c.Config.MaxConcurrency); err != nil {
 		return nil, err
 	}

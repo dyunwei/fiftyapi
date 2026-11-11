@@ -165,3 +165,46 @@ test('贡献授权完成后清除回调结果并显示提交成功', async({page
  await expect(page.getByLabel('授权结果',{exact:true})).toHaveCount(0)
  await expect(page.getByRole('button',{name:'提交账号',exact:true})).toHaveCount(0)
 })
+
+test('代理配置页面创建代理并在贡献链接中选择脱敏代理', async({page})=>{
+ const listener=net.createServer();await new Promise(resolve=>listener.listen(0,'127.0.0.1',resolve))
+ const proxyPort=listener.address().port
+ try{
+  await page.goto(baseURL)
+  await page.getByLabel('用户名',{exact:true}).fill('admin')
+  await page.getByLabel('密码',{exact:true}).fill(password)
+  await page.getByRole('button',{name:'登录',exact:false}).click()
+  await page.locator('.nav-item').filter({hasText:'代理配置'}).click()
+  await expect(page.getByRole('heading',{name:'代理配置',exact:true})).toBeVisible()
+  await page.locator('.heading-actions').getByRole('button',{name:'＋ 添加代理',exact:true}).click()
+  const dialog=page.getByRole('dialog')
+  await dialog.getByLabel('代理协议',{exact:true}).selectOption('http')
+  await dialog.getByLabel('代理端口',{exact:true}).fill(String(proxyPort))
+  await dialog.getByLabel('代理服务器地址',{exact:true}).fill('127.0.0.1')
+  await dialog.getByLabel('地理位置',{exact:true}).fill('日本东京')
+  await dialog.getByLabel('备注',{exact:true}).fill('分享节点')
+  await dialog.getByRole('button',{name:'保存',exact:true}).click()
+  await expect(dialog).toHaveCount(0)
+  await expect(page.locator('.proxy-table')).toContainText('HTTP://127.0.0.1:'+proxyPort)
+  await expect(page.locator('.proxy-table')).toContainText('日本东京')
+  await expect(page.locator('.proxy-table')).toContainText('正常')
+ }finally{
+  await new Promise(resolve=>listener.close(resolve))
+ }
+ const token='p'.repeat(43)
+ let selectedProxyId=null
+ await page.route('**/api/contributions/check',route=>route.fulfill({json:{provider:'openai',expires_at:Math.floor(Date.now()/1000)+3600,default_proxy_id:2,proxies:[{id:2,location:'日本东京',note:'分享节点',healthy:true}]}}))
+ await page.route('**/api/contributions/oauth/start',route=>{
+  selectedProxyId=route.request().postDataJSON().proxy_id
+  return route.fulfill({json:{session_id:'proxy-session',auth_url:'https://auth.openai.com/authorize',expires_at:Math.floor(Date.now()/1000)+600}})
+ })
+ await page.goto(baseURL+'/#contribute='+token)
+ const select=page.getByLabel('代理服务器',{exact:true})
+ await expect(select).toBeVisible()
+ await expect(select).toHaveValue('2')
+ await expect(select.locator('option',{hasText:'#2 · 日本东京 · 分享节点 (正常)'})).toHaveCount(1)
+ await page.getByRole('button',{name:'通过链接授权',exact:true}).click()
+ await page.getByLabel('账号名称',{exact:true}).fill('带代理账号')
+ await page.getByRole('button',{name:'生成授权链接',exact:true}).click()
+ expect(selectedProxyId).toBe(2)
+})

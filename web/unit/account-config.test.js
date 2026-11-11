@@ -1,11 +1,15 @@
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
-import {parseHeaders,toConfigForm,fromConfigForm} from '../src/account-config.js'
+import {parseHeaders,toConfigForm,fromConfigForm,formatProxyOption,formatContributionProxyOption} from '../src/account-config.js'
 test('configuration round-trip preserves masked proxy and default/explicit booleans',()=>{
- const config={proxy_url:'https://operator:***@proxy.example',max_concurrency:0,timeout_seconds:0,identity_patch_enabled:null,metadata_passthrough:false,fingerprint_unification:true,gateway_headers:{'X-Trace':'a:b'},models_headers:{},antigravity_fallback_urls:['https://backup.example']}
+ const config={proxy_id:3,proxy_url:'https://operator:***@proxy.example',max_concurrency:0,timeout_seconds:0,identity_patch_enabled:null,metadata_passthrough:false,fingerprint_unification:true,gateway_headers:{'X-Trace':'a:b'},models_headers:{},antigravity_fallback_urls:['https://backup.example']}
  const {max_concurrency,...connection}=config
  assert.deepEqual(fromConfigForm(toConfigForm(config)),connection)
  assert.equal(Object.hasOwn(fromConfigForm({...toConfigForm(config),max_concurrency:99}),'max_concurrency'),false)
+})
+test('proxy option formatting exposes full details to admin and sanitized details to contributors',()=>{
+ assert.equal(formatProxyOption({id:1,protocol:'socks5',host:'127.0.0.1',port:1080,location:'日本东京',note:'主力节点',healthy:true,latency_ms:42}),'#1 · 日本东京 · 主力节点 · SOCKS5://127.0.0.1:1080 · 正常 42ms')
+ assert.equal(formatContributionProxyOption({id:1,location:'日本东京',note:'主力节点',healthy:true}),'#1 · 日本东京 · 主力节点 (正常)')
 })
 test('header parser rejects ambiguous or credential-bearing input',()=>{
  for(const text of ['bad header: value','no colon','X-A: a\nx-a: b','Authorization: Bearer private','Cookie: private','x-api-key: private','Connection: close'])assert.throws(()=>parseHeaders(text))

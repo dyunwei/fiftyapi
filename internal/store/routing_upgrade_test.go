@@ -84,8 +84,8 @@ func TestAccountRoutingUpgradeSnapshot(t *testing.T) {
 		}
 	}
 	var version, policies, health int
-	if s.DB.QueryRow("SELECT max(version) FROM schema_migrations").Scan(&version) != nil || version != 16 {
-		t.Fatal("schema 16 was not applied")
+	if s.DB.QueryRow("SELECT max(version) FROM schema_migrations").Scan(&version) != nil || version != 17 {
+		t.Fatal("schema 17 was not applied")
 	}
 	if s.DB.QueryRow("SELECT count(*) FROM account_policies").Scan(&policies) != nil || policies != len(before[0]) {
 		t.Fatal("account policies missing")

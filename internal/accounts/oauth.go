@@ -15,6 +15,7 @@ import (
 
 type oauthPending struct {
 	linkID  int64
+	proxyID *int64
 	owner   int64
 	name    string
 	target  int64
@@ -29,23 +30,24 @@ type OAuthStart struct {
 	ExpiresAt   int64  `json:"expires_at"`
 }
 
-func (s *Service) StartOAuth(ctx context.Context, actor int64, provider, name string, target int64) (OAuthStart, error) {
-	return s.startOAuth(ctx, actor, provider, name, target, 0)
+func (s *Service) StartOAuth(ctx context.Context, actor int64, provider, name string, target int64, proxyID ...int64) (OAuthStart, error) {
+	return s.startOAuth(ctx, actor, provider, name, target, 0, proxyID...)
 }
 
-func (s *Service) StartContributedOAuth(ctx context.Context, actor int64, provider, name string, linkID int64) (OAuthStart, error) {
+func (s *Service) StartContributedOAuth(ctx context.Context, actor int64, provider, name string, linkID int64, proxyID ...int64) (OAuthStart, error) {
 	if linkID <= 0 {
 		return OAuthStart{}, errors.New("贡献链接无效")
 	}
-	return s.startOAuth(ctx, actor, provider, name, 0, linkID)
+	return s.startOAuth(ctx, actor, provider, name, 0, linkID, proxyID...)
 }
 
-func (s *Service) startOAuth(ctx context.Context, actor int64, provider, name string, target, linkID int64) (OAuthStart, error) {
+func (s *Service) startOAuth(ctx context.Context, actor int64, provider, name string, target, linkID int64, proxyID ...int64) (OAuthStart, error) {
 	name = strings.TrimSpace(name)
 	c, err := providers.DefaultConfig(provider)
 	if err != nil {
 		return OAuthStart{}, err
 	}
+	var chosenProxyID *int64
 	if target > 0 {
 		row, e := s.store.Account(ctx, target)
 		if e != nil || row.Provider != provider {
@@ -61,6 +63,24 @@ func (s *Service) startOAuth(ctx context.Context, actor int64, provider, name st
 			return OAuthStart{}, errors.New("账号配置无效")
 		}
 		c = saved.Config
+		chosenProxyID = row.ProxyID
+	}
+	if len(proxyID) > 0 {
+		if proxyID[0] < 0 {
+			return OAuthStart{}, errors.New("所选代理服务器不存在")
+		}
+		if proxyID[0] > 0 {
+			pid := proxyID[0]
+			chosenProxyID = &pid
+		} else {
+			chosenProxyID = nil
+			c.ProxyURL = ""
+		}
+	}
+	if chosenProxyID != nil {
+		if err = s.applyAccountProxy(ctx, chosenProxyID, &c); err != nil {
+			return OAuthStart{}, err
+		}
 	}
 	if name == "" || len(name) > 128 {
 		return OAuthStart{}, errors.New("账号名称需为 1–128 字节")
@@ -95,7 +115,7 @@ func (s *Service) startOAuth(ctx context.Context, actor int64, provider, name st
 		return OAuthStart{}, errors.New("未完成授权过多，请稍后重试")
 	}
 	expires := now.Add(10 * time.Minute)
-	s.oauth[id] = &oauthPending{linkID: linkID, owner: actor, name: name, target: target, config: c, session: session, expires: expires}
+	s.oauth[id] = &oauthPending{linkID: linkID, proxyID: chosenProxyID, owner: actor, name: name, target: target, config: c, session: session, expires: expires}
 	return OAuthStart{SessionID: id, AuthURL: authURL, RedirectURI: c.RedirectURI, ExpiresAt: expires.Unix()}, nil
 }
 func (s *Service) CompleteOAuth(ctx context.Context, actor int64, id, result string, onboard bool) (int64, string, error) {
@@ -131,12 +151,12 @@ func (s *Service) completeOAuth(ctx context.Context, actor int64, id, result str
 	}
 	c := Credential{Config: pending.config, Token: token, ExpiresAt: time.Now().Add(time.Duration(token.ExpiresIn) * time.Second)}
 	if linkID > 0 {
-		accountID, err := s.importWithOrigin(ctx, actor, pending.name, c, store.AccountOrigin{LinkID: linkID, Fingerprint: authFingerprint(c)})
+		accountID, err := s.importWithOrigin(ctx, actor, pending.name, c, store.AccountOrigin{LinkID: linkID, ProxyID: pending.proxyID, Fingerprint: authFingerprint(c)})
 		return accountID, "", err
 	}
 	accountID := pending.target
 	if accountID == 0 {
-		accountID, err = s.Import(ctx, actor, pending.name, c)
+		accountID, err = s.importWithOrigin(ctx, actor, pending.name, c, store.AccountOrigin{ProxyID: pending.proxyID})
 	} else {
 		err = func() error {
 			lock := make(chan struct{}, 1)
@@ -162,11 +182,21 @@ func (s *Service) completeOAuth(ctx context.Context, actor int64, id, result str
 				return errors.New("当前账号配置无效")
 			}
 			c.Config = current.Config
+			var proxyIDVal any
+			if pending.proxyID != nil && *pending.proxyID > 0 {
+				if e = s.applyAccountProxy(ctx, pending.proxyID, &c.Config); e != nil {
+					return e
+				}
+				proxyIDVal = *pending.proxyID
+			} else if row.ProxyID != nil && pending.proxyID == nil {
+				c.Config.ProxyURL = ""
+				proxyIDVal = nil
+			}
 			encrypted, e := s.seal(accountID, c)
 			if e != nil {
 				return e
 			}
-			if e = s.store.UpdateAccountCredentials(ctx, accountID, encrypted); e != nil {
+			if _, e = s.store.DB.ExecContext(ctx, "UPDATE upstream_accounts SET credentials=?,proxy_id=?,updated_at=? WHERE id=? AND deleted_at IS NULL", encrypted, proxyIDVal, time.Now().Unix(), accountID); e != nil {
 				return e
 			}
 			return s.store.AccountState(ctx, accountID, "authorized", "")

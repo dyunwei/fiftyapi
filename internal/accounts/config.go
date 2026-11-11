@@ -22,6 +22,7 @@ type RuntimeConfig struct {
 	ClaudeSystemPromptInjection *bool                     `json:"claude_system_prompt_injection"`
 	ClaudeSystemPrompt          string                    `json:"claude_oauth_system_prompt"`
 	GatewayURL                  string                    `json:"gateway_url"`
+	ProxyID                     int64                     `json:"proxy_id"`
 	ProxyURL                    string                    `json:"proxy_url"`
 	GatewayHeaders              map[string]string         `json:"gateway_headers"`
 	ModelsHeaders               map[string]string         `json:"models_headers"`
@@ -62,6 +63,11 @@ func (s *Service) RuntimeConfig(ctx context.Context, id int64) (RuntimeConfig, e
 		return RuntimeConfig{}, errors.New("账号配置无效")
 	}
 	c := providers.NormalizeOpenAIConfig(saved.Config)
+	_ = s.applyAccountProxy(ctx, row.ProxyID, &c)
+	var proxyID int64
+	if row.ProxyID != nil {
+		proxyID = *row.ProxyID
+	}
 	if e = s.ensurePolicy(ctx, id, c.MaxConcurrency); e != nil {
 		return RuntimeConfig{}, e
 	}
@@ -70,7 +76,7 @@ func (s *Service) RuntimeConfig(ctx context.Context, id int64) (RuntimeConfig, e
 		return RuntimeConfig{}, e
 	}
 	c.MaxConcurrency = policy.Concurrency
-	return RuntimeConfig{InferencePolicy: c.InferencePolicy, OpenAIAccountID: c.OpenAIAccountID, Gateway: c.Gateway, MetadataPassthrough: c.MetadataPassthrough, FingerprintUnification: c.FingerprintUnification, ClaudeSystemPromptInjection: c.ClaudeSystemPromptInjection, ClaudeSystemPrompt: c.ClaudeSystemPrompt, GatewayURL: c.GatewayURL, ProxyURL: maskProxy(c.ProxyURL), GatewayHeaders: c.GatewayHeaders, ModelsHeaders: c.ModelsHeaders, UserAgent: c.UserAgent, ClientVersion: c.ClientVersion, MaxConcurrency: c.MaxConcurrency, TimeoutSeconds: c.TimeoutSeconds, AntigravityVersion: c.AntigravityVersion, AntigravityIdentity: c.AntigravityIdentity, FallbackURLs: c.AntigravityFallbackURLs, IdentityPatchEnabled: c.IdentityPatchEnabled}, nil
+	return RuntimeConfig{InferencePolicy: c.InferencePolicy, OpenAIAccountID: c.OpenAIAccountID, Gateway: c.Gateway, MetadataPassthrough: c.MetadataPassthrough, FingerprintUnification: c.FingerprintUnification, ClaudeSystemPromptInjection: c.ClaudeSystemPromptInjection, ClaudeSystemPrompt: c.ClaudeSystemPrompt, GatewayURL: c.GatewayURL, ProxyID: proxyID, ProxyURL: maskProxy(c.ProxyURL), GatewayHeaders: c.GatewayHeaders, ModelsHeaders: c.ModelsHeaders, UserAgent: c.UserAgent, ClientVersion: c.ClientVersion, MaxConcurrency: c.MaxConcurrency, TimeoutSeconds: c.TimeoutSeconds, AntigravityVersion: c.AntigravityVersion, AntigravityIdentity: c.AntigravityIdentity, FallbackURLs: c.AntigravityFallbackURLs, IdentityPatchEnabled: c.IdentityPatchEnabled}, nil
 }
 func (s *Service) UpdateRuntime(ctx context.Context, actor, id int64, in RuntimeConfig) error {
 	lock := make(chan struct{}, 1)
@@ -109,8 +115,31 @@ func (s *Service) UpdateRuntime(ctx context.Context, actor, id int64, in Runtime
 			saved.APIKey = in.APIKey
 		}
 	}
-	if in.ProxyURL != maskProxy(c.ProxyURL) {
-		c.ProxyURL = in.ProxyURL
+	var proxyIDVal any
+	if in.ProxyID < 0 {
+		return errors.New("所选代理服务器不存在")
+	}
+	if in.ProxyID > 0 {
+		rawProxy, e := s.ProxyURL(ctx, in.ProxyID)
+		if e != nil {
+			return e
+		}
+		c.ProxyURL = rawProxy
+		proxyIDVal = in.ProxyID
+	} else if row.ProxyID != nil {
+		c.ProxyURL = ""
+		proxyIDVal = nil
+	} else {
+		if in.ProxyURL != maskProxy(c.ProxyURL) {
+			c.ProxyURL = in.ProxyURL
+		}
+		if strings.TrimSpace(c.ProxyURL) != "" {
+			if parsed, ok := parseProxyURLToInput(c.ProxyURL, "自动创建自账号配置"); ok {
+				if pid, e := s.findOrCreateProxy(ctx, actor, parsed); e == nil && pid > 0 {
+					proxyIDVal = pid
+				}
+			}
+		}
 	}
 	c.InferencePolicy = in.InferencePolicy
 	c.GatewayURL = in.GatewayURL
@@ -171,12 +200,12 @@ func (s *Service) UpdateRuntime(ctx context.Context, actor, id int64, in Runtime
 		return e
 	}
 	defer tx.Rollback()
-	result, e := tx.ExecContext(ctx, "UPDATE upstream_accounts SET credentials=?,gateway_platform=?,state='authorized',last_error='',updated_at=? WHERE id=? AND deleted_at IS NULL", encrypted, func() string {
+	result, e := tx.ExecContext(ctx, "UPDATE upstream_accounts SET credentials=?,gateway_platform=?,proxy_id=?,state='authorized',last_error='',updated_at=? WHERE id=? AND deleted_at IS NULL", encrypted, func() string {
 		if c.Gateway != nil {
 			return c.Gateway.Platform
 		}
 		return ""
-	}(), time.Now().Unix(), id)
+	}(), proxyIDVal, time.Now().Unix(), id)
 	if e != nil {
 		return e
 	}

@@ -145,8 +145,9 @@ test('手机布局与初始化关闭',async({page})=>{
 
 test('账号配置表单、默认值、平台字段与请求头校验',async({page})=>{
  let provider='antigravity',saved=null
- const config={gateway_url:'',proxy_url:'https://operator:***@proxy.example',gateway_headers:{},models_headers:{},max_concurrency:0,timeout_seconds:0,user_agent:'',client_version:'',antigravity_user_agent_version:'',antigravity_identity_prompt:'',antigravity_fallback_urls:[],identity_patch_enabled:null,metadata_passthrough:null,fingerprint_unification:null,claude_system_prompt_injection:null,claude_oauth_system_prompt:''}
- await page.route('**/api/admin/accounts',route=>route.fulfill({json:[{id:99,name:'配置表单测试',provider,enabled:true,state:'catalog_ready'}]}))
+ const config={gateway_url:'',proxy_id:7,proxy_url:'https://operator:***@proxy.example',gateway_headers:{},models_headers:{},max_concurrency:0,timeout_seconds:0,user_agent:'',client_version:'',antigravity_user_agent_version:'',antigravity_identity_prompt:'',antigravity_fallback_urls:[],identity_patch_enabled:null,metadata_passthrough:null,fingerprint_unification:null,claude_system_prompt_injection:null,claude_oauth_system_prompt:''}
+ await page.route('**/api/admin/proxies',route=>route.fulfill({json:[{id:7,protocol:'https',host:'proxy.example',port:443,location:'日本东京',note:'主力节点',healthy:true,latency_ms:32}]}))
+ await page.route('**/api/admin/accounts',route=>route.fulfill({json:[{id:99,name:'配置表单测试',provider,enabled:true,state:'catalog_ready',proxy_id:7}]}))
  await page.route('**/api/admin/accounts/99/config',async route=>{
   if(route.request().method()==='PUT'){saved=route.request().postDataJSON();await route.fulfill({json:{ok:true,needs_verify:true}})}else await route.fulfill({json:config})
  })
@@ -157,7 +158,7 @@ test('账号配置表单、默认值、平台字段与请求头校验',async({pa
  await page.getByRole('button',{name:'配置',exact:true}).click()
  const dialog=page.getByRole('dialog')
  await expect(dialog.getByLabel('账号最大并发',{exact:true})).toHaveCount(0)
- await expect(dialog.getByLabel('代理地址',{exact:true})).toHaveValue(config.proxy_url)
+ await expect(dialog.getByLabel('代理服务器',{exact:true})).toHaveValue('7')
  await dialog.getByRole('button',{name:'配置帮助: 连接设置',exact:true}).click()
  await expect(page.getByRole('tooltip')).toContainText('最大并发、优先级和等待队列统一')
  await page.keyboard.press('Escape')
@@ -177,7 +178,7 @@ test('账号配置表单、默认值、平台字段与请求头校验',async({pa
  await dialog.getByRole('button',{name:'保存',exact:true}).click()
  await expect(dialog).toHaveCount(0)
  expect(saved.inference_policy).toEqual({max_effort:'medium',max_thinking_tokens:4096,force_standard:true})
- expect(saved).not.toHaveProperty('max_concurrency');expect(saved.identity_patch_enabled).toBe(false);expect(saved.proxy_url).toBe(config.proxy_url);expect(saved.gateway_headers).toEqual({'X-Trace':'test'})
+ expect(saved).not.toHaveProperty('max_concurrency');expect(saved.identity_patch_enabled).toBe(false);expect(saved.proxy_id).toBe(7);expect(saved.proxy_url).toBe(config.proxy_url);expect(saved.gateway_headers).toEqual({'X-Trace':'test'})
  for(const platform of ['claude','openai']){
   provider=platform
   await page.getByRole('button',{name:'刷新当前页面'}).click()

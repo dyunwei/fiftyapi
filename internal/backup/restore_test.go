@@ -35,6 +35,11 @@ func TestRestoreArchive(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	for _, q := range []string{"ALTER TABLE account_contribution_links DROP COLUMN proxy_id", "ALTER TABLE upstream_accounts DROP COLUMN proxy_id", "DROP TABLE proxy_servers"} {
+		if _, err := s.store.DB.Exec(q); err != nil {
+			t.Fatal(err)
+		}
+	}
 	if _, err := s.store.DB.Exec("DROP TABLE imported_users; DELETE FROM schema_migrations WHERE version>=14"); err != nil {
 		t.Fatal(err)
 	}

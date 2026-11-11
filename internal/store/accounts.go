@@ -13,6 +13,7 @@ type Account struct {
 	Platform           string `json:"gateway_platform,omitempty"`
 	ContributionLinkID *int64 `json:"contribution_link_id,omitempty"`
 	ContributedAt      *int64 `json:"contributed_at,omitempty"`
+	ProxyID            *int64 `json:"proxy_id,omitempty"`
 	ID                 int64  `json:"id"`
 	Name               string `json:"name"`
 	Provider           string `json:"provider"`
@@ -23,7 +24,7 @@ type Account struct {
 }
 
 func (s *Store) Accounts(ctx context.Context) ([]Account, error) {
-	rows, err := s.DB.QueryContext(ctx, "SELECT id,name,provider,enabled,state,last_error,gateway_platform,(SELECT count(*) FROM account_models WHERE account_id=upstream_accounts.id),models_synced_at,contribution_link_id,CASE WHEN contribution_link_id IS NOT NULL THEN created_at END FROM upstream_accounts WHERE deleted_at IS NULL ORDER BY id")
+	rows, err := s.DB.QueryContext(ctx, "SELECT id,name,provider,enabled,state,last_error,gateway_platform,(SELECT count(*) FROM account_models WHERE account_id=upstream_accounts.id),models_synced_at,contribution_link_id,CASE WHEN contribution_link_id IS NOT NULL THEN created_at END,proxy_id FROM upstream_accounts WHERE deleted_at IS NULL ORDER BY id")
 	if err != nil {
 		return nil, err
 	}
@@ -31,7 +32,7 @@ func (s *Store) Accounts(ctx context.Context) ([]Account, error) {
 	result := []Account{}
 	for rows.Next() {
 		var a Account
-		if err = rows.Scan(&a.ID, &a.Name, &a.Provider, &a.Enabled, &a.State, &a.LastError, &a.Platform, &a.ModelCount, &a.ModelsSyncedAt, &a.ContributionLinkID, &a.ContributedAt); err != nil {
+		if err = rows.Scan(&a.ID, &a.Name, &a.Provider, &a.Enabled, &a.State, &a.LastError, &a.Platform, &a.ModelCount, &a.ModelsSyncedAt, &a.ContributionLinkID, &a.ContributedAt, &a.ProxyID); err != nil {
 			return nil, err
 		}
 		result = append(result, a)
@@ -40,7 +41,7 @@ func (s *Store) Accounts(ctx context.Context) ([]Account, error) {
 }
 func (s *Store) Account(ctx context.Context, id int64) (Account, error) {
 	var a Account
-	err := s.DB.QueryRowContext(ctx, "SELECT id,name,provider,enabled,state,last_error,credentials,gateway_platform FROM upstream_accounts WHERE id=? AND deleted_at IS NULL", id).Scan(&a.ID, &a.Name, &a.Provider, &a.Enabled, &a.State, &a.LastError, &a.Credentials, &a.Platform)
+	err := s.DB.QueryRowContext(ctx, "SELECT id,name,provider,enabled,state,last_error,credentials,gateway_platform,proxy_id FROM upstream_accounts WHERE id=? AND deleted_at IS NULL", id).Scan(&a.ID, &a.Name, &a.Provider, &a.Enabled, &a.State, &a.LastError, &a.Credentials, &a.Platform, &a.ProxyID)
 	return a, err
 }
 func (s *Store) CreateAccount(ctx context.Context, actor int64, name, provider string, seal func(int64) ([]byte, error), platforms ...string) (int64, error) {
@@ -70,7 +71,18 @@ func (s *Store) CreateAccountWithOrigin(ctx context.Context, actor int64, name, 
 		linkID = origin.LinkID
 		enabled = false
 	}
-	result, err := tx.ExecContext(ctx, "INSERT INTO upstream_accounts(name,provider,credentials,state,created_at,updated_at,gateway_platform,enabled,contribution_link_id,auth_fingerprint) VALUES(?,?,?,'authorized',?,?,?,?,?,?)", name, provider, []byte{}, now, now, platform, enabled, linkID, origin.Fingerprint)
+	var proxyID any
+	if origin.ProxyID != nil && *origin.ProxyID > 0 {
+		var exists int
+		if err = tx.QueryRowContext(ctx, "SELECT count(*) FROM proxy_servers WHERE id=?", *origin.ProxyID).Scan(&exists); err != nil {
+			return 0, err
+		}
+		if exists != 1 {
+			return 0, errors.New("所选代理服务器不存在")
+		}
+		proxyID = *origin.ProxyID
+	}
+	result, err := tx.ExecContext(ctx, "INSERT INTO upstream_accounts(name,provider,credentials,state,created_at,updated_at,gateway_platform,enabled,contribution_link_id,auth_fingerprint,proxy_id) VALUES(?,?,?,'authorized',?,?,?,?,?,?,?)", name, provider, []byte{}, now, now, platform, enabled, linkID, origin.Fingerprint, proxyID)
 	if err != nil {
 		return 0, err
 	}
@@ -173,7 +185,7 @@ func (s *Store) DeleteAccount(ctx context.Context, actor, id int64) error {
 		return err
 	}
 	defer tx.Rollback()
-	r, err := tx.ExecContext(ctx, "UPDATE upstream_accounts SET enabled=0,state='error',credentials=randomblob(32),name='deleted-'||id||'-'||hex(randomblob(8)),last_error='',deleted_at=?,updated_at=? WHERE id=? AND deleted_at IS NULL", time.Now().Unix(), time.Now().Unix(), id)
+	r, err := tx.ExecContext(ctx, "UPDATE upstream_accounts SET enabled=0,state='error',credentials=randomblob(32),name='deleted-'||id||'-'||hex(randomblob(8)),last_error='',proxy_id=NULL,deleted_at=?,updated_at=? WHERE id=? AND deleted_at IS NULL", time.Now().Unix(), time.Now().Unix(), id)
 	if err != nil {
 		return err
 	}

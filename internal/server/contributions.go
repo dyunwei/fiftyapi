@@ -26,6 +26,7 @@ func (a *API) createContributionLink(w http.ResponseWriter, r *http.Request, id 
 		Provider string `json:"provider"`
 		Note     string `json:"note"`
 		Hours    int    `json:"hours"`
+		ProxyID  int64  `json:"proxy_id"`
 	}
 	if !decode(w, r, &in) {
 		return
@@ -38,6 +39,10 @@ func (a *API) createContributionLink(w http.ResponseWriter, r *http.Request, id 
 		writeError(w, 400, "请选择供应商，有效期需为 1–168 小时，备注不超过 200 字节")
 		return
 	}
+	if in.ProxyID < 0 {
+		writeError(w, 400, "所选代理服务器不存在")
+		return
+	}
 	token, err := randomToken()
 	if err != nil {
 		writeError(w, 500, "生成贡献链接失败")
@@ -45,8 +50,12 @@ func (a *API) createContributionLink(w http.ResponseWriter, r *http.Request, id 
 	}
 	hash := sha256.Sum256([]byte(token))
 	expires := time.Now().Add(time.Duration(in.Hours) * time.Hour)
-	link, err := a.store.CreateContributionLink(r.Context(), id.user.ID, hash[:], in.Provider, in.Note, expires)
+	link, err := a.store.CreateContributionLink(r.Context(), id.user.ID, hash[:], in.Provider, in.Note, expires, in.ProxyID)
 	if err != nil {
+		if err.Error() == "所选代理服务器不存在" {
+			writeError(w, 400, err.Error())
+			return
+		}
 		writeError(w, 500, "保存贡献链接失败")
 		return
 	}
@@ -95,8 +104,31 @@ func (a *API) checkContributionLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if link, ok := a.contributionLink(w, r, in.Token); ok {
-		writeJSON(w, 200, map[string]any{"provider": link.Provider, "expires_at": link.ExpiresAt})
+		proxies, err := a.store.ContributionProxies(r.Context())
+		if err != nil {
+			proxies = []store.ContributionProxy{}
+		}
+		writeJSON(w, 200, map[string]any{"provider": link.Provider, "expires_at": link.ExpiresAt, "default_proxy_id": link.ProxyID, "proxies": proxies})
 	}
+}
+func (a *API) resolveContributionProxyID(w http.ResponseWriter, r *http.Request, link store.ContributionLink, requested *int64) (int64, bool) {
+	chosen := int64(0)
+	if requested != nil {
+		if *requested < 0 {
+			writeError(w, 400, "所选代理服务器不存在")
+			return 0, false
+		}
+		chosen = *requested
+	} else if link.ProxyID != nil {
+		chosen = *link.ProxyID
+	}
+	if chosen > 0 {
+		if _, err := a.store.Proxy(r.Context(), chosen); err != nil {
+			writeError(w, 400, "所选代理服务器不存在")
+			return 0, false
+		}
+	}
+	return chosen, true
 }
 func (a *API) contributeAccounts(w http.ResponseWriter, r *http.Request) {
 	if a.accounts == nil {
@@ -113,6 +145,7 @@ func (a *API) contributeAccounts(w http.ResponseWriter, r *http.Request) {
 	}
 	var in struct {
 		Token    string `json:"token"`
+		ProxyID  *int64 `json:"proxy_id"`
 		Accounts []struct {
 			Name string          `json:"name"`
 			Auth json.RawMessage `json:"auth"`
@@ -128,6 +161,10 @@ func (a *API) contributeAccounts(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	proxyID, ok := a.resolveContributionProxyID(w, r, link, in.ProxyID)
+	if !ok {
+		return
+	}
 	type result struct {
 		Name     string `json:"name"`
 		Imported bool   `json:"imported"`
@@ -137,7 +174,7 @@ func (a *API) contributeAccounts(w http.ResponseWriter, r *http.Request) {
 	imported := 0
 	for i, item := range in.Accounts {
 		out[i].Name = item.Name
-		_, err := a.accounts.ImportContributedAuth(r.Context(), link.ActorID, item.Name, link.Provider, item.Auth, link.ID)
+		_, err := a.accounts.ImportContributedAuth(r.Context(), link.ActorID, item.Name, link.Provider, item.Auth, link.ID, proxyID)
 		if err != nil {
 			out[i].Warning = "未导入：授权格式无效、名称或授权重复，或链接已失效"
 			continue
@@ -165,6 +202,7 @@ func (a *API) contributionOAuth(w http.ResponseWriter, r *http.Request, complete
 	}
 	// Separate request types keep provider, target account and runtime settings server-controlled.
 	var token, name, sessionID, result string
+	var requestedProxyID *int64
 	if complete {
 		var in struct {
 			Token     string `json:"token"`
@@ -177,20 +215,25 @@ func (a *API) contributionOAuth(w http.ResponseWriter, r *http.Request, complete
 		token, sessionID, result = in.Token, in.SessionID, in.Result
 	} else {
 		var in struct {
-			Token string `json:"token"`
-			Name  string `json:"name"`
+			Token   string `json:"token"`
+			Name    string `json:"name"`
+			ProxyID *int64 `json:"proxy_id"`
 		}
 		if !decode(w, r, &in) {
 			return
 		}
-		token, name = in.Token, in.Name
+		token, name, requestedProxyID = in.Token, in.Name, in.ProxyID
 	}
 	link, ok := a.contributionLink(w, r, token)
 	if !ok {
 		return
 	}
 	if !complete {
-		started, err := a.accounts.StartContributedOAuth(r.Context(), link.ActorID, link.Provider, name, link.ID)
+		proxyID, ok := a.resolveContributionProxyID(w, r, link, requestedProxyID)
+		if !ok {
+			return
+		}
+		started, err := a.accounts.StartContributedOAuth(r.Context(), link.ActorID, link.Provider, name, link.ID, proxyID)
 		if err != nil {
 			writeError(w, 400, "无法生成授权链接，请检查账号名称或稍后重试")
 			return

@@ -13,6 +13,7 @@ const catalogSyncInterval = 24 * time.Hour
 // OAuth credentials through Access, and resynchronizes healthy catalogs once a day.
 // No background task onboards accounts without an explicit OAuth consent step.
 func (s *Service) Maintain(ctx context.Context) {
+	s.MaintainProxies(ctx)
 	rows, err := s.store.Accounts(ctx)
 	if err != nil {
 		s.store.RecordRuntime(ctx, store.RuntimeLog{Level: "error", Module: "accounts", Event: "maintenance", Message: "账号维护无法读取账号列表"})

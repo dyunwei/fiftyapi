@@ -26,6 +26,7 @@ func (a *API) importAccounts(w http.ResponseWriter, r *http.Request, id identity
 	var in struct {
 		Provider string `json:"provider"`
 		Verify   bool   `json:"verify"`
+		ProxyID  int64  `json:"proxy_id"`
 		Accounts []struct {
 			Name string          `json:"name"`
 			Auth json.RawMessage `json:"auth"`
@@ -41,6 +42,16 @@ func (a *API) importAccounts(w http.ResponseWriter, r *http.Request, id identity
 		writeError(w, 400, "供应商无效")
 		return
 	}
+	if in.ProxyID < 0 {
+		writeError(w, 400, "所选代理服务器不存在")
+		return
+	}
+	if in.ProxyID > 0 {
+		if _, err := a.store.Proxy(r.Context(), in.ProxyID); err != nil {
+			writeError(w, 400, "所选代理服务器不存在")
+			return
+		}
+	}
 	type result struct {
 		ID       int64  `json:"id,omitempty"`
 		Name     string `json:"name"`
@@ -53,7 +64,7 @@ func (a *API) importAccounts(w http.ResponseWriter, r *http.Request, id identity
 	defer cancel()
 	for i, item := range in.Accounts {
 		out[i].Name = item.Name
-		account, err := a.accounts.ImportAuth(ctx, id.user.ID, item.Name, in.Provider, item.Auth)
+		account, err := a.accounts.ImportAuth(ctx, id.user.ID, item.Name, in.Provider, item.Auth, in.ProxyID)
 		if err != nil {
 			out[i].Warning = "导入失败：名称重复、授权字段无效或本地保存失败"
 			continue

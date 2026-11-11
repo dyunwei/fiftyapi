@@ -93,6 +93,9 @@ func (s *Service) RefreshRejected(ctx context.Context, id int64, rejected string
 	if c.Token.AccessToken != rejected {
 		return nil
 	}
+	if err = s.applyAccountProxy(ctx, row.ProxyID, &c.Config); err != nil {
+		return err
+	}
 	client := s.client
 	if c.Config.ProxyURL != "" || c.Config.TimeoutSeconds != 0 {
 		client = providers.HTTPClient(c.Config)

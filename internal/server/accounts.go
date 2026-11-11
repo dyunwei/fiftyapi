@@ -25,7 +25,7 @@ func (a *API) listAccounts(w http.ResponseWriter, r *http.Request, id identity) 
 	}
 	views := []map[string]any{}
 	for _, record := range records {
-		view := map[string]any{"id": record.ID, "name": record.Name, "provider": record.Provider, "enabled": record.Enabled, "state": record.State, "last_error": record.LastError, "gateway_platform": record.Platform, "model_count": record.ModelCount, "models_synced_at": record.ModelsSyncedAt, "contribution_link_id": record.ContributionLinkID, "contributed_at": record.ContributedAt}
+		view := map[string]any{"id": record.ID, "name": record.Name, "provider": record.Provider, "enabled": record.Enabled, "state": record.State, "last_error": record.LastError, "gateway_platform": record.Platform, "model_count": record.ModelCount, "models_synced_at": record.ModelsSyncedAt, "contribution_link_id": record.ContributionLinkID, "contributed_at": record.ContributedAt, "proxy_id": record.ProxyID}
 		if a.accounts != nil {
 			if info, e := a.accounts.CredentialInfo(r.Context(), record.ID); e == nil {
 				view["credential_info"] = info
@@ -103,11 +103,16 @@ func (a *API) startOAuth(w http.ResponseWriter, r *http.Request, id identity) {
 	var in struct {
 		Name      string `json:"name"`
 		AccountID int64  `json:"account_id"`
+		ProxyID   *int64 `json:"proxy_id"`
 	}
 	if !decode(w, r, &in) {
 		return
 	}
-	result, err := a.accounts.StartOAuth(r.Context(), id.user.ID, r.PathValue("provider"), in.Name, in.AccountID)
+	var proxyArgs []int64
+	if in.ProxyID != nil {
+		proxyArgs = append(proxyArgs, *in.ProxyID)
+	}
+	result, err := a.accounts.StartOAuth(r.Context(), id.user.ID, r.PathValue("provider"), in.Name, in.AccountID, proxyArgs...)
 	if err != nil {
 		writeError(w, 400, err.Error())
 		return
@@ -188,7 +193,7 @@ func (a *API) createGatewayAccount(w http.ResponseWriter, r *http.Request, id id
 		return
 	}
 	cfg := providers.Config{InferencePolicy: in.InferencePolicy, Provider: "gateway", Gateway: in.Gateway, ProxyURL: in.ProxyURL, MaxConcurrency: in.MaxConcurrency, TimeoutSeconds: in.TimeoutSeconds, UserAgent: in.UserAgent, GatewayHeaders: in.GatewayHeaders, ModelsHeaders: in.ModelsHeaders}
-	account, err := a.accounts.Import(r.Context(), id.user.ID, in.Name, accounts.Credential{Config: cfg, APIKey: in.APIKey})
+	account, err := a.accounts.Import(r.Context(), id.user.ID, in.Name, accounts.Credential{Config: cfg, APIKey: in.APIKey}, in.ProxyID)
 	if err != nil {
 		writeError(w, 400, "无法创建网关账号，请检查名称、API Key、协议及地址配置："+err.Error())
 		return

@@ -44,7 +44,7 @@ test('English setup, errors, admin pages, live switch and public pages',async({b
  await page.getByRole('button',{name:'Sign in',exact:false}).click()
  await expect(page.getByRole('heading',{name:'Admin console',exact:true})).toBeVisible()
  await page.screenshot({path:'/tmp/fiftyapi-overview-en.png',fullPage:true,animations:'disabled'})
- for(const label of ['API keys','Request logs','Upstream accounts','Team members','Models & pricing','Runtime logs','Audit log','System settings']){
+ for(const label of ['API keys','Request logs','Upstream accounts','Proxy settings','Team members','Models & pricing','Runtime logs','Audit log','System settings']){
   await page.locator('.nav-item').filter({hasText:label}).click()
   await expect(page.locator('.header-page h1')).toHaveText(label)
  }
