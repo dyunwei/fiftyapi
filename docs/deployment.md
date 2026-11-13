@@ -13,7 +13,7 @@ go build -buildvcs=false -o bin/fiftyapi ./cmd/fiftyapi
 
 制作发布包使用 `./scripts/build-release.sh`（需要 Node 24+），生成 `CGO_ENABLED=0` 二进制。发布脚本默认 `GOAMD64=v1`，避免发行版工具链的 v2 默认值提高 x86-64 CPU 要求；可以通过环境变量显式覆盖。普通 `go build` 仍使用系统工具链默认值。升级 Go 后需要重新构建二进制才能使用新的运行时和标准库。
 
-Rocky Linux 启用 SELinux 时，Compose 默认 named volume 可继续使用；若改用专属数据目录的 bind mount，使用 `./data:/data:Z`，入口脚本会自动准备目录权限，再以 UID/GID 10001 运行服务。默认仅监听回环地址的部署无需开放外部端口；对外提供服务时按实际入口配置 firewalld。
+Rocky Linux 启用 SELinux 时，默认 Docker 命名卷可直接使用；若选择宿主机目录，将 Compose 的数据挂载改为 `"${FIFTYAPI_DATA_PATH:-./data}:/data:Z"`，仅使用专属数据目录。入口脚本会自动准备目录权限，再以 UID/GID 10001 运行服务。对外提供服务时按实际入口配置 firewalld；仅通过本机反向代理访问时，将 `FIFTYAPI_LISTEN` 设为 `127.0.0.1:8080`。
 
 本机脚本在 `.local/` 首次创建主密钥和部署口令，以后复用。读取 `.local/setup-token` 填入网页初始化表单，设置管理员用户名和密码；随后正常登录。登录页提供注册入口，邮箱、真实姓名和密码必填；新用户两种额度均为 0，由管理员分配。不要重新生成旧数据库的主密钥。
 
@@ -27,7 +27,6 @@ Rocky Linux 启用 SELinux 时，Compose 默认 named volume 可继续使用；�
 | `FIFTYAPI_DATA_DIR` | 默认 `data`；容器默认 `/data`，用于自动选择数据库文件 |
 | `FIFTYAPI_LISTEN` | 默认 `127.0.0.1:8080` |
 | `FIFTYAPI_COOKIE_SECURE` | HTTPS 部署设 `true`；HTTP（包括内网）设 `false` |
-| `ANTIGRAVITY_OAUTH_CLIENT_SECRET` | 可选，覆盖配套桌面客户端参数；通常留空使用内置配置，不能填随机值 |
 
 主密钥错误会拒绝启动，不会覆盖已有凭据。管理员和普通用户密码均为 8–72 字节，使用 bcrypt；会话有效期 12 小时，Cookie HttpOnly/SameSiteStrict，写操作需 CSRF，管理接口校验角色。
 
@@ -38,7 +37,24 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-`.env` 中两个密钥可留空，程序会在数据卷中自动生成 `/data/master.key` 和 `/data/setup-token`（权限 0600），重启、重建容器时复用。读取初始化口令：`docker compose exec fiftyapi cat /data/setup-token`。不要把两个值统一设为 `fiftyapi`；显式配置的环境变量优先，仍需满足长度和格式要求。依赖网络受限时可设置 `GOPROXY=https://goproxy.cn,direct` 再构建。Compose 默认只绑定 `127.0.0.1:8080`；数据存于 named volume `data`。入口脚本以 root 准备数据目录权限后，切换到 UID/GID 10001 运行服务；Compose 根目录只读。bind mount 同样会自动处理数据目录及已有文件的归属；显式指定非 root `--user` 时需自行保证目录可写。
+`.env` 中两个密钥可留空，程序会在数据卷中自动生成 `/data/master.key` 和 `/data/setup-token`（权限 0600），重启、重建容器时复用。读取初始化口令：`docker compose exec fiftyapi cat /data/setup-token`。不要把两个值统一设为 `fiftyapi`；显式配置的环境变量优先，仍需满足长度和格式要求。依赖网络受限时可设置 `GOPROXY=https://goproxy.cn,direct` 再构建。Compose 默认绑定宿主机 `0.0.0.0:8080`，可通过 `http://localhost:8080` 或 `http://服务器IP:8080` 访问；数据默认保存到 Docker 管理的命名卷 `data`（通常名为 `fiftyapi_data`，实际前缀取决于 Compose 项目名）。入口脚本以 root 准备数据目录权限后，切换到 UID/GID 10001 运行服务；Compose 根目录只读。bind mount 同样会自动处理数据目录及已有文件的归属；显式指定非 root `--user` 时需自行保证目录可写。
+
+在 `.env` 中调整宿主机配置，无需修改 `compose.yaml`：
+
+```dotenv
+# 可选：Compose 默认 0.0.0.0:8080，本地直接运行默认 127.0.0.1:8080
+# FIFTYAPI_LISTEN=0.0.0.0:8080
+# 可选：不配置或留空时使用 Docker 默认存储位置
+# FIFTYAPI_DATA_PATH=./data
+```
+
+例如设置 `FIFTYAPI_LISTEN=0.0.0.0:28080` 即可使用宿主机 28080 端口；仅允许本机访问时设为 `127.0.0.1:28080`。此变量在本地直接运行时配置程序监听地址，在 Compose 中配置宿主机发布地址，不传入容器；容器内仍监听 `0.0.0.0:8080`，健康检查不受影响。配置变更后执行 `docker compose up -d`。
+
+`FIFTYAPI_DATA_PATH` 不配置或留空时，由 Docker 决定数据卷的宿主机存放位置；容器内数据库为 `/data/fiftyapi.db`，自动生成的密钥和初始化口令也在 `/data`。可用 `docker volume inspect <卷名>` 查看存储信息。`docker compose down` 保留命名卷，`docker compose down -v` 会删除命名卷及其中数据。
+
+若希望指定宿主机目录，设置 `FIFTYAPI_DATA_PATH=./data` 或 `/srv/fiftyapi/data` 等绝对路径。相对路径以 `compose.yaml` 所在目录为基准；设置为 `./data` 时数据库保存在项目的 `./data/fiftyapi.db`。该变量与容器内的 `FIFTYAPI_DATA_DIR=/data` 不同。宿主机目录不会被 `docker compose down -v` 删除。
+
+已有部署保持原 Compose 项目名、未配置 `FIFTYAPI_DATA_PATH` 时继续使用原命名卷。切换命名卷与宿主机目录前，先停机并将**完整数据目录（包括主密钥）**复制到目标位置；数据不会自动迁移，不要使用空目录重新初始化已有部署。
 
 首次访问、OAuth 和模型启用流程与二进制一致。`GET /healthz` 检查数据库连接；Docker 配置了健康检查。升级前先备份；新版本启动自动迁移，拒绝比程序更新的数据库 schema。
 
@@ -136,9 +152,9 @@ Docker named volume 可停机后导出到本机目录再备份；恢复 bind mou
 
 ### 网页授权返回 invalid_client
 
-内置 Antigravity 客户端已有配套参数，通常无需设置 `ANTIGRAVITY_OAUTH_CLIENT_SECRET`。以前在终端随意填写过该变量时，网页服务会继承旧值；开发探针辅助脚本会对子进程覆盖该值，所以探针成功不代表网页服务环境已修正。
+内置 Antigravity 客户端已有配套参数，普通部署和账号导入无需设置 `ANTIGRAVITY_OAUTH_CLIENT_SECRET`；配置示例将该变量作为注释掉的可选项，Compose 支持从环境或 `.env` 传入覆盖值；不配置或留空时使用内置值。它是 OAuth 客户端参数的高级覆盖项，与用户账号凭据不同；导入账号后的令牌刷新仍会使用配套客户端参数。以前在终端随意填写过该变量时，网页服务会继承旧值；开发探针辅助脚本会对子进程覆盖该值，所以探针成功不代表网页服务环境已修正。
 
-本机启动先执行 `unset ANTIGRAVITY_OAUTH_CLIENT_SECRET` 再启动服务；Docker 则清空 `.env` 中的该变量，并重新创建容器。修正后在页面重新生成授权链接，不要复用失败的回调。不要输出或分享完整环境、授权结果及令牌。
+本机启动先执行 `unset ANTIGRAVITY_OAUTH_CLIENT_SECRET` 再启动服务；Docker Compose 部署则清空 `.env` 中的该变量，并清除启动 Compose 的 shell 中同名变量，再重新创建容器；自定义 Compose 或 `docker run` 部署应移除传入容器的覆盖项后重新创建容器。修正后在页面重新生成授权链接，不要复用失败的回调。不要输出或分享完整环境、授权结果及令牌。
 
 
 ## 邀请普通用户

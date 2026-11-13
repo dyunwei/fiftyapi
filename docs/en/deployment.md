@@ -15,7 +15,7 @@ go build -buildvcs=false -o bin/fiftyapi ./cmd/fiftyapi
 
 Use `./scripts/build-release.sh` to create a release package (requires Node 24+). It builds with `CGO_ENABLED=0` and defaults to `GOAMD64=v1` so distribution toolchains defaulting to v2 do not raise the x86-64 CPU requirements. Override `GOAMD64` explicitly when needed; ordinary `go build` keeps the system defaults. Rebuild binaries after upgrading Go to use the new runtime and standard library.
 
-On Rocky Linux with SELinux enabled, keep the default Compose named volume, or use `./data:/data:Z` for a dedicated bind-mounted data directory. The entrypoint prepares data directory ownership automatically before running the service as UID/GID 10001 (an explicit non-root `--user` must already have write access). Loopback-only deployments need no external port opened; configure firewalld for the actual public entry point when exposing the service.
+On Rocky Linux with SELinux enabled, the default Docker named volume works as-is. If choosing a host directory, change the Compose data mount to `"${FIFTYAPI_DATA_PATH:-./data}:/data:Z"` and use a dedicated data directory. The entrypoint prepares data directory ownership automatically before running the service as UID/GID 10001 (an explicit non-root `--user` must already have write access). Configure firewalld for the actual public entry point; set `FIFTYAPI_LISTEN=127.0.0.1:8080` when only a local reverse proxy should access the service.
 
 The local helper saves its master key and setup token under `.local/` and reuses them. For explicit configuration or a downloaded package, follow the [release quickstart](release-quickstart.md).
 
@@ -41,7 +41,24 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-When blank, the service generates `/data/master.key` and `/data/setup-token` with mode 0600 and reuses them across restarts and container recreation. Read the initial setup token with `docker compose exec fiftyapi cat /data/setup-token`. Explicit environment values take precedence and must satisfy their format and length requirements; do not use a shared value such as `fiftyapi`. Compose binds `127.0.0.1:8080`, stores data in a named volume, runs with a read-only root filesystem and allows 60 seconds for shutdown. Keep `.env` private and back it up separately. Set `FIFTYAPI_COOKIE_SECURE=true` for public HTTPS access. Compose defaults to `TZ=Asia/Shanghai`; change it if desired.
+When blank, the service generates `/data/master.key` and `/data/setup-token` with mode 0600 and reuses them across restarts and container recreation. Read the initial setup token with `docker compose exec fiftyapi cat /data/setup-token`. Explicit environment values take precedence and must satisfy their format and length requirements; do not use a shared value such as `fiftyapi`. Compose binds host `0.0.0.0:8080` (accessible at `http://localhost:8080` or `http://SERVER_IP:8080`), stores data in the Docker-managed named volume `data` (usually `fiftyapi_data`, depending on the Compose project name), runs with a read-only root filesystem and allows 60 seconds for shutdown. Keep `.env` private and back it up separately. Set `FIFTYAPI_COOKIE_SECURE=true` for public HTTPS access. Compose defaults to `TZ=Asia/Shanghai`; change it if desired.
+
+Adjust host settings in `.env` without editing `compose.yaml`:
+
+```dotenv
+# Optional: Compose defaults to 0.0.0.0:8080; local startup to 127.0.0.1:8080.
+# FIFTYAPI_LISTEN=0.0.0.0:8080
+# Optional: unset or blank uses Docker’s default storage location.
+# FIFTYAPI_DATA_PATH=./data
+```
+
+For example, set `FIFTYAPI_LISTEN=0.0.0.0:28080` to publish host port 28080, or `127.0.0.1:28080` for local access only. This variable sets the application listen address when running locally and the host publishing address in Compose. Compose does not pass it into the container, which still listens on `0.0.0.0:8080`, preserving its health check. Apply changes with `docker compose up -d`.
+
+When `FIFTYAPI_DATA_PATH` is unset or blank, Docker determines where to store the named volume on the host. The container database is `/data/fiftyapi.db`, with generated key and setup-token files also under `/data`. Use `docker volume inspect <volume-name>` to inspect storage information. `docker compose down` preserves the named volume; `docker compose down -v` deletes the named volume and its data.
+
+To choose a host directory, set `FIFTYAPI_DATA_PATH=./data` or an absolute path such as `/srv/fiftyapi/data`. Relative paths are based on `compose.yaml`; `./data` puts the database at the project’s `./data/fiftyapi.db`. This variable differs from the container’s `FIFTYAPI_DATA_DIR=/data`. Host directories are not deleted by `docker compose down -v`.
+
+Existing deployments keep using their original named volume when the Compose project name stays the same and `FIFTYAPI_DATA_PATH` is unset. Before switching between a named volume and a host directory, stop the service and copy the **entire data directory, including the master key**, to the destination. Data is not migrated automatically; do not initialize an empty directory for an existing deployment.
 
 The command above builds from source. To use the published Docker Hub image, follow the next section.
 
@@ -132,4 +149,4 @@ After success, set `FIFTYAPI_DB_PATH=/data/restored/fiftyapi.db` in `.env`, then
 
 `fiftyapi version` works without a master key. `/api/version` returns the version and build commit. Request IDs identify individual calls; request logs do not store full prompts or responses. Runtime logs retain operational summaries for 7 days. Errors before database initialization and runtime-log write failures remain visible in terminal/container logs.
 
-If Antigravity reports `invalid_client` after an environment override, clear `ANTIGRAVITY_OAUTH_CLIENT_SECRET`, recreate/restart the service and generate a new authorization link. Do not reuse a failed callback or disclose environment values, authorization results or tokens.
+Antigravity includes paired OAuth client parameters. Normal deployment and account import do not require `ANTIGRAVITY_OAUTH_CLIENT_SECRET`; the configuration example lists it as a commented optional setting, and Compose forwards an override from the environment or `.env`. Unset or blank values use the built-in value. This advanced override configures the OAuth client, rather than user credentials. Refreshing imported account tokens still uses the paired client parameters. If Antigravity reports `invalid_client` after an environment override, unset the variable for local startup, or clear it in both `.env` and the shell running Compose and recreate the container (remove the override from custom Compose or Docker run environments as applicable), then generate a new authorization link. Do not reuse a failed callback or disclose environment values, authorization results or tokens.

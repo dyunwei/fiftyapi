@@ -8,7 +8,7 @@ services:
     restart: unless-stopped
     stop_grace_period: 60s
     ports:
-      - "127.0.0.1:8080:8080"
+      - "${FIFTYAPI_LISTEN:-0.0.0.0:8080}:8080"
     environment:
       FIFTYAPI_MASTER_KEY: "${FIFTYAPI_MASTER_KEY-}"
       FIFTYAPI_DB_PATH: "${FIFTYAPI_DB_PATH-}"
@@ -24,7 +24,7 @@ services:
       FIFTYAPI_SMTP_TLS: "${FIFTYAPI_SMTP_TLS-starttls}"
       ANTIGRAVITY_OAUTH_CLIENT_SECRET: "${ANTIGRAVITY_OAUTH_CLIENT_SECRET:-}"
     volumes:
-      - data:/data
+      - "${FIFTYAPI_DATA_PATH:-data}:/data"
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=32m
