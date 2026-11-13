@@ -18,6 +18,7 @@ import (
 type Credential struct {
 	APIKey    string           `json:"api_key,omitempty"`
 	AccountID int64            `json:"-"`
+	DeviceID  string           `json:"-"`
 	Config    providers.Config `json:"config"`
 	Token     providers.Token  `json:"token"`
 	ExpiresAt time.Time        `json:"expires_at"`

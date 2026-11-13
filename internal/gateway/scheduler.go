@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
@@ -178,7 +179,14 @@ func (h *Handler) selectAccount(ctx context.Context, user int64, model, scope st
 	}
 	previous := int64(0)
 	if len(fingerprint) > 0 {
-		previous, _ = h.store.GatewaySession(ctx, fingerprint)
+		var hold int64
+		previous, hold, err = h.store.GatewaySessionBinding(ctx, fingerprint)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return selection{}, err
+		}
+		if previous != 0 && hold > time.Now().Unix() {
+			return selection{}, &scheduleUnavailable{status: 429, until: hold, message: "原会话账号暂时限流，请稍后重试或新建会话"}
+		}
 	}
 	candidates := []store.RouteCandidate{}
 	earliest := int64(0)
@@ -337,6 +345,7 @@ func (h *Handler) AccountLoad(id int64) (int, int) { return h.slot(id).load() }
 func (h *Handler) ResetAccountCooldown(id int64)   { h.cooldowns.Delete(id) }
 
 type scheduleUnavailable struct {
+	status  int
 	until   int64
 	message string
 }

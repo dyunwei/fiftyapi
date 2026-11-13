@@ -93,3 +93,11 @@ python3 scripts/backup-offline.py restore \
 ```
 
 Start with that database and the original master key. The snapshot excludes later changes. Review restored backup schedules and settings, and do not let the old and restored instances manage the same remote backups simultaneously.
+
+## OpenAI device identity and temporary limits
+
+Native OpenAI OAuth accounts use a random, persistent device ID per account. HTTP and WebSocket inference normalize `x-codex-installation-id` and device fields in `x-codex-turn-metadata` and `client_metadata` together. Session, thread and turn IDs, other metadata and encrypted histories remain independent. The ID is stored in the database and survives restarts, token refresh and reauthorization of the same account row. Deleting and reimporting an account creates a new identity. API gateway device identities are not rewritten. Normalizing these fields does not guarantee that the provider identifies all clients as one device.
+
+A temporary OpenAI 429, including an unspecified 429 without evidence of quota exhaustion, keeps the session bound to its original account. `Retry-After` is returned; a valid provider delay is honored, otherwise the delay defaults to 60 seconds. The hold survives subsequent requests and server restarts. New sessions may use other healthy accounts. Explicit quota-exhaustion signals, or exhausted quota percentages with reset times, allow ordinary portable histories to follow the existing failover rules. Encrypted, signed or provider-referenced context stays on its original account. This behavior is always enabled, with no new configuration switch; an administrator's health reset clears the hold.
+
+Session recognition accepts `session-id`, `session_id`, `x-session-id`, `conversation_id` and `client_metadata.session_id`. Migration `018_openai_session_identity.sql` adds the device table and session hold field automatically. Back up the database and master key before upgrading; rollback requires the pre-upgrade database.

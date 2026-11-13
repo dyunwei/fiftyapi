@@ -232,6 +232,7 @@ func TestPortableBindingMovesAndOpaqueBindingStays(t *testing.T) {
 					secondCalls.Add(1)
 				} else if reject.Load() {
 					w.WriteHeader(429)
+					io.WriteString(w, `{"error":{"code":"usage_limit_reached"}}`)
 					return
 				}
 				w.Header().Set("Content-Type", "text/event-stream")

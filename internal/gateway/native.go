@@ -90,8 +90,7 @@ func (h *Handler) forward(w http.ResponseWriter, r *http.Request, body []byte, r
 		out.err = errors.New("上游网关地址无效")
 		return out
 	}
-	encoded, _ := json.Marshal(request)
-	req, err := http.NewRequestWithContext(r.Context(), http.MethodPost, u.String(), bytes.NewReader(encoded))
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodPost, u.String(), nil)
 	if err != nil {
 		out.err = errors.New("无法构造上游请求")
 		return out
@@ -112,7 +111,7 @@ func (h *Handler) forward(w http.ResponseWriter, r *http.Request, body []byte, r
 	if m.Provider == "openai" {
 		providers.SetOpenAIAccountHeader(req.Header, c.Config, c.Token)
 	}
-	for _, name := range []string{"session_id", "conversation_id", "x-codex-turn-metadata", "openai-beta"} {
+	for _, name := range []string{"session-id", "session_id", "conversation_id", "x-codex-turn-metadata", "openai-beta"} {
 		if value := r.Header.Get(name); value != "" {
 			req.Header.Set(name, value)
 		}
@@ -128,6 +127,12 @@ func (h *Handler) forward(w http.ResponseWriter, r *http.Request, body []byte, r
 	if c.Config.InferencePolicy.ForceStandard {
 		req.Header.Del("OpenAI-Service-Tier")
 	}
+	if m.Provider == "openai" {
+		providers.NormalizeOpenAIDevice(req.Header, request, c.DeviceID)
+	}
+	encoded, _ := json.Marshal(request)
+	req.Body = io.NopCloser(bytes.NewReader(encoded))
+	req.ContentLength = int64(len(encoded))
 	client := h.upstreamClient(r, c)
 	defer client.CloseIdleConnections()
 	out.dispatched = true

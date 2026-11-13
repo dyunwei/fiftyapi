@@ -54,6 +54,10 @@ func TestRefreshSurvivesCanceledWaiterAndMergesConcurrentRequests(t *testing.T) 
 	if e != nil {
 		t.Fatal(e)
 	}
+	device, e := s.OpenAIDeviceID(ctx, id)
+	if e != nil {
+		t.Fatal(e)
+	}
 	waiter, cancel := context.WithCancel(ctx)
 	answer := make(chan error, 1)
 	go func() { _, err := service.Access(waiter, id); answer <- err }()
@@ -70,7 +74,7 @@ func TestRefreshSurvivesCanceledWaiterAndMergesConcurrentRequests(t *testing.T) 
 		go func() {
 			defer wg.Done()
 			c, e := service.Access(ctx, id)
-			if e == nil && (c.Token.AccessToken != "rotated-access" || c.Token.RefreshToken != "rotated-refresh") {
+			if e == nil && (c.Token.AccessToken != "rotated-access" || c.Token.RefreshToken != "rotated-refresh" || c.DeviceID != device) {
 				e = fmt.Errorf("stale credential")
 			}
 			errors <- e

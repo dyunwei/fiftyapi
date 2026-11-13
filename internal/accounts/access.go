@@ -49,6 +49,12 @@ func (s *Service) Access(ctx context.Context, id int64) (Credential, error) {
 		return Credential{}, err
 	}
 	c.AccountID = id
+	if c.Config.Provider == "openai" {
+		c.DeviceID, err = s.store.OpenAIDeviceID(ctx, id)
+		if err != nil {
+			return Credential{}, err
+		}
+	}
 	if c.Config.Provider == "gateway" {
 		return c, nil
 	}

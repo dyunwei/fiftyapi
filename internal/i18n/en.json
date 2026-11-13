@@ -1,4 +1,5 @@
 {
+  "原会话账号暂时限流，请稍后重试或新建会话": "The session account is temporarily rate limited; retry later or start a new session",
   "无法创建本地密钥目录": "Cannot create local key directory",
   "无法保存本地密钥": "Cannot save local key",
   "无法打开本地密钥": "Cannot open local key",

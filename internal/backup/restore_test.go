@@ -35,7 +35,7 @@ func TestRestoreArchive(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	for _, q := range []string{"ALTER TABLE account_contribution_links DROP COLUMN proxy_id", "ALTER TABLE upstream_accounts DROP COLUMN proxy_id", "DROP TABLE proxy_servers"} {
+	for _, q := range []string{"DROP TABLE openai_account_devices", "ALTER TABLE gateway_sessions DROP COLUMN hold_until", "ALTER TABLE account_contribution_links DROP COLUMN proxy_id", "ALTER TABLE upstream_accounts DROP COLUMN proxy_id", "DROP TABLE proxy_servers"} {
 		if _, err := s.store.DB.Exec(q); err != nil {
 			t.Fatal(err)
 		}

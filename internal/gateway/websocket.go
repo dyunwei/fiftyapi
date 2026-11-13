@@ -66,20 +66,7 @@ func (h *Handler) ServeWebSocket(w http.ResponseWriter, r *http.Request) {
 	conn.SetReadLimit(4 << 20)
 	state := &websocketState{cache: map[string]wsCachedResponse{}}
 	defer state.close()
-	seed := r.Header.Get("session_id")
-	if seed == "" {
-		seed = r.Header.Get("x-session-id")
-	}
-	if seed == "" {
-		seed = r.Header.Get("conversation_id")
-	}
-	if seed == "" {
-		nonce := make([]byte, 24)
-		if _, err = rand.Read(nonce); err != nil {
-			return
-		}
-		seed = "ws-" + hex.EncodeToString(nonce)
-	}
+	seed := explicitSessionID(r, nil)
 	var writeMu sync.Mutex
 	write := func(raw []byte) error {
 		writeMu.Lock()
@@ -152,6 +139,16 @@ func (h *Handler) ServeWebSocket(w http.ResponseWriter, r *http.Request) {
 				if e != nil || !m.SupportsProtocol("responses") {
 					sendError("model_not_found", "模型未启用、未定价或不支持 Responses", stream)
 					continue
+				}
+				if seed == "" {
+					seed = explicitSessionID(r, payload)
+					if seed == "" {
+						nonce := make([]byte, 24)
+						if _, err := rand.Read(nonce); err != nil {
+							return
+						}
+						seed = "ws-" + hex.EncodeToString(nonce)
+					}
 				}
 				delete(payload, "type")
 				payload["stream"] = json.RawMessage("true")

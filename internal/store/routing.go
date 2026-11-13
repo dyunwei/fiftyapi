@@ -151,6 +151,8 @@ type RequestAttempt struct {
 type AccountObservation struct {
 	RequestAttempt
 	Success, Failure             bool
+	HoldBinding                  bool
+	QuotaExhausted               bool
 	CooldownUntil                int64
 	CooldownScope                string
 	PrimaryUsed, SecondaryUsed   *float64
@@ -210,6 +212,15 @@ func (s *Store) RecordAttempt(ctx context.Context, o AccountObservation) error {
 			return err
 		}
 	}
+	if o.HoldBinding && o.CooldownUntil > now {
+		if _, err = tx.ExecContext(ctx, "UPDATE gateway_sessions SET hold_until=max(hold_until,?) WHERE account_id=?", o.CooldownUntil, o.AccountID); err != nil {
+			return err
+		}
+	} else if o.QuotaExhausted {
+		if _, err = tx.ExecContext(ctx, "UPDATE gateway_sessions SET hold_until=0 WHERE account_id=?", o.AccountID); err != nil {
+			return err
+		}
+	}
 	return tx.Commit()
 }
 func (s *Store) ResetAccountHealth(ctx context.Context, actor, id int64) error {
@@ -227,6 +238,9 @@ func (s *Store) ResetAccountHealth(ctx context.Context, actor, id int64) error {
 		return ErrNotFound
 	}
 	if _, err = tx.ExecContext(ctx, "DELETE FROM account_cooldowns WHERE account_id=?", id); err != nil {
+		return err
+	}
+	if _, err = tx.ExecContext(ctx, "UPDATE gateway_sessions SET hold_until=0 WHERE account_id=?", id); err != nil {
 		return err
 	}
 	if err = audit(ctx, tx, actor, "reset_account_health", id); err != nil {

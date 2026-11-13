@@ -9,28 +9,7 @@ import (
 )
 
 func sessionHash(r *http.Request, user int64, provider string, request map[string]json.RawMessage) []byte {
-	value := ""
-	for _, header := range []string{"session_id", "x-session-id", "conversation_id"} {
-		if value = r.Header.Get(header); value != "" {
-			break
-		}
-	}
-	if value == "" {
-		var metadata struct {
-			UserID    string `json:"user_id"`
-			SessionID string `json:"session_id"`
-		}
-		_ = json.Unmarshal(request["metadata"], &metadata)
-		value = metadata.SessionID
-		if value == "" {
-			var nested struct {
-				SessionID string `json:"session_id"`
-			}
-			if json.Unmarshal([]byte(metadata.UserID), &nested) == nil {
-				value = nested.SessionID
-			}
-		}
-	}
+	value := explicitSessionID(r, request)
 	if value == "" {
 		_ = json.Unmarshal(request["prompt_cache_key"], &value)
 	}
@@ -68,6 +47,39 @@ func sessionHash(r *http.Request, user int64, provider string, request map[strin
 	digest := sha256.Sum256([]byte(strconv.FormatInt(user, 10) + "\x00" + provider + "\x00" + value))
 	return digest[:]
 }
+func explicitSessionID(r *http.Request, request map[string]json.RawMessage) string {
+	value := ""
+	for _, header := range []string{"session-id", "session_id", "x-session-id", "conversation_id"} {
+		if value = r.Header.Get(header); value != "" {
+			break
+		}
+	}
+	if value == "" {
+		var metadata struct {
+			UserID    string `json:"user_id"`
+			SessionID string `json:"session_id"`
+		}
+		_ = json.Unmarshal(request["metadata"], &metadata)
+		value = metadata.SessionID
+		if value == "" {
+			var nested struct {
+				SessionID string `json:"session_id"`
+			}
+			if json.Unmarshal([]byte(metadata.UserID), &nested) == nil {
+				value = nested.SessionID
+			}
+		}
+	}
+	if value == "" {
+		var metadata struct {
+			SessionID string `json:"session_id"`
+		}
+		_ = json.Unmarshal(request["client_metadata"], &metadata)
+		value = metadata.SessionID
+	}
+	return value
+}
+
 func legacySessionHash(r *http.Request, user int64, provider string, request map[string]json.RawMessage) []byte {
 	value := r.Header.Get("session_id")
 	if value == "" {

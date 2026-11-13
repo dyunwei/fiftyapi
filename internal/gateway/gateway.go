@@ -324,6 +324,9 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 				var unavailable *scheduleUnavailable
 				if errors.As(e, &unavailable) {
 					out.retryAfter = unavailable.until
+					if unavailable.status != 0 {
+						out.status = unavailable.status
+					}
 				}
 				if r.Context().Err() != nil {
 					out.status = 499
@@ -379,9 +382,10 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 				out.signal = "refreshed"
 			}
 		}
-		eligible := out.retryable && writer.writeErr == nil && !writer.committed && !out.invalidUsage && out.usage.Input+out.usage.Output+out.usage.Cached+out.usage.CacheWrite == 0 && r.Context().Err() == nil
+		holdBinding := chosen.Route.Provider == "openai" && out.signal == "rate_limit"
+		eligible := !holdBinding && out.retryable && writer.writeErr == nil && !writer.committed && !out.invalidUsage && out.usage.Input+out.usage.Output+out.usage.Cached+out.usage.CacheWrite == 0 && r.Context().Err() == nil
 		reason := routingReason(out)
-		observation := store.AccountObservation{RequestAttempt: store.RequestAttempt{RequestID: id, Attempt: attempt, AccountID: chosen.ID, Model: m.ID, Status: out.status, DurationMS: time.Since(started).Milliseconds(), Dispatched: out.dispatched, Retryable: eligible && (portable || refreshed) && attempt < 3, Reason: reason, CreatedAt: started.Unix()}, Success: out.complete && out.err == nil, Failure: writer.writeErr == nil && out.err != nil && out.signal != "refreshed" && out.signal != "rate_limit" && out.signal != "model_unavailable" && out.status != 400 && out.status != 403 && r.Context().Err() == nil, CooldownUntil: out.cooldownUntil, PrimaryUsed: out.primaryUsed, PrimaryReset: out.primaryReset, SecondaryUsed: out.secondaryUsed, SecondaryReset: out.secondaryReset}
+		observation := store.AccountObservation{RequestAttempt: store.RequestAttempt{RequestID: id, Attempt: attempt, AccountID: chosen.ID, Model: m.ID, Status: out.status, DurationMS: time.Since(started).Milliseconds(), Dispatched: out.dispatched, Retryable: eligible && (portable || refreshed) && attempt < 3, Reason: reason, CreatedAt: started.Unix()}, Success: out.complete && out.err == nil, Failure: writer.writeErr == nil && out.err != nil && out.signal != "refreshed" && out.signal != "rate_limit" && out.signal != "quota_exhausted" && out.signal != "model_unavailable" && out.status != 400 && out.status != 403 && r.Context().Err() == nil, CooldownUntil: out.cooldownUntil, HoldBinding: holdBinding, QuotaExhausted: out.signal == "quota_exhausted", PrimaryUsed: out.primaryUsed, PrimaryReset: out.primaryReset, SecondaryUsed: out.secondaryUsed, SecondaryReset: out.secondaryReset}
 		if writer.firstOutput != nil {
 			ms := writer.firstOutput.Sub(started).Milliseconds()
 			observation.FirstOutputMS = &ms

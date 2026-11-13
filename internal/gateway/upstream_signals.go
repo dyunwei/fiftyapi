@@ -30,7 +30,9 @@ func errorSignal(raw []byte) string {
 	}
 	for _, code := range []string{root.Error.Code, root.Error.Type, root.Error.Status, root.Response.Error.Code, root.Response.Error.Type} {
 		switch code {
-		case "rate_limit_exceeded", "usage_limit_reached", "quota_exceeded", "insufficient_quota", "RESOURCE_EXHAUSTED":
+		case "usage_limit_reached", "quota_exceeded", "insufficient_quota":
+			return "quota_exhausted"
+		case "rate_limit_exceeded", "RESOURCE_EXHAUSTED":
 			return "rate_limit"
 		case "overloaded_error", "server_is_overloaded", "server_overloaded":
 			return "overloaded"
@@ -93,16 +95,18 @@ func observeHeaders(out *result, h http.Header) {
 func classifyRejection(out *result, resp *http.Response) {
 	observeHeaders(out, resp.Header)
 	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
-	out.signal = errorSignal(raw)
+	if signal := errorSignal(raw); signal != "" && out.signal != "quota_exhausted" {
+		out.signal = signal
+	}
 	out.retryAfter = max(out.retryAfter, googleRetryHint(raw))
-	if out.status == 429 {
+	if out.status == 429 && out.signal != "quota_exhausted" {
 		out.signal = "rate_limit"
 	}
 	if out.status == 401 {
 		out.signal = "authentication"
 	}
 	switch out.signal {
-	case "rate_limit":
+	case "rate_limit", "quota_exhausted":
 		out.retryable = true
 		out.known = true
 		out.complete = true
@@ -141,7 +145,9 @@ func applyStreamSignal(out *result, raw []byte) {
 	if signal == "" {
 		return
 	}
-	out.signal = signal
+	if out.signal != "quota_exhausted" {
+		out.signal = signal
+	}
 	if signal == "context_missing" {
 		out.status = 400
 		out.known = true
@@ -152,15 +158,19 @@ func applyStreamSignal(out *result, raw []byte) {
 	if used > 0 || out.invalidUsage {
 		return
 	}
-	if signal == "rate_limit" || signal == "overloaded" {
+	if signal == "rate_limit" || signal == "quota_exhausted" || signal == "overloaded" {
 		out.retryable = true
 		out.known = true
 		out.complete = true
 		delay := 5 * time.Second
-		if signal == "rate_limit" {
+		if signal == "rate_limit" || signal == "quota_exhausted" {
+			out.status = http.StatusTooManyRequests
 			delay = time.Minute
 		}
-		out.cooldownUntil = max(out.cooldownUntil, out.retryAfter, time.Now().Add(delay).Unix())
+		out.cooldownUntil = max(out.cooldownUntil, out.retryAfter)
+		if out.cooldownUntil <= time.Now().Unix() {
+			out.cooldownUntil = time.Now().Add(delay).Unix()
+		}
 	}
 }
 
