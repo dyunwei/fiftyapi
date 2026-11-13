@@ -5,6 +5,45 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 English | 中文说明见各版本下方折叠区域
 
+## 0.1.1 (2026-11-13)
+
+### Added
+
+- Proxy management with health checks and proxy selection for upstream accounts and account contribution links.
+- Remaining budget progress for each member's 5-hour and 7-day windows in the team table.
+
+### Changed
+
+- Background model catalog synchronization now runs every 24 hours to reduce upstream requests.
+- The environment example now explains source builds versus the published `dyunwei/fiftyapi` Docker image.
+
+### Upgrade notes
+
+- This release adds SQLite migration `017_proxy_servers.sql` for proxy settings and account/contribution bindings. Existing migrations remain unchanged and the new migration runs automatically at startup.
+- Back up the database and its master key before upgrading. To roll back, restore the pre-upgrade database together with the older binary.
+- Provider compatibility limitations remain unchanged; see [compatibility](docs/en/compatibility.md). No new live-provider compatibility is claimed.
+
+<details>
+<summary>中文说明</summary>
+
+**新增**
+
+- 代理管理、健康检查，以及上游账号和账号贡献链接的代理选择。
+- 成员列表展示每位成员 5 小时与 7 天窗口的剩余额度进度。
+
+**调整**
+
+- 后台模型目录同步间隔调整为 24 小时，减少上游请求。
+- 环境变量示例补充源码构建与使用已发布 `dyunwei/fiftyapi` Docker 镜像的说明。
+
+**升级注意事项**
+
+- 新增 SQLite 迁移 `017_proxy_servers.sql`，保存代理配置及账号、贡献链接绑定；现有迁移不变，新迁移在启动时自动执行。
+- 升级前备份数据库和主密钥。回退时须同时恢复升级前的数据库和旧版程序。
+- 上游兼容性限制保持不变，详见 [兼容性](docs/compatibility.md)；本版不新增真实供应商兼容性声明。
+
+</details>
+
 ## 0.1.0 (2026-11-09)
 
 First public preview.

@@ -2,7 +2,7 @@
 
 [简体中文](../README.md) | English
 
-Public preview: **0.1.0**. The console supports Simplified Chinese and English. Choose a language in the top-right corner; preferences are saved in your browser. Initial selection follows the first supported browser language, falling back to English.
+Public preview: **0.1.1**. The console supports Simplified Chinese and English. Choose a language in the top-right corner; preferences are saved in your browser. Initial selection follows the first supported browser language, falling back to English.
 
 | Guide | Contents |
 | --- | --- |

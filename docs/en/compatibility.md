@@ -2,7 +2,7 @@
 
 [简体中文](../compatibility.md) | English
 
-These are the boundaries of the **0.1.0 public preview**. Implemented endpoints and mock tests do not establish that every upstream account or third-party deployment supports them.
+These are the boundaries of the **0.1.1 public preview**. Implemented endpoints and mock tests do not establish that every upstream account or third-party deployment supports them.
 
 | Source | Standard protocol | Real verification |
 | --- | --- | --- |
