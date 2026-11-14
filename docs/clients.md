@@ -1,5 +1,7 @@
 # 客户端接入
 
+在线配置与备份恢复见[一键配置客户端](client-setup.md)。
+
 先在网页创建自己的 API Key。客户端使用 `sk-…` Key，不使用管理员密码或上游 OAuth 令牌。下面为本机示例；其他部署替换为自己的访问地址，内网可使用 HTTP，公网建议 HTTPS。模型名称以本项目 `/v1/models` 返回的 ID 为准，重名模型可能加供应商前缀。
 
 ## Claude Code / Messages

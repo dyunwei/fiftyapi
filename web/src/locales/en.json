@@ -1024,5 +1024,16 @@
   "保存时会自动检测代理服务器连通性与认证状态。贡献链接页面仅向分享者展示地理位置和备注，不公开 IP、端口与认证信息。": "Saving automatically checks connectivity and authentication. Contribution links show only location and note, never IP, port or credentials.",
   "默认代理（选填）": "Default proxy (optional)",
   "不预设代理": "No preset proxy",
-  "不使用代理": "No proxy"
+  "不使用代理": "No proxy",
+  "一键配置与恢复": "Automatic setup and restore",
+  "需要 Python 3.11+。在使用客户端的环境中执行；VS Code 用户请在对应窗口的终端执行，Remote SSH 会配置远端用户。不要使用 sudo。密钥在终端隐藏输入并明文保存在本机配置中；修改前自动备份，TOML 注释与排版会规范化。完成后重新加载窗口并新建会话。": "Requires Python 3.11+. Run in the client environment; in VS Code use that window’s terminal. Remote SSH configures the remote user. Do not use sudo. Enter the key at the hidden prompt; it is stored in plaintext locally. Files are backed up before changes; TOML comments and formatting are normalized. Reload the window and start a new session afterwards.",
+  "恢复：python3 ~/.fiftyapi-helper/helper.py restore codex（Claude Code 将 codex 换成 claude）；Windows 使用 py -3.11 和用户目录。支持 status、use、restore、uninstall；卸载保留备份。以下为手动配置方式。": "Restore: python3 ~/.fiftyapi-helper/helper.py restore codex (replace codex with claude for Claude Code). On Windows use py -3.11 and your user directory. Supports status, use, restore and uninstall; uninstall retains backups. Manual setup follows.",
+  "一键配置": "Automatic setup",
+  "在使用客户端的终端执行，按提示粘贴密钥即可自动配置，无需手动编辑文件。VS Code 用户请使用对应窗口的终端；Remote SSH 会配置远端用户。完成后重新加载窗口并新建会话。": "Run in the terminal where you use the client, then paste your key when prompted. Files are configured automatically. In VS Code use that window’s terminal; Remote SSH configures the remote user. Reload the window and start a new session afterwards.",
+  "需要 Python 3.11+，不要使用 sudo。修改前自动备份；密钥明文保存在本机，TOML 注释与排版会规范化。": "Requires Python 3.11+. Do not use sudo. Files are backed up before changes; the key is stored locally in plaintext and TOML comments and formatting are normalized.",
+  "恢复接入前的配置": "Restore previous connection settings",
+  "恢复首次通过助手接入 FiftyAPI 前的模型、服务地址与鉴权设置，保留之后修改的其他设置。如果之前使用官方服务，恢复后即可沿用原来的接入方式。此操作不会重置客户端，也不会退出原有账号。": "Restore the model, endpoint and authentication settings from before the first FiftyAPI setup, keeping later changes to other settings. If you previously used the official service, you can use that connection again. This does not reset the client or sign out of your existing account.",
+  "恢复命令": "Restore command",
+  "在同一环境、同一用户下执行，然后重新加载窗口并新建会话。若接入字段已被其他工具修改，助手会提示冲突并停止。每次修改前的完整备份保存在 ~/.fiftyapi-helper/backups/；目前不支持选择某个时间点自动恢复。": "Run as the same user in the same environment, then reload the window and start a new session. The helper stops on conflicts with connection fields changed by other tools. Full backups are stored in ~/.fiftyapi-helper/backups/ before each change; selecting a historical backup for automatic restore is not currently supported.",
+  "手动配置（可选）": "Manual setup (optional)"
 }

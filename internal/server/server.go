@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fiftyapi/internal/backup"
 	"fiftyapi/internal/buildinfo"
+	"fiftyapi/internal/clientsetup"
 	"fiftyapi/internal/i18n"
 	"fmt"
 	"io"
@@ -78,6 +79,7 @@ func New(s *store.Store, cfg Config) (*API, error) {
 }
 func (a *API) Handler() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /setup.py", clientsetup.Handler)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		if err := a.store.DB.PingContext(r.Context()); err != nil {
 			writeError(w, 503, "数据库不可用")

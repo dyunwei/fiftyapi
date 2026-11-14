@@ -1,5 +1,7 @@
 # Client configuration
 
+For online configuration, backups and restore, see [Automatic client setup](client-setup.md).
+
 [简体中文](../clients.md) | English
 
 Create your own API key in the console. Clients use that `sk-…` key, not an administrator password or upstream OAuth token. Replace local URLs below with your site origin. LAN deployments may use HTTP; HTTPS is recommended for public access. Use complete model IDs from `/v1/models`.

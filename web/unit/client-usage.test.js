@@ -31,3 +31,16 @@ test('Messages uses origin without v1 and generic Windows API uses curl.exe',()=
  assert.match(api.code,/curl.exe 'https:\/\/example.test\/v1\/models'/)
  assert.match(api.code,/Bearer \$env:FIFTYAPI_API_KEY/)
 })
+
+test('setup commands quote untrusted values and never include the key',async()=>{
+ const {setupCommand}=await import('../src/client-usage.js')
+ const options={origin:'https://example.test/',client:'codex',model:"a'b; $(id)",token:'sk-secret',websocket:true}
+ const unix=setupCommand(options)
+ assert.ok(!unix.includes('sk-secret'))
+ assert.ok(unix.includes("'a'\\''b; $(id)'"))
+ assert.ok(unix.includes('--websocket'))
+ const windows=setupCommand({...options,system:'windows'})
+ assert.ok(windows.includes("'a''b; $(id)'"))
+ assert.ok(windows.includes('if ($?)'))
+ assert.ok(!setupCommand({...options,client:'claude'}).includes('--websocket'))
+})
