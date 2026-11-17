@@ -8,6 +8,7 @@
 
 | 文档 | 内容 |
 | --- | --- |
+| [low-maintenance.md](low-maintenance.md) | 原生透传、自动价格、用户预算与客户端默认版本 |
 | [deployment.md](deployment.md) | 部署说明：二进制、Docker、HTTPS、环境变量、备份恢复、升级 |
 | [release-quickstart.md](release-quickstart.md) | 二进制发布包快速启动（打包时复制为 `QUICKSTART.md`） |
 | [clients.md](clients.md) | Claude Code、Codex 等客户端接入 |

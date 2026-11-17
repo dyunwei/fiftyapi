@@ -10,18 +10,17 @@ import (
 )
 
 // DefaultOpenAIClientVersion is the locally verified Codex identity used for
-// discovery and inference together. Keep defaults/openai.json in sync.
+// discovery and inference together when no account/global override is set.
 const DefaultOpenAIClientVersion = "0.164.0"
 
-// NormalizeOpenAIConfig upgrades the previous shipped official defaults only.
-// Custom endpoints, custom user agents and other explicit versions remain pins.
+// NormalizeOpenAIConfig aligns discovery with the resolved identity. Explicit
+// versions remain pins; account inheritance is resolved by the account service.
 func NormalizeOpenAIConfig(c Config) Config {
 	if c.Provider != "openai" {
 		return c
 	}
 	u, err := url.Parse(c.ModelsURL)
-	legacy := err == nil && u.Scheme == "https" && u.Host == "chatgpt.com" && u.Path == "/backend-api/codex/models" && u.Query().Get("client_version") == "0.146.0" && c.ClientVersion == "0.146.0" && c.UserAgent == ""
-	if c.ClientVersion == "" || legacy {
+	if c.ClientVersion == "" {
 		c.ClientVersion = DefaultOpenAIClientVersion
 	}
 	if err == nil {

@@ -105,7 +105,7 @@ func TestModelSearchPaginationAndLatestPrice(t *testing.T) {
 	if err = s.SyncModels(ctx, other, "openai", []string{"different-model"}); err != nil {
 		t.Fatal(err)
 	}
-	filtered, err := s.ModelPage(ctx, 2, 10, "gemini", false, ModelFilter{AccountID: account, Protocol: "messages"})
+	filtered, err := s.ModelPage(ctx, 2, 10, "gemini", false, ModelFilter{AccountID: account, Protocol: "antigravity"})
 	if err != nil || filtered.Total != 25 || len(filtered.Items) != 10 {
 		t.Fatal("combined account/protocol pagination", err, filtered)
 	}

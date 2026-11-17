@@ -13,11 +13,11 @@ import (
 	"strings"
 )
 
-// The default behavior follows sub2api's OAuth identity normalization and
-// metadata privacy defaults. Runtime overrides are exposed in account config.
+// Native metadata and system blocks pass through by default. Legacy identity
+// normalization is explicit and isolated from the standard API relay.
 func normalizeClaude(request map[string]json.RawMessage, r *http.Request, c accounts.Credential) error {
 	cfg := c.Config
-	if cfg.MetadataPassthrough == nil || !*cfg.MetadataPassthrough {
+	if cfg.MetadataPassthrough != nil && !*cfg.MetadataPassthrough {
 		var metadata map[string]json.RawMessage
 		json.Unmarshal(request["metadata"], &metadata)
 		var userID string
@@ -59,7 +59,7 @@ func normalizeClaude(request map[string]json.RawMessage, r *http.Request, c acco
 			delete(request, "metadata")
 		}
 	}
-	if cfg.ClaudeSystemPromptInjection == nil || *cfg.ClaudeSystemPromptInjection {
+	if cfg.ClaudeSystemPromptInjection != nil && *cfg.ClaudeSystemPromptInjection {
 		var blocks []map[string]json.RawMessage
 		raw := request["system"]
 		if len(raw) > 0 && string(raw) != "null" {

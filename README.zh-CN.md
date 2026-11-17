@@ -17,6 +17,8 @@
 
 </div>
 
+自动价格、原生 Antigravity、用户访问限制和集中版本设置见 [低维护账号共享](docs/low-maintenance.md)。
+
 ## 为什么选择 FiftyAPI
 
 - **部署简单**：一个 Go 程序，内嵌 Vue 3 页面和 SQLite，无需 Redis 或其他服务。

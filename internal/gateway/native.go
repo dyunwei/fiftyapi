@@ -16,7 +16,15 @@ import (
 )
 
 func (h *Handler) forward(w http.ResponseWriter, r *http.Request, body []byte, request map[string]json.RawMessage, m store.Model, c accounts.Credential, output int64) result {
-	if err := applyInferencePolicy(request, m.Protocol, c.Config.InferencePolicy, c.Config.Provider == "antigravity"); err != nil {
+	for key, value := range c.Config.GatewayHeaders {
+		if strings.EqualFold(key, "OpenAI-Service-Tier") {
+			tier, err := requestedTier(request, r)
+			if err != nil || tier != store.NormalizeTier(value) {
+				return result{status: 400, known: true, complete: true, err: errors.New("账号请求头与已定价的请求档位不一致")}
+			}
+		}
+	}
+	if err := applyInferencePolicy(request, m.Protocol, c.Config.InferencePolicy); err != nil {
 		return result{status: 400, known: true, complete: true, err: err}
 	}
 	if c.Config.Provider == "gateway" {
@@ -55,9 +63,6 @@ func (h *Handler) forward(w http.ResponseWriter, r *http.Request, body []byte, r
 		request["stream"] = json.RawMessage("true")
 		if compact {
 			request["stream"] = json.RawMessage("false")
-		}
-		for _, key := range []string{"max_output_tokens", "max_completion_tokens", "temperature", "top_p", "frequency_penalty", "presence_penalty", "chat_template_kwargs", "user", "metadata", "prompt_cache_retention", "safety_identifier", "stream_options", "truncation", "stop_sequences"} {
-			delete(request, key)
 		}
 		if len(request["instructions"]) == 0 {
 			request["instructions"], _ = json.Marshal("You are a coding assistant.")
@@ -111,7 +116,7 @@ func (h *Handler) forward(w http.ResponseWriter, r *http.Request, body []byte, r
 	if m.Provider == "openai" {
 		providers.SetOpenAIAccountHeader(req.Header, c.Config, c.Token)
 	}
-	for _, name := range []string{"session-id", "session_id", "conversation_id", "x-codex-turn-metadata", "openai-beta"} {
+	for _, name := range []string{"session-id", "session_id", "conversation_id", "x-codex-turn-metadata", "openai-beta", "OpenAI-Service-Tier"} {
 		if value := r.Header.Get(name); value != "" {
 			req.Header.Set(name, value)
 		}
@@ -123,9 +128,6 @@ func (h *Handler) forward(w http.ResponseWriter, r *http.Request, body []byte, r
 	}
 	for k, v := range c.Config.GatewayHeaders {
 		req.Header.Set(k, v)
-	}
-	if c.Config.InferencePolicy.ForceStandard {
-		req.Header.Del("OpenAI-Service-Tier")
 	}
 	if m.Provider == "openai" {
 		providers.NormalizeOpenAIDevice(req.Header, request, c.DeviceID)
@@ -177,10 +179,12 @@ func consumeProtocolResponse(w http.ResponseWriter, r *http.Request, resp *http.
 			if t != "" {
 				kind = t
 			}
+			observeBilling(data, &out)
 			if protocolProvider == "claude" {
 				if kind == "message_start" {
 					var message map[string]json.RawMessage
 					json.Unmarshal(data["message"], &message)
+					observeBilling(message, &out)
 					if u, ok := message["usage"]; ok {
 						mergeNativeUsage(u, "claude", &out)
 					}
@@ -194,6 +198,7 @@ func consumeProtocolResponse(w http.ResponseWriter, r *http.Request, resp *http.
 			} else if len(data["response"]) > 0 {
 				var response map[string]json.RawMessage
 				json.Unmarshal(data["response"], &response)
+				observeBilling(response, &out)
 				if raw, ok := response["usage"]; ok {
 					mergeNativeUsage(raw, "openai", &out)
 				}
@@ -259,6 +264,7 @@ func consumeProtocolResponse(w http.ResponseWriter, r *http.Request, resp *http.
 		out.err = errors.New("上游响应格式错误")
 		return out
 	}
+	observeBilling(root, &out)
 	if raw, ok := root["usage"]; ok {
 		mergeNativeUsage(raw, protocolProvider, &out)
 	}
@@ -286,10 +292,16 @@ func consumeProtocolResponse(w http.ResponseWriter, r *http.Request, resp *http.
 
 func mergeNativeUsage(raw []byte, provider string, out *result) {
 	var v struct {
-		Input   *int64 `json:"input_tokens"`
-		Output  *int64 `json:"output_tokens"`
-		Read    *int64 `json:"cache_read_input_tokens"`
-		Write   *int64 `json:"cache_creation_input_tokens"`
+		Input         *int64 `json:"input_tokens"`
+		Output        *int64 `json:"output_tokens"`
+		Read          *int64 `json:"cache_read_input_tokens"`
+		Write         *int64 `json:"cache_creation_input_tokens"`
+		ServiceTier   string `json:"service_tier"`
+		Speed         string `json:"speed"`
+		CacheCreation struct {
+			Hour  *int64 `json:"ephemeral_1h_input_tokens"`
+			Short *int64 `json:"ephemeral_5m_input_tokens"`
+		} `json:"cache_creation"`
 		Details struct {
 			Cached *int64 `json:"cached_tokens"`
 		} `json:"input_tokens_details"`
@@ -299,7 +311,7 @@ func mergeNativeUsage(raw []byte, provider string, out *result) {
 		out.invalidUsage = true
 		return
 	}
-	for _, n := range []*int64{v.Input, v.Output, v.Read, v.Write, v.Details.Cached} {
+	for _, n := range []*int64{v.Input, v.Output, v.Read, v.Write, v.Details.Cached, v.CacheCreation.Hour, v.CacheCreation.Short} {
 		if n != nil && *n < 0 {
 			out.known = false
 			out.invalidUsage = true
@@ -310,6 +322,16 @@ func mergeNativeUsage(raw []byte, provider string, out *result) {
 		out.invalidUsage = true
 		out.known = false
 		return
+	}
+	if v.Speed != "" {
+		v.ServiceTier = v.Speed
+	}
+	if v.ServiceTier != "" && v.ServiceTier != "auto" {
+		out.usage.Tier = store.NormalizeTier(v.ServiceTier)
+		out.usage.Confirmed = true
+	}
+	if v.CacheCreation.Hour != nil {
+		out.usage.CacheWriteHour = max(out.usage.CacheWriteHour, *v.CacheCreation.Hour)
 	}
 	if v.Input != nil {
 		out.seenInput = true
@@ -333,6 +355,19 @@ func mergeNativeUsage(raw []byte, provider string, out *result) {
 	}
 	if v.Write != nil {
 		out.usage.CacheWrite = max(out.usage.CacheWrite, *v.Write)
+	}
+	out.usage.InputTotal = out.inputTotal
+	if provider == "claude" {
+		if out.usage.Cached > 9223372036854775807-out.usage.InputTotal || out.usage.CacheWrite > 9223372036854775807-out.usage.InputTotal-out.usage.Cached {
+			out.invalidUsage = true
+			out.known = false
+		} else {
+			out.usage.InputTotal += out.usage.Cached + out.usage.CacheWrite
+		}
+	}
+	if out.usage.CacheWriteHour > out.usage.CacheWrite {
+		out.invalidUsage = true
+		out.known = false
 	}
 	if provider == "openai" {
 		if out.seenInput && out.usage.Cached > out.inputTotal {

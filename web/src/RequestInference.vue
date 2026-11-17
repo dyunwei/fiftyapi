@@ -16,8 +16,9 @@ const speed = computed(() => [
 </script>
 
 <template>
-  <span :title="t('客户端请求参数；账号策略可能调整，上游实际执行档位未确认。历史日志无此信息。')">
+  <span :title="t('请求参数与计费档位分别记录；历史日志可能缺少档位信息。')">
     <small class="cell-note">{{ t('请求推理') }}: {{ reasoning }}</small>
     <small class="cell-note">{{ t('请求速度') }}: {{ speed }}</small>
+  <small v-if="log.billing_usage?.tier" class="cell-note">{{ t('计费档位') }}: {{ log.billing_usage.tier }} · {{ log.billing_usage.confirmed?t('上游已确认'):t('按请求档位') }}</small>
   </span>
 </template>

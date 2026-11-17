@@ -16,12 +16,14 @@ import (
 )
 
 type Credential struct {
-	APIKey    string           `json:"api_key,omitempty"`
-	AccountID int64            `json:"-"`
-	DeviceID  string           `json:"-"`
-	Config    providers.Config `json:"config"`
-	Token     providers.Token  `json:"token"`
-	ExpiresAt time.Time        `json:"expires_at"`
+	inheritedVersion     bool
+	inheritedAntigravity bool
+	APIKey               string           `json:"api_key,omitempty"`
+	AccountID            int64            `json:"-"`
+	DeviceID             string           `json:"-"`
+	Config               providers.Config `json:"config"`
+	Token                providers.Token  `json:"token"`
+	ExpiresAt            time.Time        `json:"expires_at"`
 }
 type Service struct {
 	store          *store.Store
@@ -112,6 +114,12 @@ func (s *Service) importWithOrigin(ctx context.Context, actor int64, name string
 	return id, nil
 }
 func (s *Service) seal(id int64, c Credential) ([]byte, error) {
+	if c.inheritedVersion {
+		c.Config.ClientVersion = ""
+	}
+	if c.inheritedAntigravity {
+		c.Config.AntigravityVersion = ""
+	}
 	b, err := json.Marshal(c)
 	if err != nil {
 		return nil, err
@@ -152,7 +160,9 @@ func (s *Service) verify(ctx context.Context, id int64, allowOnboard bool) (mode
 	if json.Unmarshal(plain, &c) != nil {
 		return nil, errors.New("账号凭据格式错误")
 	}
-	c.Config = providers.NormalizeOpenAIConfig(c.Config)
+	if err = s.resolveIdentity(ctx, &c); err != nil {
+		return nil, err
+	}
 	if err = s.applyAccountProxy(ctx, account.ProxyID, &c.Config); err != nil {
 		return nil, err
 	}

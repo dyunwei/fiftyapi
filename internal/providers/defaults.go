@@ -4,7 +4,6 @@ import (
 	"embed"
 	"encoding/json"
 	"errors"
-	compat "fiftyapi/internal/compat/antigravity"
 	"os"
 	"strings"
 )
@@ -24,7 +23,6 @@ func DefaultConfig(provider string) (Config, error) {
 	err = json.Unmarshal(b, &c)
 	if provider == "antigravity" {
 		c.AntigravityVersion = os.Getenv("ANTIGRAVITY_USER_AGENT_VERSION")
-		c.AntigravityIdentity = compat.GetDefaultIdentityPatch()
 	}
 	return c, err
 }

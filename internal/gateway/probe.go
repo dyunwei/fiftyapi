@@ -73,7 +73,10 @@ func (h *Handler) Probe(ctx context.Context, account int64, model, protocol, hos
 	defer slot.release()
 	body := map[string]any{"model": selected.UpstreamID, "stream": false}
 	path := "/v1/" + protocol
-	if protocol == "responses" {
+	if protocol == "antigravity" {
+		path = "/v1internal:streamGenerateContent"
+		body = map[string]any{"model": selected.UpstreamID, "request": map[string]any{"contents": []any{map[string]any{"role": "user", "parts": []any{map[string]string{"text": "hi"}}}}, "generationConfig": map[string]int{"maxOutputTokens": 64}}}
+	} else if protocol == "responses" {
 		body["input"] = "hi"
 		body["instructions"] = "Reply briefly to the greeting."
 	} else {

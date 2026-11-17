@@ -55,17 +55,21 @@ func TestInvalidUsageAfterGoodSampleIsNotBilled(t *testing.T) {
 			}))
 			defer up.Close()
 			g := setupGateway(t, provider, up)
-			g.request("/v1/messages", agRequest)
+			path := "/v1/messages"
+			if provider == "antigravity" {
+				path = "/v1internal:streamGenerateContent"
+			}
+			g.request(path, agRequest)
 			q, err := g.s.Quota(context.Background(), g.user)
 			if err != nil || q[0].Used != 0 || q[0].Reserved != 0 {
 				t.Fatal("invalid usage billed from earlier sample", err, q)
 			}
 			pending, _ := g.s.PendingCharges(context.Background())
-			if len(pending) != 0 {
-				t.Fatal("invalid usage left pending")
+			if len(pending) != 1 {
+				t.Fatal("invalid usage did not remain reviewable")
 			}
 			logs, _ := g.s.Logs(context.Background(), g.user, false, 0, "", 0)
-			if len(logs) != 1 || logs[0].Amount == nil || *logs[0].Amount != 0 || logs[0].Input != nil {
+			if len(logs) != 1 || logs[0].Amount != nil || logs[0].Input != nil {
 				t.Fatal("invalid sample persisted as reliable usage")
 			}
 		})

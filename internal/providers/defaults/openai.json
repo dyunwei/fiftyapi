@@ -10,6 +10,5 @@
     "codex_cli_simplified_flow": "true",
     "id_token_add_organizations": "true"
   },
-  "models_url": "https://chatgpt.com/backend-api/codex/models?client_version=0.164.0",
-  "client_version": "0.164.0"
+  "models_url": "https://chatgpt.com/backend-api/codex/models"
 }

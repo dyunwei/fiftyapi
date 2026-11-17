@@ -22,7 +22,7 @@ func TestRestoreArchive(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Simulate a schema-13 backup; restore must upgrade only its copy.
-	for _, column := range []string{"reasoning_effort", "thinking_type", "thinking_budget_tokens", "speed", "service_tier"} {
+	for _, column := range []string{"billing_usage", "reasoning_effort", "thinking_type", "thinking_budget_tokens", "speed", "service_tier"} {
 		if _, err := s.store.DB.Exec("ALTER TABLE request_logs DROP COLUMN " + column); err != nil {
 			t.Fatal(err)
 		}
@@ -35,7 +35,7 @@ func TestRestoreArchive(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	for _, q := range []string{"DROP TABLE openai_account_devices", "ALTER TABLE gateway_sessions DROP COLUMN hold_until", "ALTER TABLE account_contribution_links DROP COLUMN proxy_id", "ALTER TABLE upstream_accounts DROP COLUMN proxy_id", "DROP TABLE proxy_servers"} {
+	for _, q := range []string{"DROP INDEX request_charges_user_status", "DROP TABLE user_access", "ALTER TABLE models DROP COLUMN pricing_key", "ALTER TABLE model_prices DROP COLUMN source", "ALTER TABLE model_prices DROP COLUMN rules", "DROP TABLE price_catalog", "DROP TABLE maintenance_state", "DROP TABLE openai_account_devices", "ALTER TABLE gateway_sessions DROP COLUMN hold_until", "ALTER TABLE account_contribution_links DROP COLUMN proxy_id", "ALTER TABLE upstream_accounts DROP COLUMN proxy_id", "DROP TABLE proxy_servers"} {
 		if _, err := s.store.DB.Exec(q); err != nil {
 			t.Fatal(err)
 		}

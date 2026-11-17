@@ -1,5 +1,14 @@
 # Compatibility and verification
 
+## Current refactor verification boundary
+
+Current behavior is defined in [low-maintenance sharing](low-maintenance.md): native Antigravity v1internal replaces Messages conversion; Claude metadata/system pass through by default; automatic tier prices consume user budgets; unknown usage releases reservations and remains pending. User model allowlists and concurrency apply without separate speed permissions.
+
+This change uses simulated upstreams and temporary databases, Codex identity 0.164.0 and fixture model IDs such as `model`. Coverage includes Responses HTTP/JSON/SSE/WebSocket, Messages, native Antigravity, caches, immutable price snapshots and recovery. No live provider or real client acceptance was run. Historical Antigravity converter tool tests do not establish current native compatibility.
+
+## Historical acceptance records (behavior before this refactor)
+
+
 [简体中文](../compatibility.md) | English
 
 These are the boundaries of the **0.1.1 public preview**. Implemented endpoints and mock tests do not establish that every upstream account or third-party deployment supports them.

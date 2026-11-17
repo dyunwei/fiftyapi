@@ -163,15 +163,24 @@ func TestRelayFailureUsageAndLoopGuards(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if len(pending) != 0 || quota[0].Used != 0 || quota[0].Reserved != 0 {
-				t.Fatalf("failed/unknown usage should be zero-settled: %s status=%d", kind, response.Code)
+			rejected := kind == "429" || kind == "508"
+			wantPending := 1
+			if rejected {
+				wantPending = 0
+			}
+			if len(pending) != wantPending || quota[0].Used != 0 || quota[0].Reserved != 0 {
+				t.Fatalf("failed usage disposition wrong: %s status=%d", kind, response.Code)
 			}
 			logs, err := g.s.Logs(context.Background(), g.user, false, 0, "", 0)
-			if err != nil || len(logs) != 1 || logs[0].Amount == nil || *logs[0].Amount != 0 {
-				t.Fatal("missing zero settlement log", err)
+			if err != nil || len(logs) != 1 {
+				t.Fatal("missing settlement evidence", err)
 			}
-			if kind != "429" && kind != "508" && !strings.Contains(logs[0].Error, "按 0 结算") {
-				t.Fatal("unknown usage not explained")
+			if rejected {
+				if logs[0].Amount == nil || *logs[0].Amount != 0 {
+					t.Fatal("known rejection charged")
+				}
+			} else if logs[0].Amount != nil {
+				t.Fatal("unknown usage treated as free")
 			}
 
 			request := httptest.NewRequest("POST", "/v1/responses", strings.NewReader(`{"model":"model","input":"test"}`))

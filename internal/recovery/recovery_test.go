@@ -156,8 +156,8 @@ func TestOfflineBackupRestorePreservesEncryptedAccountsAndLedger(t *testing.T) {
 		}
 	}
 	pending, err := restored.PendingCharges(ctx)
-	if err != nil || len(pending) != 0 {
-		t.Fatal("interrupted unknown request still pending after recovery")
+	if err != nil || len(pending) != 1 || pending[0].Reservation != 0 {
+		t.Fatal("interrupted usage lost review evidence or held reservation")
 	}
 	// Corruption must be detected before creating a restore target.
 	f, err := os.OpenFile(filepath.Join(backup, "fiftyapi.db"), os.O_APPEND|os.O_WRONLY, 0)

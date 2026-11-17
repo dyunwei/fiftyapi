@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fiftyapi/internal/providers"
+	"fiftyapi/internal/store"
 	ws "github.com/coder/websocket"
 	"io"
 	"net/http"
@@ -14,20 +15,20 @@ import (
 )
 
 func TestInferencePolicy(t *testing.T) {
-	policy := providers.InferencePolicy{MaxEffort: "medium", MaxThinkingTokens: 4096, ForceStandard: true}
+	policy := providers.InferencePolicy{MaxEffort: "medium", MaxThinkingTokens: 4096}
 	for _, tc := range []struct {
 		name, protocol, input, want string
 		invalid                     bool
 	}{
-		{"responses", "responses", `{"reasoning":{"effort":"xhigh","summary":"auto"},"service_tier":"priority"}`, `{"reasoning":{"effort":"medium","summary":"auto"},"service_tier":"default"}`, false},
-		{"lower", "responses", `{"reasoning":{"effort":"low"}}`, `{"reasoning":{"effort":"low"},"service_tier":"default"}`, false},
-		{"default", "responses", `{}`, `{"reasoning":{"effort":"medium"},"service_tier":"default"}`, false},
-		{"chat", "chat", `{"reasoning_effort":"high"}`, `{"reasoning_effort":"medium","service_tier":"default"}`, false},
-		{"adaptive", "messages", `{"thinking":{"type":"adaptive"},"output_config":{"effort":"max","format":{"type":"json_schema"}},"speed":"fast"}`, `{"thinking":{"type":"adaptive"},"output_config":{"effort":"medium","format":{"type":"json_schema"}},"service_tier":"standard_only"}`, false},
-		{"legacy budget", "messages", `{"thinking":{"type":"enabled","budget_tokens":20000},"max_tokens":25000}`, `{"thinking":{"type":"enabled","budget_tokens":4096},"max_tokens":25000,"service_tier":"standard_only"}`, false},
-		{"lower budget", "messages", `{"thinking":{"type":"enabled","budget_tokens":2048}}`, `{"thinking":{"type":"enabled","budget_tokens":2048},"service_tier":"standard_only"}`, false},
-		{"disabled", "messages", `{"thinking":{"type":"disabled"}}`, `{"thinking":{"type":"disabled"},"service_tier":"standard_only"}`, false},
-		{"message overrides", "messages", `{"messages":[{"role":"system","content":"","output_config":{"effort":"max"}},{"role":"user","content":"hello"}]}`, `{"output_config":{"effort":"medium"},"service_tier":"standard_only","messages":[{"role":"system","content":"","output_config":{"effort":"medium"}},{"role":"user","content":"hello"}]}`, false},
+		{"responses", "responses", `{"reasoning":{"effort":"xhigh","summary":"auto"},"service_tier":"priority"}`, `{"reasoning":{"effort":"medium","summary":"auto"},"service_tier":"priority"}`, false},
+		{"lower", "responses", `{"reasoning":{"effort":"low"}}`, `{"reasoning":{"effort":"low"}}`, false},
+		{"default", "responses", `{}`, `{"reasoning":{"effort":"medium"}}`, false},
+		{"chat", "chat", `{"reasoning_effort":"high"}`, `{"reasoning_effort":"medium"}`, false},
+		{"adaptive", "messages", `{"thinking":{"type":"adaptive"},"output_config":{"effort":"max","format":{"type":"json_schema"}},"speed":"fast"}`, `{"thinking":{"type":"adaptive"},"output_config":{"effort":"medium","format":{"type":"json_schema"}},"speed":"fast"}`, false},
+		{"legacy budget", "messages", `{"thinking":{"type":"enabled","budget_tokens":20000},"max_tokens":25000}`, `{"thinking":{"type":"enabled","budget_tokens":4096},"max_tokens":25000}`, false},
+		{"lower budget", "messages", `{"thinking":{"type":"enabled","budget_tokens":2048}}`, `{"thinking":{"type":"enabled","budget_tokens":2048}}`, false},
+		{"disabled", "messages", `{"thinking":{"type":"disabled"}}`, `{"thinking":{"type":"disabled"}}`, false},
+		{"message overrides", "messages", `{"messages":[{"role":"system","content":"","output_config":{"effort":"max"}},{"role":"user","content":"hello"}]}`, `{"output_config":{"effort":"medium"},"messages":[{"role":"system","content":"","output_config":{"effort":"medium"}},{"role":"user","content":"hello"}]}`, false},
 		{"unknown effort", "responses", `{"reasoning":{"effort":"future"}}`, `null`, true},
 		{"malformed", "responses", `{"reasoning":[]}`, `null`, true},
 	} {
@@ -40,7 +41,7 @@ func TestInferencePolicy(t *testing.T) {
 			for k, v := range request {
 				attempt[k] = v
 			}
-			err := applyInferencePolicy(attempt, tc.protocol, policy, false)
+			err := applyInferencePolicy(attempt, tc.protocol, policy)
 			if (err != nil) != tc.invalid {
 				t.Fatalf("error = %v", err)
 			}
@@ -62,15 +63,15 @@ func TestInferencePolicy(t *testing.T) {
 	}
 	var request map[string]json.RawMessage
 	_ = json.Unmarshal([]byte(`{"service_tier":"fast"}`), &request)
-	if applyInferencePolicy(request, "responses", providers.InferencePolicy{}, false) == nil {
-		t.Fatal("unconfigured account accepted premium tier")
+	if applyInferencePolicy(request, "responses", providers.InferencePolicy{}) != nil {
+		t.Fatal("pricing-independent policy rejected premium tier")
 	}
 }
 
 func TestInferencePolicyWebSocket(t *testing.T) {
 	g, server := websocketGateway(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("OpenAI-Service-Tier") != "" {
-			t.Error("premium header survived")
+		if r.Header.Get("OpenAI-Service-Tier") != "fast" {
+			t.Error("premium header lost")
 		}
 		conn, err := ws.Accept(w, r, nil)
 		if err != nil {
@@ -86,7 +87,7 @@ func TestInferencePolicyWebSocket(t *testing.T) {
 			_ = json.Unmarshal(raw, &request)
 			var reasoning map[string]string
 			_ = json.Unmarshal(request["reasoning"], &reasoning)
-			if reasoning["effort"] != "medium" || string(request["service_tier"]) != `"default"` {
+			if reasoning["effort"] != "medium" || string(request["service_tier"]) != `"fast"` {
 				t.Errorf("WS policy escaped: %s", raw)
 			}
 			err = conn.Write(r.Context(), ws.MessageText, []byte(`{"type":"response.completed","response":{"id":"policy_response","status":"completed","output":[],"usage":{"input_tokens":10,"output_tokens":2}}}`))
@@ -95,7 +96,7 @@ func TestInferencePolicyWebSocket(t *testing.T) {
 			}
 		}
 	})
-	setTestInferencePolicy(t, g, providers.InferencePolicy{MaxEffort: "medium", ForceStandard: true})
+	setTestInferencePolicy(t, g, providers.InferencePolicy{MaxEffort: "medium"})
 	conn := dialGatewayWS(t, g, server)
 	for _, effort := range []string{"xhigh", "max"} {
 		sendWS(t, conn, `{"type":"response.create","model":"model","input":"hello","reasoning":{"effort":"`+effort+`"},"service_tier":"fast"}`)
@@ -132,6 +133,14 @@ func TestInferencePolicyWebSocket(t *testing.T) {
 func setTestInferencePolicy(t *testing.T, g testGateway, p providers.InferencePolicy) {
 	t.Helper()
 	ctx := context.Background()
+	p0, err := g.s.Price(ctx, "model")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p0.Rates = []store.PriceRate{{Tier: "default", Input: p0.Input, Output: p0.Output, Cached: &p0.Cached, CacheWrite: &p0.CacheWrite}, {Tier: "fast", Input: 2 * p0.Input, Output: 2 * p0.Output, Cached: &p0.Cached, CacheWrite: &p0.CacheWrite}}
+	if err = g.s.SetModel(ctx, g.user, "model", true, &p0); err != nil {
+		t.Fatal(err)
+	}
 	cfg, err := g.h.accounts.RuntimeConfig(ctx, g.account)
 	if err != nil {
 		t.Fatal(err)
@@ -151,7 +160,7 @@ func setTestInferencePolicy(t *testing.T, g testGateway, p providers.InferencePo
 }
 
 func TestInferencePolicyForwarding(t *testing.T) {
-	for _, provider := range []string{"openai", "claude", "antigravity", "gateway"} {
+	for _, provider := range []string{"openai", "claude", "gateway"} {
 		t.Run(provider, func(t *testing.T) {
 			calls := 0
 			upstream := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -161,11 +170,11 @@ func TestInferencePolicyForwarding(t *testing.T) {
 					t.Error(err)
 				}
 				if provider == "openai" || provider == "gateway" {
-					if body["service_tier"] != "default" || body["reasoning"].(map[string]any)["effort"] != "medium" || r.Header.Get("OpenAI-Service-Tier") != "" {
+					if body["service_tier"] != "priority" || body["reasoning"].(map[string]any)["effort"] != "medium" || r.Header.Get("OpenAI-Service-Tier") != "fast" {
 						t.Errorf("policy not applied: %v", body)
 					}
 				} else if provider == "claude" {
-					if body["speed"] != nil || body["service_tier"] != "standard_only" || body["output_config"].(map[string]any)["effort"] != "medium" {
+					if body["speed"] != "fast" || body["service_tier"] != "priority" || body["output_config"].(map[string]any)["effort"] != "medium" {
 						t.Errorf("Claude policy not applied: %v", body)
 					}
 				} else {
@@ -185,7 +194,7 @@ func TestInferencePolicyForwarding(t *testing.T) {
 			} else {
 				g = setupGateway(t, provider, upstream)
 			}
-			setTestInferencePolicy(t, g, providers.InferencePolicy{MaxEffort: "medium", MaxThinkingTokens: 4096, ForceStandard: true})
+			setTestInferencePolicy(t, g, providers.InferencePolicy{MaxEffort: "medium", MaxThinkingTokens: 4096})
 			path := "/v1/messages"
 			if provider == "openai" || provider == "gateway" {
 				path = "/v1/responses"

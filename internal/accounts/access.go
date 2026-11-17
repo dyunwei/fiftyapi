@@ -41,7 +41,9 @@ func (s *Service) Access(ctx context.Context, id int64) (Credential, error) {
 		return Credential{}, errors.New("账号凭据无效")
 	}
 	clear(raw)
-	c.Config = providers.NormalizeOpenAIConfig(c.Config)
+	if err = s.resolveIdentity(ctx, &c); err != nil {
+		return Credential{}, err
+	}
 	if err = s.applyAccountProxy(ctx, row.ProxyID, &c.Config); err != nil {
 		return Credential{}, err
 	}

@@ -50,22 +50,16 @@ func capObjectEffort(request map[string]json.RawMessage, field, ceiling string) 
 }
 
 // Each forwarding attempt gets its own map. Never mutate raw JSON shared by retries.
-func applyInferencePolicy(request map[string]json.RawMessage, protocol string, p providers.InferencePolicy, antigravity bool) error {
+func applyInferencePolicy(request map[string]json.RawMessage, protocol string, p providers.InferencePolicy) error {
 	if err := p.Validate(); err != nil {
 		return err
 	}
 	if protocol == "responses" || protocol == "chat" {
-		if p.ForceStandard {
-			request["service_tier"] = json.RawMessage(`"default"`)
-		}
 		var tier string
 		if raw := request["service_tier"]; len(raw) > 0 && string(raw) != "null" {
 			if json.Unmarshal(raw, &tier) != nil {
 				return errors.New("service_tier 必须是字符串")
 			}
-		}
-		if tier != "" && tier != "auto" && tier != "default" {
-			return errors.New("当前折算价格适用于标准档位，请使用 auto/default")
 		}
 		if p.MaxEffort != "" {
 			if protocol == "chat" {
@@ -78,14 +72,7 @@ func applyInferencePolicy(request map[string]json.RawMessage, protocol string, p
 	if protocol != "messages" {
 		return nil
 	}
-	if p.ForceStandard {
-		// Omitting speed selects standard processing; do not send an unsupported enum.
-		delete(request, "speed")
-		if !antigravity {
-			request["service_tier"] = json.RawMessage(`"standard_only"`)
-		}
-	}
-	if p.MaxEffort != "" && !antigravity {
+	if p.MaxEffort != "" {
 		// Legacy enabled/disabled thinking models may not support effort. Only add
 		// it for adaptive/default requests, or clamp an effort the caller uses.
 		thinking, err := policyObject(request["thinking"])
@@ -115,7 +102,7 @@ func applyInferencePolicy(request map[string]json.RawMessage, protocol string, p
 			request["messages"], _ = json.Marshal(messages)
 		}
 	}
-	if p.MaxThinkingTokens > 0 && !antigravity {
+	if p.MaxThinkingTokens > 0 {
 		thinking, err := policyObject(request["thinking"])
 		if err != nil {
 			return err
@@ -134,14 +121,4 @@ func applyInferencePolicy(request map[string]json.RawMessage, protocol string, p
 		}
 	}
 	return nil
-}
-
-// Antigravity's current adapter uses token budgets rather than effort levels.
-// These are gateway policy mappings, not vendor-defined effort equivalences.
-func antigravityBudget(p providers.InferencePolicy) int {
-	cap := p.MaxThinkingTokens
-	if effortCap := map[string]int{"low": 2048, "medium": 8192, "high": 24576}[p.MaxEffort]; effortCap > 0 && (cap == 0 || effortCap < cap) {
-		cap = effortCap
-	}
-	return cap
 }

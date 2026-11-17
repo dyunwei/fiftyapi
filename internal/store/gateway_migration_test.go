@@ -58,7 +58,7 @@ func TestGatewayAccountMigrationPreservesParentReferences(t *testing.T) {
 	if _, ids, err := s.RoutableModel(ctx, "model"); err != nil || len(ids) != 1 || ids[0] != 9 {
 		t.Fatal("model relation lost")
 	}
-	if route, err := s.AccountModel(ctx, 9, "model"); err != nil || route.UpstreamID != "model" || len(route.Protocols) != 1 || route.Protocols[0] != "messages" {
+	if route, err := s.AccountModel(ctx, 9, "model"); err != nil || route.UpstreamID != "model" || len(route.Protocols) != 1 || route.Protocols[0] != "antigravity" {
 		t.Fatal("legacy membership was not backfilled into a concrete route")
 	}
 	if id, err := s.GatewaySession(ctx, []byte{1}); err != nil || id != 9 {

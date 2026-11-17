@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-const unknownUsageNote = "未取得可靠用量，按 0 结算并释放预占"
+const unknownUsageNote = "未取得可靠用量，已释放预占，等待管理员核算"
 const observedUsageNote = "已按记录的用量自动结算并释放预占"
 const settlementFailureNote = "自动结算失败，需要管理员核算"
 
@@ -32,6 +32,7 @@ func (s *Store) FinalizeRequest(ctx context.Context, l RequestLog) (err error) {
 			save, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
 			defer cancel()
 			_ = s.Pending(save, l.ID)
+			_ = s.ReleasePending(save, l.ID)
 			s.noteSettlementFailure(save, l.ID)
 		}
 	}()
@@ -79,9 +80,9 @@ func (s *Store) autoSettleRequestAs(ctx context.Context, id string, actor *int64
 		return err
 	}
 	defer tx.Rollback()
-	var status, snapshot, message string
+	var status, snapshot, message, billing string
 	var input, output, cached, write sql.NullInt64
-	err = tx.QueryRowContext(ctx, `SELECT c.status,c.price_snapshot,l.input_tokens,l.output_tokens,l.cached_tokens,l.cache_write_tokens,COALESCE(l.error,'') FROM request_charges c LEFT JOIN request_logs l ON l.id=c.id WHERE c.id=?`, id).Scan(&status, &snapshot, &input, &output, &cached, &write, &message)
+	err = tx.QueryRowContext(ctx, `SELECT c.status,c.price_snapshot,l.input_tokens,l.output_tokens,l.cached_tokens,l.cache_write_tokens,COALESCE(l.error,''),COALESCE(l.billing_usage,'{}') FROM request_charges c LEFT JOIN request_logs l ON l.id=c.id WHERE c.id=?`, id).Scan(&status, &snapshot, &input, &output, &cached, &write, &message, &billing)
 	if err != nil {
 		return err
 	}
@@ -107,7 +108,11 @@ func (s *Store) autoSettleRequestAs(ctx context.Context, id string, actor *int64
 		if priceErr != nil {
 			return priceErr
 		}
-		amount, err = price.Cost(TokenUsage{Input: input.Int64, Output: output.Int64, Cached: cached.Int64, CacheWrite: write.Int64})
+		var metadata BillingUsage
+		if json.Unmarshal([]byte(billing), &metadata) != nil {
+			return errors.New("计费用量元数据无效")
+		}
+		amount, err = price.Cost(TokenUsage{BillingUsage: metadata, Input: input.Int64, Output: output.Int64, Cached: cached.Int64, CacheWrite: write.Int64})
 		if err != nil {
 			return err
 		}
@@ -115,7 +120,7 @@ func (s *Store) autoSettleRequestAs(ctx context.Context, id string, actor *int64
 			message = appendAccountingNote(message, observedUsageNote)
 		}
 	} else {
-		message = appendAccountingNote(message, unknownUsageNote)
+		return errors.New(unknownUsageNote)
 	}
 	if err = settleTx(ctx, tx, id, amount, time.Now()); err != nil {
 		return err
@@ -142,4 +147,36 @@ func (s *Store) noteSettlementFailure(ctx context.Context, id string) {
 	defer cancel()
 	// Never overwrite a concurrent administrator settlement or its audit reason.
 	_, _ = s.DB.ExecContext(save, `UPDATE request_logs SET error=CASE WHEN instr(error,?)>0 THEN error WHEN error='' THEN ? ELSE error||'；'||? END WHERE id=? AND EXISTS(SELECT 1 FROM request_charges c WHERE c.id=request_logs.id AND c.status='pending')`, settlementFailureNote, settlementFailureNote, settlementFailureNote, id)
+}
+
+// ReleasePending preserves the usage and snapshot for review without holding
+// reservations after a terminal request. Retrying settlement remains idempotent.
+func (s *Store) ReleasePending(ctx context.Context, id string) error {
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var w5, w7, reserve int64
+	var status string
+	if err = tx.QueryRowContext(ctx, "SELECT window_5h,window_7d,reservation,status FROM request_charges WHERE id=?", id).Scan(&w5, &w7, &reserve, &status); err != nil {
+		return err
+	}
+	if status == "settled" {
+		return nil
+	}
+	for _, w := range []int64{w5, w7} {
+		r, e := tx.ExecContext(ctx, "UPDATE quota_windows SET reserved=reserved-? WHERE id=? AND reserved>=?", reserve, w, reserve)
+		if e != nil {
+			return e
+		}
+		n, _ := r.RowsAffected()
+		if n != 1 {
+			return errors.New("额度预占记录不一致")
+		}
+	}
+	if _, err = tx.ExecContext(ctx, "UPDATE request_charges SET status='pending',reservation=0 WHERE id=?", id); err != nil {
+		return err
+	}
+	return tx.Commit()
 }

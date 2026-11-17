@@ -15,7 +15,7 @@ export ANTHROPIC_MODEL='MODEL_ID_FROM_CATALOG'
 claude
 ```
 
-base URL 不加 `/v1`，客户端调用 `/v1/messages`。如果终端原先配置了供应商的 `ANTHROPIC_API_KEY`，请清除冲突配置。Messages 可路由到 Claude 或 Antigravity 模型；后者由服务转换请求、工具结果和 SSE。`/v1/messages/count_tokens` 为本地估算，不代表供应商精确分词。
+base URL 不加 `/v1`，客户端调用 `/v1/messages`。如果终端原先配置了供应商的 `ANTHROPIC_API_KEY`，请清除冲突配置。Messages 路由到 Claude 或支持 Messages 的 API 上游。Antigravity 需要原生 v1internal 客户端，见 [低维护账号共享](low-maintenance.md)。`/v1/messages/count_tokens` 为本地估算，不代表供应商精确分词。
 
 Antigravity `gemini-3.5-flash-lite` 的网关工具闭环已实测；真实 Claude OAuth 与 Claude Code 原生程序尚未验收。完整兼容性见 [验证记录](compatibility.md)。
 
@@ -60,7 +60,7 @@ curl -N http://127.0.0.1:8080/v1/messages \
   -d '{"model":"gemini-3.5-flash-lite","max_tokens":64,"stream":true,"messages":[{"role":"user","content":"Reply OK"}]}'
 ```
 
-先由管理员为模型设置内部价格并给当前用户额度。401 检查本服务 Key/用户状态；400 检查模型启用、价格和协议；429 检查额度或上游限流；503 检查账号就绪、并发及会话绑定。断流有可靠用量时自动扣除，缺失或无效用量按 0 释放预占；日志说明结算结果，只有结算异常需要管理员核实。诊断时仅提供状态、请求 ID 和脱敏错误，不公开 Key 或授权回调地址。
+先由管理员为模型设置内部价格并给当前用户额度。401 检查本服务 Key/用户状态；400 检查模型启用、价格和协议；429 检查额度或上游限流；503 检查账号就绪、并发及会话绑定。断流有可靠用量时自动扣除，缺失或无效用量释放预占并等待管理员核算，处理前暂停该用户继续调用；日志说明结算结果，只有结算异常需要管理员核实。诊断时仅提供状态、请求 ID 和脱敏错误，不公开 Key 或授权回调地址。
 
 ## Cherry Studio / Chat Completions
 
@@ -68,14 +68,14 @@ curl -N http://127.0.0.1:8080/v1/messages \
 
 | 本地来源/能力 | 客户端协议 | 路径 |
 | --- | --- | --- |
-| Claude、Antigravity、仅 Messages 的 API 模型 | Anthropic Messages | /v1/messages |
+| Claude、仅 Messages 的 API 模型 | Anthropic Messages | /v1/messages |
 | Codex OAuth、支持 Responses 的 API 模型 | OpenAI Responses | /v1/responses |
 | 声明支持 Chat 的上游 API 模型 | OpenAI Chat Completions | /v1/chat/completions |
 | 同时声明 Chat 与 Responses 的 API 模型 | 两种模式均可，使用同一 ID | 按模式选择对应路径 |
 
 Chat/Responses 的 Base URL 通常填写 http://127.0.0.1:8080/v1，Messages 通常填站点根地址。模型 ID 必须使用目录中的完整 ID；Cherry Studio 的供应商 UUID 前缀属于客户端内部标识。
 
-目录 protocols、supported_endpoint_types 和 supported_endpoints 只声明实际配置的能力。升级后重新拉取目录，检查模型的接口模式；旧的 Messages 模型不再声明支持 Chat。Antigravity Gemini 请改为 Anthropic 模式。某个客户端不读取这些字段时，需要手工选择协议。
+目录 protocols、supported_endpoint_types 和 supported_endpoints 只声明实际配置的能力。升级后重新拉取目录，检查模型的接口模式；旧的 Messages 模型不再声明支持 Chat。Antigravity 需要支持原生 v1internal 的客户端，不能使用 Anthropic Messages 模式。某个客户端不读取这些字段时，需要手工选择协议。
 
 原生 Chat 保留工具、推理、输出格式、图片等标准/扩展字段，具体能力由上游决定；只替换上游模型 ID，并为流式请求开启 usage。不会把其他协议响应转换成 Chat。价格与路由设置见 [多协议配置](model-protocols.md)。
 

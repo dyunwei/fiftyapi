@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 
 	"strings"
 )
@@ -15,9 +16,10 @@ type ModelPage struct {
 }
 
 type ModelFilter struct {
-	AccountID int64
-	Protocol  string
-	Status    string
+	AllowedModels *[]string
+	AccountID     int64
+	Protocol      string
+	Status        string
 }
 
 func (s *Store) ModelPage(ctx context.Context, page, size int, search string, public bool, filters ...ModelFilter) (ModelPage, error) {
@@ -35,6 +37,11 @@ func (s *Store) ModelPage(ctx context.Context, page, size int, search string, pu
 	}
 	if len(filters) > 0 {
 		f := filters[0]
+		if f.AllowedModels != nil {
+			raw, _ := json.Marshal(*f.AllowedModels)
+			where += ` AND m.id IN (SELECT value FROM json_each(?))`
+			args = append(args, string(raw))
+		}
 		if f.AccountID > 0 {
 			where += ` AND EXISTS(SELECT 1 FROM account_models fam JOIN upstream_accounts fa ON fa.id=fam.account_id WHERE fam.model_id=m.id AND fam.account_id=? AND fa.deleted_at IS NULL)`
 			args = append(args, f.AccountID)
@@ -67,7 +74,7 @@ func (s *Store) ModelPage(ctx context.Context, page, size int, search string, pu
 	if err = tx.QueryRowContext(ctx, `SELECT count(*)`+from+where, args...).Scan(&out.Total); err != nil {
 		return out, err
 	}
-	rows, err := tx.QueryContext(ctx, `SELECT m.id,m.provider,m.upstream_id,m.enabled,m.synced_at,m.protocols,`+available+`,p.id,p.input,p.output,p.cached,p.cache_write`+from+where+` ORDER BY m.provider,m.id LIMIT ? OFFSET ?`, append(args, size, (page-1)*size)...)
+	rows, err := tx.QueryContext(ctx, `SELECT m.id,m.provider,m.upstream_id,m.enabled,m.synced_at,m.protocols,m.pricing_key,`+available+`,p.id,p.input,p.output,p.cached,p.cache_write,p.source,p.rules`+from+where+` ORDER BY m.provider,m.id LIMIT ? OFFSET ?`, append(args, size, (page-1)*size)...)
 	if err != nil {
 		return out, err
 	}
@@ -75,13 +82,16 @@ func (s *Store) ModelPage(ctx context.Context, page, size int, search string, pu
 		var m Model
 		var protocols string
 		var priceID, input, output, cached, write sql.NullInt64
-		if err = rows.Scan(&m.ID, &m.Provider, &m.UpstreamID, &m.Enabled, &m.SyncedAt, &protocols, &m.Available, &priceID, &input, &output, &cached, &write); err != nil {
+		var source, rules sql.NullString
+		if err = rows.Scan(&m.ID, &m.Provider, &m.UpstreamID, &m.Enabled, &m.SyncedAt, &protocols, &m.PricingKey, &m.Available, &priceID, &input, &output, &cached, &write, &source, &rules); err != nil {
 			rows.Close()
 			return out, err
 		}
 		m.setProtocols(protocols)
 		if priceID.Valid {
-			m.Price = &Price{ID: priceID.Int64, Input: input.Int64, Output: output.Int64, Cached: cached.Int64, CacheWrite: write.Int64}
+			var extra Price
+			_ = json.Unmarshal([]byte(rules.String), &extra)
+			m.Price = &Price{MaxOutput: extra.MaxOutput, Source: source.String, Revision: extra.Revision, Rates: extra.Rates, ID: priceID.Int64, Input: input.Int64, Output: output.Int64, Cached: cached.Int64, CacheWrite: write.Int64}
 		}
 		out.Items = append(out.Items, m)
 	}

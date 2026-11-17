@@ -115,7 +115,7 @@ func (h *Handler) relay(w http.ResponseWriter, r *http.Request, request map[stri
 		ua = "FiftyAPI/" + buildinfo.Version()
 	}
 	req.Header.Set("User-Agent", ua)
-	for _, name := range []string{"anthropic-version", "anthropic-beta", "openai-beta", "session-id", "session_id", "conversation_id", "x-session-id", "x-codex-turn-metadata"} {
+	for _, name := range []string{"OpenAI-Service-Tier", "anthropic-version", "anthropic-beta", "openai-beta", "session-id", "session_id", "conversation_id", "x-session-id", "x-codex-turn-metadata"} {
 		if value := r.Header.Get(name); value != "" {
 			req.Header.Set(name, value)
 		}
@@ -125,9 +125,6 @@ func (h *Handler) relay(w http.ResponseWriter, r *http.Request, request map[stri
 	}
 	for k, v := range c.Config.GatewayHeaders {
 		req.Header.Set(k, v)
-	}
-	if c.Config.InferencePolicy.ForceStandard {
-		req.Header.Del("OpenAI-Service-Tier")
 	}
 	providers.GatewayAuth(req.Header, c.Config, c.APIKey)
 	req.Header.Set(providers.RelayChainHeader, chain)

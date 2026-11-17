@@ -159,6 +159,14 @@ func (a *API) Handler() http.Handler {
 	mux.HandleFunc("GET /api/admin/audit-logs", a.protect(true, false, a.auditLogs))
 	mux.HandleFunc("GET /api/admin/charges", a.protect(true, false, a.pendingCharges))
 	mux.HandleFunc("POST /api/admin/charges/{id}/settle", a.protect(true, true, a.manualSettle))
+	mux.HandleFunc("GET /api/admin/users/{id}/access", a.protect(true, false, a.userAccess))
+	mux.HandleFunc("PUT /api/admin/users/{id}/access", a.protect(true, true, a.userAccess))
+	mux.HandleFunc("GET /api/admin/settings/maintenance", a.protect(true, false, a.maintenanceSettings))
+	mux.HandleFunc("PUT /api/admin/settings/maintenance", a.protect(true, true, a.saveMaintenanceSettings))
+	mux.HandleFunc("POST /api/admin/settings/prices/sync", a.protect(true, true, a.syncPrices))
+	mux.HandleFunc("POST /api/admin/settings/codex/check", a.protect(true, true, a.checkCodex))
+	mux.HandleFunc("GET /api/admin/prices/catalog", a.protect(true, false, a.priceCatalog))
+	mux.HandleFunc("PUT /api/admin/models/pricing-key", a.protect(true, true, a.setPricingKey))
 	mux.HandleFunc("GET /api/admin/settings", a.protect(true, false, a.settings))
 	mux.HandleFunc("PUT /api/admin/settings", a.protect(true, true, a.setSettings))
 	mux.HandleFunc("GET /api/admin/settings/backup", a.protect(true, false, a.backupConfig))
@@ -180,7 +188,7 @@ func (a *API) Handler() http.Handler {
 	if a.gateway != nil {
 		mux.HandleFunc("GET /v1/responses", a.gateway.ServeWebSocket)
 		mux.HandleFunc("GET /responses", a.gateway.ServeWebSocket)
-		for _, route := range []string{"POST /v1/messages", "POST /v1/messages/count_tokens", "POST /v1/responses", "POST /v1/responses/compact", "POST /responses", "POST /responses/compact"} {
+		for _, route := range []string{"POST /v1internal:streamGenerateContent", "POST /v1internal:generateContent", "POST /v1/messages", "POST /v1/messages/count_tokens", "POST /v1/responses", "POST /v1/responses/compact", "POST /responses", "POST /responses/compact"} {
 			mux.HandleFunc(route, a.gateway.Serve)
 		}
 		mux.HandleFunc("POST /v1/chat/completions", a.gateway.ChatCompletions)

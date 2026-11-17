@@ -49,6 +49,15 @@ func (h *Handler) codexManifest(w http.ResponseWriter, r *http.Request, models [
 	if err != nil {
 		return err
 	}
+	visible := map[string]bool{}
+	for _, m := range models {
+		visible[m.ID] = true
+	}
+	for upstream, public := range allowed {
+		if !visible[public] {
+			delete(allowed, upstream)
+		}
+	}
 	c, err := h.accounts.Access(r.Context(), accountID)
 	if err != nil {
 		return err
@@ -63,6 +72,9 @@ func (h *Handler) codexManifest(w http.ResponseWriter, r *http.Request, models [
 	u, err := url.Parse(endpoint)
 	if err != nil {
 		return err
+	}
+	if c.Config.Provider == "openai" {
+		version = c.Config.ClientVersion
 	}
 	query := u.Query()
 	query.Set("client_version", version)

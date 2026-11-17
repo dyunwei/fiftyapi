@@ -196,7 +196,17 @@ func (a *API) models(w http.ResponseWriter, r *http.Request, id identity) {
 			return
 		}
 		filter := store.ModelFilter{Protocol: q.Get("protocol"), Status: q.Get("status")}
-		if filter.Protocol != "" && filter.Protocol != "chat" && filter.Protocol != "messages" && filter.Protocol != "responses" {
+		if !strings.HasPrefix(r.URL.Path, "/api/admin/") {
+			access, err := a.store.UserAccess(r.Context(), id.user.ID)
+			if err != nil {
+				writeError(w, 500, "读取用户访问限制失败")
+				return
+			}
+			if access.Models != nil {
+				filter.AllowedModels = &access.Models
+			}
+		}
+		if filter.Protocol != "" && filter.Protocol != "chat" && filter.Protocol != "messages" && filter.Protocol != "responses" && filter.Protocol != "antigravity" {
 			writeError(w, 400, "协议筛选无效")
 			return
 		}
@@ -232,9 +242,14 @@ func (a *API) models(w http.ResponseWriter, r *http.Request, id identity) {
 		return
 	}
 	if !strings.HasPrefix(r.URL.Path, "/api/admin/") {
+		access, err := a.store.UserAccess(r.Context(), id.user.ID)
+		if err != nil {
+			writeError(w, 500, "读取用户访问限制失败")
+			return
+		}
 		out := []store.Model{}
 		for _, m := range models {
-			if m.Enabled && m.Price != nil && m.Available {
+			if access.Allows(m.ID) && m.Enabled && m.Price != nil && m.Available {
 				out = append(out, m)
 			}
 		}

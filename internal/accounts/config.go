@@ -62,7 +62,7 @@ func (s *Service) RuntimeConfig(ctx context.Context, id int64) (RuntimeConfig, e
 	if json.Unmarshal(b, &saved) != nil {
 		return RuntimeConfig{}, errors.New("账号配置无效")
 	}
-	c := providers.NormalizeOpenAIConfig(saved.Config)
+	c := saved.Config
 	_ = s.applyAccountProxy(ctx, row.ProxyID, &c)
 	var proxyID int64
 	if row.ProxyID != nil {

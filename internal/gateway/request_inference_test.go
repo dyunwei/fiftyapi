@@ -56,12 +56,12 @@ func TestGatewayLogsRequestedInferenceBeforePolicy(t *testing.T) {
 				if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 					t.Error(err)
 				}
-				protocol, tier := "responses", "default"
+				protocol, tier := "responses", "priority"
 				if provider == "claude" {
-					protocol, tier = "messages", "standard_only"
+					protocol, tier = "messages", ""
 				}
 				got := requestInference(request, protocol)
-				if got.ReasoningEffort != "medium" || got.ServiceTier != tier || got.Speed != "" {
+				if got.ReasoningEffort != "medium" || got.ServiceTier != tier || got.Speed != map[bool]string{true: "fast", false: ""}[provider == "claude"] {
 					t.Errorf("policy not applied: %+v", got)
 				}
 				w.Header().Set("Content-Type", "application/json")
@@ -69,7 +69,7 @@ func TestGatewayLogsRequestedInferenceBeforePolicy(t *testing.T) {
 			}))
 			defer upstream.Close()
 			g := setupGateway(t, provider, upstream)
-			setTestInferencePolicy(t, g, providers.InferencePolicy{MaxEffort: "medium", ForceStandard: true})
+			setTestInferencePolicy(t, g, providers.InferencePolicy{MaxEffort: "medium"})
 			path, body := "/v1/responses", `{"model":"model","input":"hello","reasoning":{"effort":"xhigh"},"service_tier":"priority"}`
 			want := store.RequestInference{ReasoningEffort: "xhigh", ServiceTier: "priority"}
 			if provider == "claude" {

@@ -84,7 +84,7 @@ func (c Config) ValidateGateway() error {
 	}
 	seen := map[string]bool{}
 	for _, p := range g.Protocols {
-		if !modelref.ValidProtocol(p) || seen[p] {
+		if (!modelref.ValidProtocol(p) || p == "antigravity") || seen[p] {
 			return errors.New("网关协议无效或重复")
 		}
 		seen[p] = true

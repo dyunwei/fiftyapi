@@ -40,8 +40,11 @@ func TestAutomaticSettlementUsesSnapshotAndReleasesUnknown(t *testing.T) {
 		t.Fatal(err)
 	}
 	u := RequestLog{ID: "unknown", UserID: user, KeyID: key, Model: "model", Provider: "antigravity", Status: 502, Error: "上游没有返回 usage", CreatedAt: now.Unix()}
-	if err := s.FinalizeRequest(ctx, u); err != nil {
-		t.Fatal(err)
+	if err := s.FinalizeRequest(ctx, u); err == nil {
+		t.Fatal("unknown usage treated as free")
+	}
+	if err := s.Reserve(ctx, "blocked", user, key, "model", price, 1, now); err == nil {
+		t.Fatal("unresolved usage did not block further calls")
 	}
 	windows, err := s.Quota(ctx, user)
 	if err != nil {
@@ -57,13 +60,15 @@ func TestAutomaticSettlementUsesSnapshotAndReleasesUnknown(t *testing.T) {
 		t.Fatal("missing logs", err)
 	}
 	for _, l := range logs {
-		if l.Amount == nil {
-			t.Fatal("settled log left pending")
-		}
-		if l.ID == "unknown" && (*l.Amount != 0 || l.Input != nil || !strings.Contains(l.Error, unknownUsageNote)) {
-			t.Fatal("unknown usage not explicitly zero-settled")
+		if l.ID == "unknown" {
+			if l.Amount != nil || l.Input != nil {
+				t.Fatal("unknown usage was zero-settled")
+			}
+		} else if l.Amount == nil || *l.Amount != 20 {
+			t.Fatal("known usage lost")
 		}
 	}
+
 }
 
 func TestSettlementFailurePreservesEvidenceAndRetriesAtomically(t *testing.T) {
@@ -124,10 +129,11 @@ func TestRecoverySettlesLegacyPendingAndIncompleteEvidence(t *testing.T) {
 		if err := s.Reserve(ctx, id, user, key, "model", Price{Input: 1000000, Output: 1000000}, 20, time.Now()); err != nil {
 			t.Fatal(err)
 		}
-		if id != "crash" {
-			if err := s.Pending(ctx, id); err != nil {
-				t.Fatal(err)
-			}
+
+	}
+	for _, id := range []string{"legacy-known", "legacy-unknown"} {
+		if err := s.Pending(ctx, id); err != nil {
+			t.Fatal(err)
 		}
 	}
 	l := accountingLog("legacy-known", user, key, 7, 3)
@@ -144,8 +150,8 @@ func TestRecoverySettlesLegacyPendingAndIncompleteEvidence(t *testing.T) {
 		t.Fatal(err)
 	}
 	pending, _ := s.PendingCharges(ctx)
-	if len(pending) != 0 {
-		t.Fatal("legacy pending records were not processed")
+	if len(pending) != 2 {
+		t.Fatal("unknown recovery records were discarded")
 	}
 	windows, _ := s.Quota(ctx, user)
 	for _, w := range windows {
@@ -158,19 +164,24 @@ func TestRecoverySettlesLegacyPendingAndIncompleteEvidence(t *testing.T) {
 		t.Fatal("crash request lost")
 	}
 	for _, l := range logs {
-		if l.Amount == nil {
-			t.Fatal("recovery left null amount")
-		}
-		if l.ID != "legacy-known" && *l.Amount != 0 {
-			t.Fatal("unknown usage charged")
+		if l.ID == "legacy-known" {
+			if l.Amount == nil || *l.Amount != 10 {
+				t.Fatal("known recovery usage lost")
+			}
+		} else if l.Amount != nil {
+			t.Fatal("unknown recovery usage treated as free")
 		}
 	}
+
 }
 
 func TestInvalidSnapshotRemainsManualAndNoPartialChargeOnLogFailure(t *testing.T) {
 	s, user, key := quotaStore(t)
 	ctx := context.Background()
 	if err := s.Reserve(ctx, "bad-price", user, key, "model", Price{}, 20, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Reserve(ctx, "bad-log", user, key, "model", Price{}, 20, time.Now()); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.DB.Exec("UPDATE request_charges SET price_snapshot='null' WHERE id='bad-price'"); err != nil {
@@ -183,12 +194,10 @@ func TestInvalidSnapshotRemainsManualAndNoPartialChargeOnLogFailure(t *testing.T
 		t.Fatal(err)
 	}
 	pending, _ := s.PendingCharges(ctx)
-	if len(pending) != 1 {
-		t.Fatal("corrupt financial snapshot silently discarded")
+	if len(pending) != 2 {
+		t.Fatal("corrupt or incomplete evidence silently discarded")
 	}
-	if err := s.Reserve(ctx, "bad-log", user, key, "model", Price{}, 20, time.Now()); err != nil {
-		t.Fatal(err)
-	}
+
 	if _, err := s.DB.Exec(`CREATE TRIGGER fail_log BEFORE INSERT ON request_logs WHEN NEW.id='bad-log' BEGIN SELECT RAISE(ABORT,'forced log failure'); END`); err != nil {
 		t.Fatal(err)
 	}
@@ -197,7 +206,7 @@ func TestInvalidSnapshotRemainsManualAndNoPartialChargeOnLogFailure(t *testing.T
 	}
 	windows, _ := s.Quota(ctx, user)
 	for _, w := range windows {
-		if w.Used != 0 || w.Reserved != 40 {
+		if w.Used != 0 || w.Reserved != 0 {
 			t.Fatal("charge committed without evidence", w)
 		}
 	}

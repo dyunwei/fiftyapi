@@ -119,8 +119,8 @@ func TestNativeGatewaySettlementAndTruncation(t *testing.T) {
 			truncated = true
 			w = g.request(path, `{"model":"model","stream":true,"max_tokens":20,"input":"hello","messages":[{"role":"user","content":"hello"}]}`)
 			pending, _ := g.s.PendingCharges(context.Background())
-			if len(pending) != 0 {
-				t.Fatalf("truncated response left pending: %s", w.Body.String())
+			if len(pending) != map[bool]int{true: 1, false: 0}[provider == "openai"] {
+				t.Fatalf("incorrect incomplete usage settlement: %s", w.Body.String())
 			}
 			q, _ = g.s.Quota(context.Background(), g.user)
 			expectedUsed := want
@@ -144,39 +144,46 @@ func TestNativeGatewaySettlementAndTruncation(t *testing.T) {
 	}
 }
 
-func TestAntigravityMessagesStreamingAndNonStreaming(t *testing.T) {
+func TestAntigravityNativeStreamingAndNonStreaming(t *testing.T) {
+	streaming := true
 	upstream := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var envelope map[string]any
-		if json.NewDecoder(r.Body).Decode(&envelope) != nil || envelope["project"] != "project" || envelope["model"] != "model" {
-			t.Error("invalid AG envelope")
+		var request map[string]json.RawMessage
+		if json.NewDecoder(r.Body).Decode(&request) != nil {
+			t.Error("bad request")
 		}
-		w.Header().Set("Content-Type", "text/event-stream")
-		io.WriteString(w, "data: {\"response\":{\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"hello\"}]}}],\"usageMetadata\":{\"promptTokenCount\":12,\"candidatesTokenCount\":1,\"cachedContentTokenCount\":2}}}\n\n")
-		io.WriteString(w, "data: {\"response\":{\"candidates\":[{\"finishReason\":\"STOP\"}],\"usageMetadata\":{\"promptTokenCount\":12,\"candidatesTokenCount\":3,\"cachedContentTokenCount\":2}}}\n\n")
+		if len(request["messages"]) > 0 || len(request["request"]) == 0 || string(request["future_field"]) != `{"keep":true}` {
+			t.Errorf("native fields changed: %v", request)
+		}
+		if string(request["project"]) != `"project"` {
+			t.Error("account project missing")
+		}
+		if streaming {
+			w.Header().Set("Content-Type", "text/event-stream")
+			io.WriteString(w, agSuccess)
+		} else {
+			w.Header().Set("Content-Type", "application/json")
+			io.WriteString(w, `{"response":{"candidates":[{"finishReason":"STOP","content":{"parts":[{"text":"OK"}]}}],"usageMetadata":{"promptTokenCount":12,"candidatesTokenCount":3}}}`)
+		}
 	}))
 	defer upstream.Close()
 	g := setupGateway(t, "antigravity", upstream)
 	for _, stream := range []bool{true, false} {
-		body, _ := json.Marshal(map[string]any{"model": "model", "max_tokens": 20, "stream": stream, "messages": []any{map[string]string{"role": "user", "content": "test"}}})
-		w := g.request("/v1/messages", string(body))
-		if w.Code != 200 {
-			t.Fatalf("AG failed: %d %s", w.Code, w.Body.String())
+		streaming = stream
+		path := "/v1internal:generateContent"
+		if stream {
+			path = "/v1internal:streamGenerateContent"
 		}
-		if stream && !strings.Contains(w.Body.String(), "message_stop") {
-			t.Fatal("missing converted completion")
-		}
-		if !stream {
-			var response struct {
-				Content []map[string]any `json:"content"`
-			}
-			if json.Unmarshal(w.Body.Bytes(), &response) != nil || len(response.Content) == 0 || response.Content[0]["text"] != "hello" {
-				t.Fatalf("invalid converted body: %s", w.Body.String())
-			}
+		w := g.request(path, `{"model":"model","project":"caller-project","request":{"contents":[{"role":"user","parts":[{"text":"test"}]}]},"future_field":{"keep":true}}`)
+		if w.Code != 200 || !strings.Contains(w.Body.String(), `"usageMetadata"`) || strings.Contains(w.Body.String(), "message_stop") {
+			t.Fatalf("native response lost: %d %s", w.Code, w.Body.String())
 		}
 	}
+	if w := g.request("/v1/messages", `{"model":"model","messages":[]}`); w.Code != 400 {
+		t.Fatal("emulated Messages route remained available")
+	}
 	q, _ := g.s.Quota(context.Background(), g.user)
-	if q[0].Used != 28 {
-		t.Fatalf("cached token normalization failed: %+v", q)
+	if q[0].Used != 30 || q[0].Reserved != 0 {
+		t.Fatalf("native settlement incorrect: %+v", q)
 	}
 }
 
@@ -196,7 +203,7 @@ func TestGatewayRejectsRevokedKeyAndMissingPrice(t *testing.T) {
 
 func TestCodexModelManifestPreservesMetadata(t *testing.T) {
 	upstream := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/models" || r.URL.Query().Get("client_version") != "0.146.0" {
+		if r.URL.Path != "/models" || r.URL.Query().Get("client_version") != providers.DefaultOpenAIClientVersion {
 			t.Error("wrong manifest endpoint")
 		}
 		io.WriteString(w, `{"models":[{"slug":"model","shell_type":"shell_command","context_window":123456,"supported_reasoning_levels":[{"effort":"low"}]},{"slug":"unpriced","context_window":999}]}`)

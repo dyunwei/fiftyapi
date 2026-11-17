@@ -131,7 +131,13 @@ func (s *Service) CredentialInfo(ctx context.Context, id int64) (CredentialInfo,
 	if err = s.ensurePolicy(ctx, id, c.Config.MaxConcurrency); err != nil {
 		return CredentialInfo{}, err
 	}
-	info := CredentialInfo{RefreshAvailable: c.Token.RefreshToken != "", ClientVersion: providers.NormalizeOpenAIConfig(c.Config).ClientVersion}
+	if err = s.resolveIdentity(ctx, &c); err != nil {
+		return CredentialInfo{}, err
+	}
+	info := CredentialInfo{RefreshAvailable: c.Token.RefreshToken != "", ClientVersion: c.Config.ClientVersion}
+	if c.Config.Provider == "antigravity" {
+		info.ClientVersion = c.Config.AntigravityVersion
+	}
 	if c.Config.Provider == "openai" {
 		info.Email, info.Plan = providers.OpenAIIdentity(c.Token)
 		account := c.Config.OpenAIAccountID

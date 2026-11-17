@@ -17,6 +17,8 @@ English | [简体中文](README.zh-CN.md)
 
 </div>
 
+For automatic prices, native Antigravity, user access limits, and centralized client defaults, see [low-maintenance sharing](docs/en/low-maintenance.md).
+
 ## Why FiftyAPI
 
 - **Simple to run** – one Go binary with an embedded Vue 3 UI and SQLite. No Redis, no extra services.

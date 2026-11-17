@@ -15,7 +15,8 @@ func TestClaudeNormalizationPrivacyAndSessionContinuity(t *testing.T) {
 		json.Unmarshal([]byte(`{"messages":[{"role":"user","content":"hello"}],"metadata":{"private_note":"remove-me","user_id":"user_device_account_old_session_abc-123"},"system":"Keep the user instructions."}`), &request)
 		return request
 	}
-	c := accounts.Credential{AccountID: 42}
+	enabled, disabledMetadata := true, false
+	c := accounts.Credential{AccountID: 42, Config: providers.Config{MetadataPassthrough: &disabledMetadata, ClaudeSystemPromptInjection: &enabled}}
 	r := httptest.NewRequest("POST", "/v1/messages", nil)
 	a, b := build(), build()
 	if err := normalizeClaude(a, r, c); err != nil {
@@ -57,5 +58,18 @@ func TestClaudeNormalizationPrivacyAndSessionContinuity(t *testing.T) {
 	after, _ := json.Marshal(original)
 	if string(before) != string(after) {
 		t.Fatal("explicit passthrough settings ignored")
+	}
+}
+
+func TestClaudeDefaultPreservesNativeBody(t *testing.T) {
+	var request map[string]json.RawMessage
+	_ = json.Unmarshal([]byte(`{"system":[{"type":"future","data":{"x":1}}],"metadata":{"user_id":"client-value","other":true},"future":true}`), &request)
+	before, _ := json.Marshal(request)
+	if err := normalizeClaude(request, httptest.NewRequest("POST", "/v1/messages", nil), accounts.Credential{}); err != nil {
+		t.Fatal(err)
+	}
+	after, _ := json.Marshal(request)
+	if string(before) != string(after) {
+		t.Fatal("native body changed by default")
 	}
 }

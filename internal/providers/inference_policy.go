@@ -6,7 +6,6 @@ import "errors"
 type InferencePolicy struct {
 	MaxEffort         string `json:"max_effort,omitempty"`
 	MaxThinkingTokens int    `json:"max_thinking_tokens,omitempty"`
-	ForceStandard     bool   `json:"force_standard,omitempty"`
 }
 
 func (p InferencePolicy) Validate() error {

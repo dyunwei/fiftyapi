@@ -69,6 +69,29 @@ func (s *Store) Reserve(ctx context.Context, id string, user, key int64, model s
 	if err != nil {
 		return errors.New("用户或 API Key 不可用")
 	}
+	access, err := readUserAccess(ctx, tx, user)
+	if err != nil {
+		return err
+	}
+	if !access.Allows(model) {
+		return ErrModelAccess
+	}
+	if access.Concurrency > 0 {
+		var inflight int
+		if err = tx.QueryRowContext(ctx, "SELECT count(*) FROM request_charges WHERE user_id=? AND status='inflight'", user).Scan(&inflight); err != nil {
+			return err
+		}
+		if inflight >= access.Concurrency {
+			return ErrUserConcurrency
+		}
+	}
+	var pending int
+	if err = tx.QueryRowContext(ctx, "SELECT count(*) FROM request_charges WHERE user_id=? AND status='pending'", user).Scan(&pending); err != nil {
+		return err
+	}
+	if pending > 0 {
+		return errors.New("存在待核算请求，请联系管理员处理后继续使用")
+	}
 	w5, err := activeWindow(ctx, tx, user, "5h", now.Unix())
 	if err != nil {
 		return err
@@ -186,6 +209,7 @@ func (s *Store) RecoverInFlight(ctx context.Context) error {
 	}
 	for _, id := range ids {
 		if err = s.autoSettleRequest(ctx, id); err != nil {
+			_ = s.ReleasePending(ctx, id)
 			s.noteSettlementFailure(ctx, id)
 			if ctx.Err() != nil {
 				return ctx.Err()
@@ -333,7 +357,7 @@ func decodePriceSnapshot(raw string) (Price, error) {
 	if json.Unmarshal([]byte(raw), &p) != nil {
 		return p, fmt.Errorf("价格快照无效")
 	}
-	if _, err := p.Cost(TokenUsage{}); err != nil {
+	if err := p.Validate(); err != nil {
 		return p, err
 	}
 	return p, nil

@@ -10,12 +10,12 @@ Create your own API key in the console. Clients use that `sk-…` key, not an ad
 
 | Model source | Client mode | Endpoint |
 | --- | --- | --- |
-| Claude OAuth, Antigravity, Messages-only API model | Anthropic Messages | `/v1/messages` |
+| Claude OAuth, Messages-only API model | Anthropic Messages | `/v1/messages` |
 | Codex OAuth, Responses API model | OpenAI Responses | `/v1/responses` |
 | API model explicitly supporting Chat | OpenAI Chat Completions | `/v1/chat/completions` |
 | Multi-protocol API model | Any declared mode, using the same model ID | Corresponding endpoint |
 
-Standard protocols are not automatically converted. Model names alone do not identify protocol support. Some clients ignore catalog extensions and require manual selection. Antigravity Gemini models use Anthropic Messages mode.
+Standard protocols are not automatically converted. Model names alone do not identify protocol support. Some clients ignore catalog extensions and require manual selection. Antigravity requires a native v1internal client; see [low-maintenance sharing](low-maintenance.md).
 
 ## Claude Code / Messages
 
@@ -26,9 +26,9 @@ export ANTHROPIC_MODEL='MODEL_ID_FROM_CATALOG'
 claude
 ```
 
-The base URL has no `/v1`; the client appends `/v1/messages`. Clear conflicting vendor `ANTHROPIC_API_KEY` settings. Messages routes to Claude or Antigravity; the latter uses a dedicated adapter for requests, tools and SSE. `/v1/messages/count_tokens` is a local estimate, not exact vendor tokenization.
+The base URL has no `/v1`; the client appends `/v1/messages`. Clear conflicting vendor `ANTHROPIC_API_KEY` settings. Messages routes to Claude or Messages-capable API upstreams. Antigravity uses its native v1internal protocol. `/v1/messages/count_tokens` is a local estimate, not exact vendor tokenization.
 
-Real Antigravity tool round trips passed for `gemini-3.5-flash-lite`. Real Claude OAuth and the native Claude Code client remain unverified.
+Historical Antigravity converter tool tests do not establish compatibility for the new native path. Real Claude OAuth and the native Claude Code client remain unverified.
 
 ## Codex / Responses
 
@@ -90,4 +90,4 @@ Chat and Responses usually use a base URL ending in `/v1`; Messages usually uses
 
 Models need administrator-confirmed prices, an available upstream and a positive user budget. HTTP 401 suggests a key/user problem; 400 suggests model, pricing or protocol configuration; 429 suggests local budget or upstream rate limits; 503 suggests account availability, concurrency or session binding.
 
-Reliable received usage is settled after cancellation or interruption. Missing/invalid usage releases the reservation at zero local cost, which does not imply zero upstream cost. Provide request IDs, status and sanitized errors when asking for help; never share keys or OAuth callbacks. See [compatibility](compatibility.md).
+Reliable received usage is settled after cancellation or interruption. Missing/invalid usage releases reservations and requires administrator settlement; further calls by that user pause until resolution. Provide request IDs, status and sanitized errors when asking for help; never share keys or OAuth callbacks. See [compatibility](compatibility.md).

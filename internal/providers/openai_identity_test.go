@@ -11,9 +11,12 @@ import (
 
 func TestOpenAICatalogVersionAndIdentityStayAligned(t *testing.T) {
 	legacy := Config{Provider: "openai", ClientVersion: "0.146.0", ModelsURL: "https://chatgpt.com/backend-api/codex/models?client_version=0.146.0"}
-	current := NormalizeOpenAIConfig(legacy)
+	current := NormalizeOpenAIConfig(Config{Provider: "openai", ModelsURL: legacy.ModelsURL})
+	if NormalizeOpenAIConfig(legacy).ClientVersion != "0.146.0" {
+		t.Fatal("explicit old version was not preserved")
+	}
 	if current.ClientVersion != DefaultOpenAIClientVersion {
-		t.Fatal("previous shipped defaults were not upgraded")
+		t.Fatal("default identity was not applied")
 	}
 	parsed, _ := url.Parse(current.ModelsURL)
 	if parsed.Query().Get("client_version") != DefaultOpenAIClientVersion {
@@ -40,7 +43,7 @@ func TestOpenAICatalogVersionAndIdentityStayAligned(t *testing.T) {
 		t.Fatal("custom identity overwritten")
 	}
 	defaults, e := DefaultConfig("openai")
-	if e != nil || defaults.ClientVersion != DefaultOpenAIClientVersion {
+	if e != nil || defaults.ClientVersion != "" {
 		t.Fatal("embedded defaults drifted from shared constant")
 	}
 	upstream := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

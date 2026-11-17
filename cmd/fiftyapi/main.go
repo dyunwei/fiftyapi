@@ -24,6 +24,7 @@ import (
 	"fiftyapi/internal/configenv"
 	"fiftyapi/internal/credentials"
 	"fiftyapi/internal/mailer"
+	"fiftyapi/internal/pricing"
 	"fiftyapi/internal/providers"
 	"fiftyapi/internal/server"
 	"fiftyapi/internal/store"
@@ -105,6 +106,7 @@ func run() error {
 	if err = s.RecoverInFlight(ctx); err != nil {
 		return err
 	}
+	priceService := pricing.New(s)
 	maintenanceDone := make(chan struct{})
 	go func() {
 		defer close(maintenanceDone)
@@ -112,6 +114,10 @@ func run() error {
 		defer ticker.Stop()
 		count := 0
 		for {
+			if env("FIFTYAPI_AUTO_MAINTENANCE", "true") == "true" {
+				priceService.Maintain(ctx)
+				priceService.MaintainVersions(ctx)
+			}
 			accountService.Maintain(ctx)
 			if count%5 == 0 {
 				cleanup, cancel := context.WithTimeout(ctx, 10*time.Second)
@@ -170,7 +176,12 @@ func run() error {
 	}
 	probeCtx, stopProbes := context.WithCancel(ctx)
 	probeDone := make(chan struct{})
-	go func() { defer close(probeDone); api.RunMorningProbes(probeCtx) }()
+	go func() {
+		defer close(probeDone)
+		if env("FIFTYAPI_MORNING_PROBES", "false") == "true" {
+			api.RunMorningProbes(probeCtx)
+		}
+	}()
 	defer func() { stopProbes(); <-probeDone }()
 	defer func() {
 		drain, stop := context.WithTimeout(context.Background(), 5*time.Second)

@@ -18,7 +18,7 @@ import (
 )
 
 const agSuccess = "data: {\"response\":{\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"OK\"}]},\"finishReason\":\"STOP\"}],\"usageMetadata\":{\"promptTokenCount\":12,\"candidatesTokenCount\":3}}}\n\n"
-const agRequest = `{"model":"model","stream":true,"max_tokens":32,"messages":[{"role":"user","content":"test"}]}`
+const agRequest = `{"model":"model","request":{"contents":[{"role":"user","parts":[{"text":"test"}]}],"generationConfig":{"maxOutputTokens":32}},"requestType":"agent"}`
 
 func TestAntigravityFailuresAndCooldown(t *testing.T) {
 	for _, scenario := range []string{"truncated", "invalid_json", "missing_usage", "timeout", "429"} {
@@ -57,7 +57,7 @@ func TestAntigravityFailuresAndCooldown(t *testing.T) {
 					return c
 				}
 			}
-			w := g.request("/v1/messages", agRequest)
+			w := g.request("/v1internal:streamGenerateContent", agRequest)
 			pending, err := g.s.PendingCharges(context.Background())
 			if err != nil {
 				t.Fatal(err)
@@ -70,7 +70,7 @@ func TestAntigravityFailuresAndCooldown(t *testing.T) {
 				if w.Code != 429 || len(pending) != 0 || quota[0].Used != 0 || quota[0].Reserved != 0 {
 					t.Fatal("429 rejection was charged or held pending")
 				}
-				if retry := g.request("/v1/messages", agRequest); retry.Code != 503 {
+				if retry := g.request("/v1internal:streamGenerateContent", agRequest); retry.Code != 503 {
 					t.Fatal("cooldown not applied")
 				}
 			}
@@ -78,7 +78,12 @@ func TestAntigravityFailuresAndCooldown(t *testing.T) {
 			if scenario == "truncated" {
 				expected = 13
 			}
-			if len(pending) != 0 || quota[0].Used != expected || quota[0].Reserved != 0 {
+			unknown := scenario != "truncated" && scenario != "429"
+			wantPending := 0
+			if unknown {
+				wantPending = 1
+			}
+			if len(pending) != wantPending || quota[0].Used != expected || quota[0].Reserved != 0 {
 				t.Fatal("automatic settlement policy violated", quota, pending)
 			}
 
@@ -89,7 +94,7 @@ func TestAntigravityFailuresAndCooldown(t *testing.T) {
 			if err != nil || len(logs) == 0 {
 				t.Fatal("missing failure log")
 			}
-			if logs[0].Amount == nil || *logs[0].Amount != expected {
+			if unknown && logs[0].Amount != nil || !unknown && (logs[0].Amount == nil || *logs[0].Amount != expected) {
 				t.Fatal("automatic settlement missing or incorrect")
 			}
 		})
@@ -115,7 +120,7 @@ func TestAntigravityClientCancellationReleasesSlot(t *testing.T) {
 	defer server.Close()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	request, _ := http.NewRequestWithContext(ctx, "POST", server.URL+"/v1/messages", strings.NewReader(agRequest))
+	request, _ := http.NewRequestWithContext(ctx, "POST", server.URL+"/v1internal:streamGenerateContent", strings.NewReader(agRequest))
 	request.Header.Set("Authorization", "Bearer "+g.token)
 	response, err := server.Client().Do(request)
 	if err != nil {
@@ -135,10 +140,10 @@ func TestAntigravityClientCancellationReleasesSlot(t *testing.T) {
 	deadline := time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {
 		logs, e := g.s.Logs(context.Background(), g.user, false, 0, "", 0)
-		if e == nil && len(logs) == 1 && logs[0].Amount != nil {
+		if e == nil && len(logs) == 1 && logs[0].Amount == nil {
 			pending, e := g.s.PendingCharges(context.Background())
-			if e != nil || len(pending) != 0 {
-				t.Fatal("canceled request left pending")
+			if e != nil || len(pending) != 1 || pending[0].Reservation != 0 {
+				t.Fatal("canceled request lost uncertain usage or held reservation")
 			}
 			slot, _ := g.h.slots.Load(g.account)
 			state := slot.(*accountSlot)
@@ -219,7 +224,7 @@ func TestAntigravityConcurrentGatewayLoad(t *testing.T) {
 		go func(index int) {
 			defer wg.Done()
 			for turn := 0; turn < turns; turn++ {
-				request := httptest.NewRequest("POST", "/v1/messages", strings.NewReader(agRequest))
+				request := httptest.NewRequest("POST", "/v1internal:streamGenerateContent", strings.NewReader(agRequest))
 				request.Header.Set("Authorization", "Bearer "+tokens[index])
 				request.Header.Set("session_id", fmt.Sprintf("load-%d", index))
 				w := httptest.NewRecorder()

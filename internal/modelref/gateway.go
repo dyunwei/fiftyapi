@@ -26,13 +26,18 @@ func Protocol(provider string) string {
 	if provider == "openai" {
 		return "responses"
 	}
-	if provider == "claude" || provider == "antigravity" {
+	if provider == "antigravity" {
+		return "antigravity"
+	}
+	if provider == "claude" {
 		return "messages"
 	}
 	return ""
 }
 
-func ValidProtocol(p string) bool { return p == "chat" || p == "messages" || p == "responses" }
+func ValidProtocol(p string) bool {
+	return p == "chat" || p == "messages" || p == "responses" || p == "antigravity"
+}
 func (m Mapping) SupportedProtocols() []string {
 	if len(m.Protocols) > 0 {
 		return m.Protocols

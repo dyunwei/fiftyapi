@@ -3,6 +3,7 @@ package gateway
 import (
 	"encoding/json"
 	"errors"
+	"fiftyapi/internal/store"
 	"io"
 	"net/http"
 )
@@ -48,12 +49,17 @@ func consumeChatResponse(w http.ResponseWriter, r *http.Request, resp *http.Resp
 				return completed
 			}
 			var frame struct {
-				Choices []json.RawMessage `json:"choices"`
-				Usage   json.RawMessage   `json:"usage"`
-				Error   json.RawMessage   `json:"error"`
+				Choices     []json.RawMessage `json:"choices"`
+				Usage       json.RawMessage   `json:"usage"`
+				Error       json.RawMessage   `json:"error"`
+				ServiceTier string            `json:"service_tier"`
 			}
 			if json.Unmarshal(payload, &frame) != nil {
 				return errors.New("invalid chat event")
+			}
+			if frame.ServiceTier != "" {
+				out.usage.Tier = store.NormalizeTier(frame.ServiceTier)
+				out.usage.Confirmed = true
 			}
 			mergeChatUsage(frame.Usage, &out)
 			if len(frame.Error) > 0 && string(frame.Error) != "null" {
@@ -93,13 +99,18 @@ func consumeChatResponse(w http.ResponseWriter, r *http.Request, resp *http.Resp
 		return out
 	}
 	var response struct {
-		Choices []json.RawMessage `json:"choices"`
-		Usage   json.RawMessage   `json:"usage"`
-		Error   json.RawMessage   `json:"error"`
+		Choices     []json.RawMessage `json:"choices"`
+		Usage       json.RawMessage   `json:"usage"`
+		Error       json.RawMessage   `json:"error"`
+		ServiceTier string            `json:"service_tier"`
 	}
 	if json.Unmarshal(body, &response) != nil {
 		out.err = errors.New("上游 Chat 响应格式无效")
 		return out
+	}
+	if response.ServiceTier != "" {
+		out.usage.Tier = store.NormalizeTier(response.ServiceTier)
+		out.usage.Confirmed = true
 	}
 	mergeChatUsage(response.Usage, &out)
 	if len(response.Error) > 0 && string(response.Error) != "null" {

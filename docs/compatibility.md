@@ -1,5 +1,14 @@
 # 兼容性与验证记录
 
+## 当前重构的验证边界
+
+当前行为以 [低维护账号共享](low-maintenance.md) 为准：Antigravity 使用原生 v1internal，不再提供 Messages 转换；Claude 默认透传 metadata/system；加速档位按自动价格计入预算；未知用量释放预占并保留待核算。模型允许列表与并发按用户控制，不单独授权加速档位。
+
+本次使用模拟上游和临时数据库，默认 Codex 身份 0.164.0、fixture 模型 `model` 等，覆盖 Responses HTTP/JSON/SSE/WebSocket、Messages、原生 Antigravity、缓存、价格快照与恢复。没有运行真实供应商或真实客户端验收；尤其不能将旧 Antigravity 转换器的工具测试当作当前原生接入的兼容保证。
+
+## 历史验收记录（以下描述为重构前行为）
+
+
 更新：2026-11-09。实现参考本地 sub2api；模拟测试、真实上游调用和原生客户端验收分开记录。
 
 | 能力 | Claude OAuth | OpenAI Codex OAuth | Antigravity OAuth |

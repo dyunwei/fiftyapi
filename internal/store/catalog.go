@@ -11,13 +11,18 @@ import (
 )
 
 type Price struct {
-	ID         int64 `json:"id"`
-	Input      int64 `json:"input"`
-	Output     int64 `json:"output"`
-	Cached     int64 `json:"cached"`
-	CacheWrite int64 `json:"cache_write"`
+	MaxOutput  int64       `json:"max_output_tokens,omitempty"`
+	ID         int64       `json:"id"`
+	Source     string      `json:"source,omitempty"`
+	Revision   string      `json:"revision,omitempty"`
+	Rates      []PriceRate `json:"rates,omitempty"`
+	Input      int64       `json:"input"`
+	Output     int64       `json:"output"`
+	Cached     int64       `json:"cached"`
+	CacheWrite int64       `json:"cache_write"`
 }
 type Model struct {
+	PricingKey string   `json:"pricing_key"`
 	Available  bool     `json:"available"`
 	Protocol   string   `json:"protocol"`
 	Protocols  []string `json:"protocols"`
@@ -29,6 +34,7 @@ type Model struct {
 	Price      *Price   `json:"price"`
 }
 type TokenUsage struct {
+	BillingUsage
 	Input      int64 `json:"input"`
 	Output     int64 `json:"output"`
 	Cached     int64 `json:"cached"`
@@ -37,8 +43,14 @@ type TokenUsage struct {
 
 // Prices are microUSD per million tokens. Round once at request settlement.
 func (p Price) Cost(u TokenUsage) (int64, error) {
+	if len(p.Rates) > 0 || NormalizeTier(u.Tier) != "default" {
+		return p.costWithRules(u)
+	}
+	return fixedCost([][2]int64{{p.Input, u.Input}, {p.Output, u.Output}, {p.Cached, u.Cached}, {p.CacheWrite, u.CacheWrite}})
+}
+func fixedCost(pairs [][2]int64) (int64, error) {
 	sum := new(big.Int)
-	for _, pair := range [][2]int64{{p.Input, u.Input}, {p.Output, u.Output}, {p.Cached, u.Cached}, {p.CacheWrite, u.CacheWrite}} {
+	for _, pair := range pairs {
 		if pair[0] < 0 || pair[1] < 0 {
 			return 0, errors.New("价格与用量不能为负数")
 		}
@@ -104,11 +116,6 @@ func (s *Store) SyncModels(ctx context.Context, account int64, provider string, 
 			return err
 		}
 		affected[id] = true
-		if p, ok := builtinPrice(upstream); ok {
-			if _, err = tx.ExecContext(ctx, "INSERT INTO model_prices(model_id,input,output,cached,cache_write,created_at) SELECT ?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM model_prices WHERE model_id=?)", id, p.Input, p.Output, p.Cached, p.CacheWrite, time.Now().Unix(), id); err != nil {
-				return err
-			}
-		}
 	}
 	for id := range affected {
 		if err = refreshModelProtocols(ctx, tx, id); err != nil {
@@ -118,7 +125,10 @@ func (s *Store) SyncModels(ctx context.Context, account int64, provider string, 
 	if _, err = tx.ExecContext(ctx, "UPDATE upstream_accounts SET models_synced_at=? WHERE id=?", time.Now().Unix(), account); err != nil {
 		return err
 	}
-	return tx.Commit()
+	if err = tx.Commit(); err != nil {
+		return err
+	}
+	return s.ApplyPriceCatalog(ctx)
 }
 
 // refreshModelProtocols maintains the public pool capability union. Selection
@@ -150,7 +160,7 @@ func refreshModelProtocols(ctx context.Context, tx *sql.Tx, model string) error 
 		return err
 	}
 	ordered := []string{}
-	for _, value := range []string{"chat", "messages", "responses"} {
+	for _, value := range []string{"chat", "messages", "responses", "antigravity"} {
 		if set[value] {
 			ordered = append(ordered, value)
 		}
@@ -160,7 +170,7 @@ func refreshModelProtocols(ctx context.Context, tx *sql.Tx, model string) error 
 	return err
 }
 func (s *Store) Models(ctx context.Context) ([]Model, error) {
-	rows, err := s.DB.QueryContext(ctx, "SELECT m.id,m.provider,m.upstream_id,m.enabled,m.synced_at,m.protocols,EXISTS(SELECT 1 FROM account_models am JOIN upstream_accounts a ON a.id=am.account_id WHERE am.model_id=m.id AND a.enabled=1 AND a.state IN ('catalog_ready','ready')) FROM models m ORDER BY m.provider,m.id")
+	rows, err := s.DB.QueryContext(ctx, "SELECT m.id,m.provider,m.upstream_id,m.enabled,m.synced_at,m.protocols,m.pricing_key,EXISTS(SELECT 1 FROM account_models am JOIN upstream_accounts a ON a.id=am.account_id WHERE am.model_id=m.id AND a.enabled=1 AND a.state IN ('catalog_ready','ready')) FROM models m ORDER BY m.provider,m.id")
 	if err != nil {
 		return nil, err
 	}
@@ -168,7 +178,7 @@ func (s *Store) Models(ctx context.Context) ([]Model, error) {
 	for rows.Next() {
 		var m Model
 		var protocols string
-		if err = rows.Scan(&m.ID, &m.Provider, &m.UpstreamID, &m.Enabled, &m.SyncedAt, &protocols, &m.Available); err != nil {
+		if err = rows.Scan(&m.ID, &m.Provider, &m.UpstreamID, &m.Enabled, &m.SyncedAt, &protocols, &m.PricingKey, &m.Available); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -192,7 +202,17 @@ func (s *Store) Models(ctx context.Context) ([]Model, error) {
 }
 func (s *Store) Price(ctx context.Context, id string) (Price, error) {
 	var p Price
-	err := s.DB.QueryRowContext(ctx, "SELECT id,input,output,cached,cache_write FROM model_prices WHERE model_id=? ORDER BY id DESC LIMIT 1", id).Scan(&p.ID, &p.Input, &p.Output, &p.Cached, &p.CacheWrite)
+	var rules string
+	err := s.DB.QueryRowContext(ctx, "SELECT id,input,output,cached,cache_write,source,rules FROM model_prices WHERE model_id=? ORDER BY id DESC LIMIT 1", id).Scan(&p.ID, &p.Input, &p.Output, &p.Cached, &p.CacheWrite, &p.Source, &rules)
+	if err == nil {
+		var extra Price
+		if e := json.Unmarshal([]byte(rules), &extra); e != nil {
+			return p, e
+		}
+		p.Rates = extra.Rates
+		p.Revision = extra.Revision
+		p.MaxOutput = extra.MaxOutput
+	}
 	return p, err
 }
 func (s *Store) SetModel(ctx context.Context, actor int64, id string, enabled bool, price *Price) error {
@@ -210,12 +230,15 @@ func (s *Store) SetModel(ctx context.Context, actor int64, id string, enabled bo
 		return ErrNotFound
 	}
 	if price != nil {
+		if err = price.Validate(); err != nil {
+			return err
+		}
 		for _, n := range []int64{price.Input, price.Output, price.Cached, price.CacheWrite} {
 			if n < 0 || n > 1000000000000 {
 				return errors.New("价格超出范围")
 			}
 		}
-		if _, err = tx.ExecContext(ctx, "INSERT INTO model_prices(model_id,input,output,cached,cache_write,created_at) VALUES(?,?,?,?,?,?)", id, price.Input, price.Output, price.Cached, price.CacheWrite, time.Now().Unix()); err != nil {
+		if _, err = tx.ExecContext(ctx, "INSERT INTO model_prices(model_id,input,output,cached,cache_write,created_at,source,rules) VALUES(?,?,?,?,?,?,'manual',?)", id, price.Input, price.Output, price.Cached, price.CacheWrite, time.Now().Unix(), priceRulesJSON(*price)); err != nil {
 			return err
 		}
 	}
@@ -228,7 +251,7 @@ func (s *Store) SetModel(ctx context.Context, actor int64, id string, enabled bo
 func (s *Store) RoutableModel(ctx context.Context, id string) (Model, []int64, error) {
 	var m Model
 	var protocols string
-	err := s.DB.QueryRowContext(ctx, "SELECT id,provider,upstream_id,enabled,synced_at,protocols FROM models WHERE id=? AND enabled=1", id).Scan(&m.ID, &m.Provider, &m.UpstreamID, &m.Enabled, &m.SyncedAt, &protocols)
+	err := s.DB.QueryRowContext(ctx, "SELECT id,provider,upstream_id,enabled,synced_at,protocols,pricing_key FROM models WHERE id=? AND enabled=1", id).Scan(&m.ID, &m.Provider, &m.UpstreamID, &m.Enabled, &m.SyncedAt, &protocols, &m.PricingKey)
 	if err != nil {
 		return m, nil, err
 	}

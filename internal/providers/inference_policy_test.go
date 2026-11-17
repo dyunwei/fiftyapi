@@ -3,7 +3,7 @@ package providers
 import "testing"
 
 func TestInferencePolicyValidation(t *testing.T) {
-	for _, p := range []InferencePolicy{{}, {MaxEffort: "medium", MaxThinkingTokens: 1024, ForceStandard: true}, {MaxEffort: "high", MaxThinkingTokens: 1048576}} {
+	for _, p := range []InferencePolicy{{}, {MaxEffort: "medium", MaxThinkingTokens: 1024}, {MaxEffort: "high", MaxThinkingTokens: 1048576}} {
 		if err := p.Validate(); err != nil {
 			t.Fatal(err)
 		}

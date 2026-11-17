@@ -89,8 +89,9 @@ API Key 上游与 OAuth 账号共用优先级、权重、并发、队列、健�
 - `max_effort`：空值不限制，可选 `low`、`medium`、`high`。保留较低请求值，较高值降到上限；缺省值使用上限，避免模型默认高档位。Codex Responses 使用 `reasoning.effort`，Chat Completions 使用 `reasoning_effort`。Claude 使用 `output_config.effort`，同时限制消息级 effort；显式 `enabled` / `disabled` 且未使用 effort 的旧模型不注入该字段，避免兼容性错误。旧模型请用思考 token 预算。启用策略后，无法识别的 effort 返回 400，不静默放行。
 - `max_thinking_tokens`：0 不限制，其余为 1024–1048576。Claude 原生 Messages 只限制 `thinking.type=enabled` 的 `budget_tokens`，保留更低预算和关闭状态；自适应思考需要设置 `max_effort`，不会被转换成旧式显式思考。Codex 不支持独立的思考 token 硬上限，这个字段不作用于 Codex。
 - Antigravity 当前提供 Messages 转 Gemini 的兼容链路，按转换后的实际思考预算控制，包括动态预算和 Opus 自适应默认预算。`low` / `medium` / `high` 对应网关预算上限 2048 / 8192 / 24576，与 `max_thinking_tokens` 取较小值；这是本网关的预算映射，不是厂商定义的等价档位。不会切换模型。未知签名导致转换器关闭思考时仍保持该行为。
-- `force_standard`：Codex 覆盖请求体 `service_tier=default`；Claude 移除 `speed` 并使用 `service_tier=standard_only`；移除自定义 `OpenAI-Service-Tier` 请求头，避免重新启用快速档位。Antigravity 当前转换器不传递 Fast 选项，没有额外可控制的 Fast 档位。
 
 API Key 上游网关账号按请求协议使用相同规则。规则优先于客户端参数和快速档位请求头；不支持这些字段的第三方上游可能拒绝请求。Claude 旧模型如不支持 effort，应清空强度上限并使用显式思考预算。强度上限用于控制推理倾向，不保证固定 token 消耗；实际用量仍按上游返回结算。原生 Codex 未启用标准速度策略时，非标准档位仍返回 400，保持当前标准档位定价约束。
 
 参数依据：[OpenAI reasoning](https://developers.openai.com/api/docs/guides/reasoning)、[Claude effort](https://platform.claude.com/docs/en/build-with-claude/effort)、[Claude Fast mode](https://platform.claude.com/docs/en/build-with-claude/fast-mode)。
+
+加速档位不单独授权，按价格目录中的对应费率消耗用户预算。目录缺少该档位时拒绝请求。详见 [低维护账号共享](low-maintenance.md)。

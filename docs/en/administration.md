@@ -1,5 +1,7 @@
 # Administration
 
+Automatic prices, client defaults, model allowlists and user concurrency are described in [low-maintenance sharing](low-maintenance.md).
+
 [简体中文文档索引](../README.md) | English
 
 ## Members and budgets
@@ -8,7 +10,7 @@ Initialize the administrator with the deployment setup token. Afterwards members
 
 Every user's keys and providers share two dollar budgets: 5 hours and 7 days. The first positive-cost settlement starts a window; unused budget does not accumulate. Increasing a limit does not reset usage. Explicit window resets are audited, and accepted requests still settle against their original windows.
 
-A request reserves estimated cost, then settles reliable reported usage against its original price snapshot. Interrupted requests settle any reliable usage received. Missing or invalid usage settles at zero and releases the reservation; this is a local cost-allocation policy and does not imply the upstream was free. Ledger or price-snapshot failures remain settlement exceptions for administrators to review under **Request logs**. Retrying settlement does not call the model again.
+A request reserves estimated cost, then settles reliable reported usage against its original price snapshot. Interrupted requests settle any reliable usage received. Missing or invalid usage releases reservations and stays pending; further requests by that user pause until administrator settlement. Ledger or price-snapshot failures remain settlement exceptions for administrators to review under **Request logs**. Retrying settlement does not call the model again.
 
 ## Upstream accounts
 
@@ -46,9 +48,9 @@ Responses WebSocket and compact are separate opt-in capabilities. Enable them on
 
 **Test** sends `hi` to the selected account/model without requiring local pricing or charging local users. It still consumes upstream quota, uses the account's concurrency and adapter settings, and can take up to 90 seconds. The response display is limited to 256 KiB. This explicit test is separate from model catalog synchronization.
 
-Enabled OpenAI OAuth accounts with synced models also receive a daily short `hi` test at 07:00 in the service timezone. The task selects the first catalog model by ID, using Responses. It attempts to start the upstream quota window; upstream rules determine the actual result. Missed tasks are not replayed after downtime. Results appear in runtime logs without response bodies or credentials.
+Only when `FIFTYAPI_MORNING_PROBES=true`, enabled OpenAI OAuth accounts with synced models receive a daily short `hi` test at 07:00 in the service timezone. The task selects the first catalog model by ID, using Responses. It attempts to start the upstream quota window; upstream rules determine the actual result. Missed tasks are not replayed after downtime. Results appear in runtime logs without response bodies or credentials.
 
-Optional usage protection caps reasoning effort (`low`, `medium`, `high`), explicit thinking token budgets (1024–1048576, zero unlimited), or forces standard speed. Codex has no independent hard thinking-token cap. Claude adaptive thinking uses effort; explicit thinking uses a token budget. Antigravity maps effort to local budget caps of 2048/8192/24576 and uses the lower configured limit. These settings do not guarantee exact token consumption or equivalent vendor effort levels.
+Optional usage protection caps reasoning effort (`low`, `medium`, `high`), explicit thinking token budgets (1024–1048576, zero unlimited). There is no separate speed permission. Codex has no independent hard thinking-token cap. Claude adaptive thinking uses effort; explicit thinking uses a token budget. Antigravity uses a native envelope and no longer applies converter effort mappings. These settings do not guarantee exact token consumption or equivalent vendor effort levels.
 
 ## Email invitations
 

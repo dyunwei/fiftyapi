@@ -6,6 +6,7 @@ Public preview: **0.1.1**. The console supports Simplified Chinese and English. 
 
 | Guide | Contents |
 | --- | --- |
+| [low-maintenance.md](low-maintenance.md) | Native forwarding, automatic prices, user budgets and client defaults |
 | [Deployment](deployment.md) | Binary, Docker, HTTPS, persistent keys, upgrades and restoration |
 | [Release quickstart](release-quickstart.md) | Running a downloaded binary package |
 | [Clients](clients.md) | Claude Code, Codex, Chat Completions and protocol selection |

@@ -102,8 +102,8 @@ func (s *Store) SyncGatewayModels(ctx context.Context, account int64, mappings [
 				var others int
 				_ = tx.QueryRowContext(ctx, "SELECT count(*) FROM account_models WHERE model_id=?", old.model).Scan(&others)
 				if others == 0 {
-					_, _ = tx.ExecContext(ctx, `INSERT INTO model_prices(model_id,input,output,cached,cache_write,created_at)
-					 SELECT ?,input,output,cached,cache_write,? FROM model_prices WHERE model_id=? ORDER BY id DESC LIMIT 1`, id, time.Now().Unix(), old.model)
+					_, _ = tx.ExecContext(ctx, `INSERT INTO model_prices(model_id,input,output,cached,cache_write,created_at,source,rules)
+					 SELECT ?,input,output,cached,cache_write,?,source,rules FROM model_prices WHERE model_id=? ORDER BY id DESC LIMIT 1`, id, time.Now().Unix(), old.model)
 				}
 			}
 		} else if err != nil {
@@ -126,5 +126,5 @@ func (s *Store) SyncGatewayModels(ctx context.Context, account int64, mappings [
 	if err = tx.Commit(); err != nil {
 		return nil, fmt.Errorf("保存网关模型失败：%w", err)
 	}
-	return result, nil
+	return result, s.ApplyPriceCatalog(ctx)
 }

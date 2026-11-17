@@ -69,7 +69,8 @@ func (h *Handler) auth(r *http.Request) (store.User, int64, error) {
 	return h.store.AuthenticateAPIKey(r.Context(), token)
 }
 func (h *Handler) Models(w http.ResponseWriter, r *http.Request) {
-	if _, _, err := h.auth(r); err != nil {
+	user, _, authErr := h.auth(r)
+	if authErr != nil {
 		failure(w, 401, "API Key 无效")
 		return
 	}
@@ -77,11 +78,23 @@ func (h *Handler) Models(w http.ResponseWriter, r *http.Request) {
 		failure(w, 508, err.Error())
 		return
 	}
+	access, err := h.store.UserAccess(r.Context(), user.ID)
+	if err != nil {
+		failure(w, 500, "读取用户访问限制失败")
+		return
+	}
 	models, err := h.store.Models(r.Context())
 	if err != nil {
 		failure(w, 500, "读取模型失败")
 		return
 	}
+	filtered := models[:0]
+	for _, m := range models {
+		if access.Allows(m.ID) {
+			filtered = append(filtered, m)
+		}
+	}
+	models = filtered
 	if r.URL.Query().Get("client_version") != "" {
 		if err = h.codexManifest(w, r, models); err != nil {
 			failure(w, 502, err.Error())
@@ -94,6 +107,9 @@ func (h *Handler) Models(w http.ResponseWriter, r *http.Request) {
 			endpoints, endpointTypes := []string{}, []string{}
 			for _, protocol := range m.Protocols {
 				switch protocol {
+				case "antigravity":
+					endpoints = append(endpoints, "/v1internal:streamGenerateContent", "/v1internal:generateContent")
+					endpointTypes = append(endpointTypes, "antigravity")
 				case "chat":
 					endpoints = append(endpoints, "/v1/chat/completions")
 					endpointTypes = append(endpointTypes, "openai")
@@ -179,6 +195,9 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	requestedProtocol := "messages"
+	if strings.HasPrefix(r.URL.Path, "/v1internal:") {
+		requestedProtocol = "antigravity"
+	}
 	if strings.Contains(r.URL.Path, "responses") {
 		requestedProtocol = "responses"
 	} else if strings.HasSuffix(r.URL.Path, "/chat/completions") {
@@ -192,6 +211,15 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 	var modelName string
 	if json.Unmarshal(request["model"], &modelName) != nil || modelName == "" {
 		failure(w, 400, "缺少模型 ID")
+		return
+	}
+	access, accessErr := h.store.UserAccess(r.Context(), user.ID)
+	if accessErr != nil {
+		failure(w, 500, "读取用户访问限制失败")
+		return
+	}
+	if !access.Allows(modelName) {
+		failure(w, 403, store.ErrModelAccess.Error())
 		return
 	}
 	m, _, err := h.store.RoutableModel(r.Context(), modelName)
@@ -228,21 +256,43 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 	if isResponses {
 		field = "max_output_tokens"
 	}
-	if raw := request[field]; len(raw) > 0 {
+	outputRaw := request[field]
+	if requestedProtocol == "antigravity" {
+		var envelope struct {
+			GenerationConfig map[string]json.RawMessage `json:"generationConfig"`
+		}
+		_ = json.Unmarshal(request["request"], &envelope)
+		if raw := envelope.GenerationConfig["maxOutputTokens"]; len(raw) > 0 {
+			outputRaw = raw
+		}
+	}
+	if raw := outputRaw; len(raw) > 0 {
 		if json.Unmarshal(raw, &output) != nil {
 			failure(w, 400, "输出上限必须是整数")
 			return
 		}
 	}
-	if output <= 0 {
-		output = 8192
+	outputLimit := int64(65536)
+	if m.Price.MaxOutput > 0 {
+		outputLimit = m.Price.MaxOutput
 	}
-	if output > 65536 {
-		failure(w, 400, "输出上限不能超过 65536 Token")
+	if output <= 0 {
+		output = min(int64(8192), outputLimit)
+	}
+	if output > outputLimit {
+		failure(w, 400, "输出上限超过模型限制")
 		return
 	}
-	estimatePrice := *m.Price
-	estimatePrice.Input = max(estimatePrice.Input, estimatePrice.CacheWrite, estimatePrice.Cached)
+	tier, tierErr := requestedTier(request, r)
+	if tierErr != nil {
+		failure(w, 400, tierErr.Error())
+		return
+	}
+	estimatePrice, tierErr := m.Price.Maximum(tier)
+	if tierErr != nil {
+		failure(w, 400, tierErr.Error())
+		return
+	}
 	candidates := int64(1)
 	if requestedProtocol == "chat" {
 		if raw := request["n"]; len(raw) > 0 && string(raw) != "null" {
@@ -260,7 +310,10 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 	estimate = max(estimate, 1)
 	if err = h.store.Reserve(r.Context(), id, user.ID, key, m.ID, *m.Price, estimate, start); err != nil {
 		status := 503
-		if errors.Is(err, store.ErrQuota) {
+		if errors.Is(err, store.ErrModelAccess) {
+			status = 403
+		}
+		if errors.Is(err, store.ErrQuota) || errors.Is(err, store.ErrUserConcurrency) {
 			status = 429
 		}
 		failure(w, status, err.Error())
@@ -272,8 +325,17 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 	finish := func(out result) {
 		saveCtx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 5*time.Second)
 		defer cancel()
+		logEntry.BillingUsage = out.usage.BillingUsage
+		if logEntry.BillingUsage.Tier == "" {
+			logEntry.BillingUsage.Tier = tier
+		}
 		logEntry.Status = out.status
 		logEntry.DurationMS = time.Since(start).Milliseconds()
+		if !out.dispatched {
+			out.known = true
+			out.invalidUsage = false
+			out.usage = store.TokenUsage{}
+		}
 		if out.known && !out.invalidUsage {
 			logEntry.Input = &out.usage.Input
 			logEntry.Output = &out.usage.Output

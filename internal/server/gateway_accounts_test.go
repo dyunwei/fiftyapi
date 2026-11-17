@@ -60,7 +60,7 @@ func TestGatewayAdminBoundaryAndWriteOnlyAPIKey(t *testing.T) {
 		api.Handler().ServeHTTP(w, r)
 		return w
 	}
-	payload, _ := json.Marshal(map[string]any{"inference_policy": providers.InferencePolicy{MaxEffort: "medium", ForceStandard: true}, "name": "gateway", "api_key": "private-server-test-key", "gateway": providers.GatewayConfig{Platform: "new-api", BaseURL: "https://upstream.example", Protocols: []string{"messages"}, Discovery: "manual", AuthMode: "bearer", Models: []providers.GatewayModel{{ID: "relay-model", UpstreamID: "upstream-model", Protocol: "messages"}}}})
+	payload, _ := json.Marshal(map[string]any{"inference_policy": providers.InferencePolicy{MaxEffort: "medium"}, "name": "gateway", "api_key": "private-server-test-key", "gateway": providers.GatewayConfig{Platform: "new-api", BaseURL: "https://upstream.example", Protocols: []string{"messages"}, Discovery: "manual", AuthMode: "bearer", Models: []providers.GatewayModel{{ID: "relay-model", UpstreamID: "upstream-model", Protocol: "messages"}}}})
 	if w := request("POST", "/api/admin/gateway-accounts", string(payload), ""); w.Code != 401 {
 		t.Fatal("anonymous gateway creation allowed")
 	}
@@ -78,7 +78,7 @@ func TestGatewayAdminBoundaryAndWriteOnlyAPIKey(t *testing.T) {
 		t.Fatal("stored key exposed in configuration")
 	}
 	var saved accounts.RuntimeConfig
-	if err := json.Unmarshal(config.Body.Bytes(), &saved); err != nil || saved.InferencePolicy.MaxEffort != "medium" || !saved.InferencePolicy.ForceStandard {
+	if err := json.Unmarshal(config.Body.Bytes(), &saved); err != nil || saved.InferencePolicy.MaxEffort != "medium" {
 		t.Fatalf("creation lost inference policy: %s", config.Body.String())
 	}
 	list := request("GET", "/api/admin/accounts", "", strings.Repeat("a", 43))
