@@ -6,6 +6,12 @@ const emit=defineEmits(['sync','copy'])
 const search=ref(''),query=ref(''),page=ref(1),size=ref(10),total=ref(0),items=ref([]),syncedAt=ref(null),loading=ref(true),error=ref('')
 const pages=computed(()=>Math.max(1,Math.ceil(total.value/size.value)))
 const testModel=ref(null),testProtocol=ref(''),testRunning=ref(false),testResult=ref(null),testError=ref('')
+const testResponse=computed(()=>{
+ const response=testResult.value?.response
+ if(!response)return t('（无响应正文）')
+ try{return JSON.stringify(JSON.parse(response),null,2)}
+ catch{return response}
+})
 const testRequest=computed(()=>{
  const body={model:testModel.value?.upstream_id,stream:false}
  if(testProtocol.value==='responses'){body.input='hi';body.instructions='Reply briefly to the greeting.'}
@@ -48,7 +54,7 @@ onBeforeUnmount(()=>request++)
    <strong>{{ t('请求内容') }}</strong><pre class="model-test-output">{{ testRequest }}</pre>
    <p v-if="testRunning" role="status">{{ t('正在向上游发送请求，等待模型响应…') }}</p>
    <p v-if="testError" class="alert error" role="alert">{{ t(testError) }}</p>
-   <template v-if="testResult"><p role="status">{{ testResult.error?t('测试失败'):t('测试完成') }} · HTTP {{ testResult.status }} · {{ testResult.duration_ms }} ms</p><p v-if="testResult.error" class="alert error">{{ t(testResult.error) }}</p><strong>{{ t('响应结果') }}</strong><pre class="model-test-output">{{ testResult.response||t('（无响应正文）') }}</pre><p v-if="testResult.truncated">{{ t('响应过长，仅显示前 256 KiB。') }}</p></template>
+   <template v-if="testResult"><p role="status">{{ testResult.error?t('测试失败'):t('测试完成') }} · HTTP {{ testResult.status }} · {{ testResult.duration_ms }} ms</p><p v-if="testResult.error" class="alert error">{{ t(testResult.error) }}</p><strong>{{ t('响应结果') }}</strong><pre class="model-test-output">{{ testResponse }}</pre><p v-if="testResult.truncated">{{ t('响应过长，仅显示前 256 KiB。') }}</p></template>
    <button type="button" :disabled="testRunning" @click="runTest">{{ testRunning?t('测试中…'):t('重新测试') }}</button>
   </div>
   <div class="account-model-summary"><div><strong>{{ account.name }}</strong><p class="subtle">{{ t('上次成功同步：') }}{{ syncTime }}</p></div><button type="button" class="secondary" :disabled="busy||loading||!account.enabled" @click="emit('sync',account)">{{ t('验证并同步') }}</button></div>
@@ -83,5 +89,5 @@ onBeforeUnmount(()=>request++)
 }
 
 .model-test-panel{position:fixed;inset:10vh max(4vw,calc((100vw - 900px)/2));z-index:1000;background:var(--surface,#fff);color:var(--text,#222);border:1px solid #999;border-radius:12px;padding:24px;overflow:auto;box-shadow:0 0 0 100vmax #0008}
-.model-test-output{white-space:pre-wrap;overflow-wrap:anywhere;background:#8881;padding:12px;max-height:35vh;overflow:auto}
+.model-test-output{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace;font-size:13px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere;background:#8881;padding:12px;max-height:35vh;overflow:auto}
 </style>
