@@ -34,7 +34,7 @@ English | 中文说明见各版本下方折叠区域
 - Existing Antigravity sources become native-only. Messages clients must switch to a compatible source or use a native Antigravity client.
 - Static bundled prices have been removed. Confirm model pricing after upgrade; select a catalog key for unmatched aliases or retain manual prices. Unpriced models remain unavailable.
 - `FIFTYAPI_AUTO_MAINTENANCE=false` disables background public price/release checks while retaining cached data and manual sync. Necessary account refresh and catalog maintenance remain active.
-- This release was checked with simulated upstreams. Historical Antigravity converter acceptance does not establish compatibility for the new native path. Client-helper platform and extension limitations are documented in [client setup](docs/en/client-setup.md); provider verification scope is in [compatibility](docs/en/compatibility.md).
+- This release was checked with simulated upstreams. Historical Antigravity converter acceptance does not establish compatibility for the new native path. Client-helper platform and extension limitations are documented in [client setup](docs/en/clients.md#automatic-client-setup); provider verification scope is in [compatibility](docs/en/compatibility.md).
 
 <details>
 <summary>中文说明</summary>
@@ -62,7 +62,7 @@ English | 中文说明见各版本下方折叠区域
 - 既有 Antigravity 来源改为仅原生协议；Messages 客户端须改用兼容来源，或使用支持原生 Antigravity 的客户端。
 - 移除静态内置价格，升级后确认模型价格；别名未匹配时手动选择目录键，或保留手动价格。未定价模型仍不可调用。
 - `FIFTYAPI_AUTO_MAINTENANCE=false` 可关闭后台公开价格与版本检查，保留本地缓存与手动同步；必要账号刷新与目录维护仍运行。
-- 本版使用模拟上游验证，历史 Antigravity 转换器验收不适用于新的原生路径。客户端助手的平台与扩展限制见 [客户端配置助手](docs/client-setup.md)，供应商验证范围见 [兼容性](docs/compatibility.md)。
+- 本版使用模拟上游验证，历史 Antigravity 转换器验收不适用于新的原生路径。客户端助手的平台与扩展限制见 [客户端配置助手](docs/clients.md#一键配置客户端)，供应商验证范围见 [兼容性](docs/compatibility.md)。
 
 </details>
 

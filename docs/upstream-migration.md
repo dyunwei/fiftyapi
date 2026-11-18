@@ -99,4 +99,4 @@ Gemini 模型相关行为纳入 Antigravity 适配审查；这不自动把独立
 
 ## 明确调整
 
-按用户确认取消标准协议之间的自动转换，原生 Chat API 上游与 Messages/Responses 分别匹配；OAuth 按固定适配器选择，Antigravity 保留专用 Messages 适配。模型新增多协议能力而非只按名称推断；配置和旧 ID/价格保留方式见 [模型协议](model-protocols.md)。
+按用户确认取消标准协议之间的自动转换，原生 Chat API 上游与 Messages/Responses 分别匹配；OAuth 按固定适配器选择，Antigravity 保留专用 Messages 适配。模型新增多协议能力而非只按名称推断；配置和旧 ID/价格保留方式见 [模型协议](gateway-upstreams.md#协议与边界)。

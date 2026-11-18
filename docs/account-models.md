@@ -50,4 +50,4 @@ GET /api/admin/accounts/{id}/models?page=1&page_size=20&search=gpt
 
 ![账号模型目录（手机）](screenshots/account-models-mobile.png)
 
-`protocols` 与 `protocol_status`，显示同模型完整协议能力和各协议冷却状态；旧 protocol 字段作为首选/兼容字段保留，不能再用它代表全部能力。协议由上游配置确定，价格独立设置；详见 [多协议说明](model-protocols.md)。
+`protocols` 与 `protocol_status`，显示同模型完整协议能力和各协议冷却状态；旧 protocol 字段作为首选/兼容字段保留，不能再用它代表全部能力。协议由上游配置确定，价格独立设置；详见 [多协议说明](gateway-upstreams.md#协议与边界)。

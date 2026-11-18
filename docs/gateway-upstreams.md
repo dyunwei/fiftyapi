@@ -29,6 +29,14 @@ Key 加密保存在账号凭据中，读取账号配置不会返回原值。编�
 
 目录只提供模型 ID，不证明协议权限。管理员声明上游实际支持的默认协议，并可在每行模型映射中覆盖。一个模型可以同时选择 Chat Completions、Messages、Responses，共用本地 ID 和价格。协议覆盖替换默认能力。
 
+例如，下列模型可通过 `/v1/chat/completions` 和 `/v1/responses` 调用。
+
+```json
+{"id":"my-model","upstream_id":"upstream-model","protocols":["chat","responses"]}
+```
+
+编辑账号协议后重新同步模型。多协议模型共享内部单价，需要分协议计价时可配置不同的对外模型 ID。
+
 对外模型 ID 是逻辑路由池。OAuth 账号和 API Key 网关只要使用相同的对外 ID，就共同提供该模型；每个账号分别保存自己的上游模型 ID 和协议能力。未填写对外 ID 时默认使用上游模型 ID，因此同名的 `gpt-6.1-sol` 会自动加入同一池；上游名称不同时可显式映射到已有池。价格、启停和客户端模型名属于逻辑池，实际转发模型名属于账号路由。
 
 手工模式不请求上游目录，只验证配置并保存模型，**不能据此证明上游连通性或 Key 权限**。推理不会在保存配置时自动执行。
@@ -36,6 +44,15 @@ Key 加密保存在账号凭据中，读取账号配置不会返回原值。编�
 网关模型不会套用厂商内置价格。管理员需填写本地内部价格；结算依据上游实际 usage 与本地价格快照，不读取上游管理账单或余额。多层网关会分别计算各自实例中对应用户的额度；上游可能另有实际收费。
 
 ## 协议与边界
+
+客户端使用哪个标准协议，网关只选择支持该协议的模型来源。协议不匹配返回 400，不调用上游、不预占预算。已删除 Chat→Messages 转换器，不会把 Chat 改成 Messages/Responses，也不会将其他协议的响应伪装为 Chat。
+
+| 来源 | 提供的标准协议 |
+| --- | --- |
+| Claude OAuth | Messages |
+| OpenAI Codex OAuth | Responses（HTTP/SSE 与已支持的原生 WebSocket） |
+| Antigravity OAuth | 原生 Antigravity v1internal；不提供 Messages 或 Chat 转换 |
+| API Key 上游（New API/Sub2Api 等） | 管理员声明的 Chat Completions、Messages、Responses，可以同时支持多种 |
 
 | 能力 | 支持范围 |
 | --- | --- |
@@ -45,11 +62,31 @@ Key 加密保存在账号凭据中，读取账号配置不会返回原值。编�
 | compact | `/v1/responses/compact`，需显式开启且上游支持 |
 | 模型目录 | `/v1/models`，只对外列出已定价、已启用且有就绪账号的模型 |
 | Codex manifest | 上游实际提供时保留元数据并映射 slug；通用目录不能伪造 context window 等信息 |
-| 用量异常 | 流中断有可靠 usage 按原价快照自动结算；缺失/无效 usage 按 0 释放预占并说明原因；仅结算异常待核算 |
+| 用量异常 | 流中断有可靠 usage 按原价快照自动结算；缺失或无效 usage 释放预占并保留待核算 |
 
 转发只替换映射的请求模型；Messages 缺少输出上限时补默认值。保留客户端的 system、工具/历史、采样参数和 store/stream 选择；不执行 Claude/Codex OAuth 身份注入、Token 刷新或厂商专用参数删除。
 
 使用标准服务等级，不支持 priority/flex 计价、图片/音频生成或任意跨协议转换。HTTP Responses 要求完整历史；原生 Responses WebSocket 支持同连接上下文，需上游确实支持并由管理员显式开启。上游应按请求返回 JSON 或 SSE；Messages 非流式收到强制 SSE 时不聚合为 JSON。第三方站点及客户端配置需使用实际账号验证。
+
+## 原生 Chat 的保留与核算
+
+Chat 直通 /v1/chat/completions。仅替换模型为配置的上游 ID；system/developer、tools、tool_choice、response_format、reasoning 等字段由上游验证，不再经过 Messages 转换器筛选或改写。user/metadata 也会原样发送给所选上游，应按客户端需求设置。认证使用保存的上游 Key，不转发用户本地 Key。
+
+流式请求设置 stream_options.include_usage=true，以便接收可靠用量，保留其他 stream_options 字段。响应的 Chat JSON/SSE、工具参数、推理及扩展字段保留；账本仅提取 prompt_tokens/completion_tokens/cached_tokens，缓存输入不重复计费。多个候选 n=1–128，预占考虑候选数量；服务档位依据本地价格目录计价，未定价档位拒绝；不设置单独的加速权限。
+
+要求上游按 stream 选择 JSON 或 SSE。不聚合 SSE 为 Chat JSON，也不把 JSON 改写成 Chat SSE。流式必须收到 [DONE]，截断不补成功标记；已观测可靠 usage 仍结算，缺失或无效 usage 会释放预占并保留待核算，详见 [自动结算](request-logs.md#自动结算)。一次逻辑请求沿用统一调度、队列、失败切换、日志和结算，不另开账本。
+
+/v1/models 返回 protocols、supported_endpoints 和 supported_endpoint_types。部分客户端不会读取扩展字段，仍需选择正确的供应商/接口模式；不能根据模型名称推断。Chat 模型只声明 openai，Messages 只声明 anthropic，Responses 只声明 openai-response；多协议模型同时声明实际配置的能力。
+
+## 路由池和升级
+
+schema 16 将实际上游模型 ID 和协议能力放到账号—模型路由关系中。`models` 表示对外逻辑模型及统一价格；`account_models` 表示该账号如何调用它。相同对外 ID 会合并为同一个路由池，不再按 API 网关账号创建隔离命名空间。
+
+移除协议后，对应接口立即不再可路由。针对某协议的模型冷却不阻断其他协议；账号级冷却仍影响全部协议，旧模型级冷却保守兼容。编辑协议后重新同步，客户端重新获取目录。
+
+通过 Chat 调用 Claude 或只支持 Messages 的 API 模型会被拒绝，需要选择 Anthropic Messages 模式。Antigravity 必须使用原生 v1internal 客户端。Codex OAuth 继续使用 Responses。没有自动选择其他模型或协议作为降级。
+
+升级前备份数据库和原主密钥，新程序启动自动执行迁移 016；回退需恢复升级前备份。说明见 [部署文档](deployment.md)。
 
 ## 循环和失败处理
 
@@ -60,6 +97,8 @@ Key 加密保存在账号凭据中，读取账号配置不会返回原值。编�
 只在明确拒绝且尚未输出实际内容等安全条件下切换账号；不重放执行结果不明的推理，也不静默切换模型。429 使用现有账号冷却；失败后可通过本地请求 ID 查日志。上游 Key、请求正文与原始错误体不会写入请求日志。
 
 ## 验证记录
+
+2026-11-03：全量 Go race 和 vet、4 项表单检查、最终二进制 14 项浏览器测试通过。覆盖同一 New API 模型 ID 的 Chat/Responses 正确接口与共享价格、协议移除、旧 ID/价格保留、互不重叠别名反复同步、Chat JSON/SSE/缓存用量/截断、模型协议冷却隔离。真实运行库的只读快照 schema 8→9 迁移通过，账号密文、模型、用户与 Key 保留；没有启动账号维护或请求真实上游。第三方真实站点仍需按实际账号验证。
 
 - 三个平台预设 × 两种协议的本机 TLS 模拟测试：JSON/SSE、工具、参数保留、认证、usage 与日志。
 - Key 加密/隐藏/轮换、手工模式、分页、共享模型池和定价保留。
@@ -88,7 +127,7 @@ API Key 上游与 OAuth 账号共用优先级、权重、并发、队列、健�
 
 - `max_effort`：空值不限制，可选 `low`、`medium`、`high`。保留较低请求值，较高值降到上限；缺省值使用上限，避免模型默认高档位。Codex Responses 使用 `reasoning.effort`，Chat Completions 使用 `reasoning_effort`。Claude 使用 `output_config.effort`，同时限制消息级 effort；显式 `enabled` / `disabled` 且未使用 effort 的旧模型不注入该字段，避免兼容性错误。旧模型请用思考 token 预算。启用策略后，无法识别的 effort 返回 400，不静默放行。
 - `max_thinking_tokens`：0 不限制，其余为 1024–1048576。Claude 原生 Messages 只限制 `thinking.type=enabled` 的 `budget_tokens`，保留更低预算和关闭状态；自适应思考需要设置 `max_effort`，不会被转换成旧式显式思考。Codex 不支持独立的思考 token 硬上限，这个字段不作用于 Codex。
-- Antigravity 当前提供 Messages 转 Gemini 的兼容链路，按转换后的实际思考预算控制，包括动态预算和 Opus 自适应默认预算。`low` / `medium` / `high` 对应网关预算上限 2048 / 8192 / 24576，与 `max_thinking_tokens` 取较小值；这是本网关的预算映射，不是厂商定义的等价档位。不会切换模型。未知签名导致转换器关闭思考时仍保持该行为。
+- Antigravity 使用原生 v1internal 协议，原生透传规则见 [低维护账号共享](low-maintenance.md)。
 
 API Key 上游网关账号按请求协议使用相同规则。规则优先于客户端参数和快速档位请求头；不支持这些字段的第三方上游可能拒绝请求。Claude 旧模型如不支持 effort，应清空强度上限并使用显式思考预算。强度上限用于控制推理倾向，不保证固定 token 消耗；实际用量仍按上游返回结算。原生 Codex 未启用标准速度策略时，非标准档位仍返回 400，保持当前标准档位定价约束。
 

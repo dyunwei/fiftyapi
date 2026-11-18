@@ -1,47 +1,28 @@
-# FiftyAPI 文档索引
+# FiftyAPI 文档
 
 简体中文 | [English](en/README.md)
 
-当前公开版本：**0.2.0**。界面右上角可切换简体中文与 English；选择保存在当前浏览器。
+- [部署与运维](deployment.md) · Docker、二进制、HTTPS、升级和恢复
+- [接入客户端](clients.md) · Claude Code、Codex、Cherry Studio 和协议选择
+- [迁移旧站](sub2api-migration.md) · 在首次初始化时从 sub2api 导入
+- [管理账号与额度](#管理账号与额度) · 上游、定价、成员和请求日志
+- [查看兼容性](compatibility.md) · 已验证的客户端、协议和限制
 
-## 部署与使用
+## 管理账号与额度
 
-| 文档 | 内容 |
+| 要做的事 | 指南 |
 | --- | --- |
-| [low-maintenance.md](low-maintenance.md) | 原生透传、自动价格、用户预算与客户端默认版本 |
-| [deployment.md](deployment.md) | 部署说明：二进制、Docker、HTTPS、环境变量、备份恢复、升级 |
-| [release-quickstart.md](release-quickstart.md) | 二进制发布包快速启动（打包时复制为 `QUICKSTART.md`） |
-| [clients.md](clients.md) | Claude Code、Codex 等客户端接入 |
+| 接入上游、同步模型 | [OAuth 账号与模型目录](account-models.md) · [API 网关](gateway-upstreams.md) |
+| 配置定价、访问权限和客户端默认值 | [账号共享设置](low-maintenance.md) |
+| 邀请成员、排查扣费 | [邮件邀请](email-invitations.md) · [请求日志](request-logs.md) |
 
-## 管理员功能
+<details>
+<summary>其他操作与开发资料</summary>
 
-| 文档 | 内容 |
-| --- | --- |
-| [sub2api-migration.md](sub2api-migration.md) | 从 sub2api 迁移用户、原 Key 和上游账号 |
-| [gateway-upstreams.md](gateway-upstreams.md) | 接入 Sub2Api / FiftyAPI / New API 上游网关、模型映射与定价 |
-| [model-protocols.md](model-protocols.md) | 同一模型的多协议（Chat / Messages / Responses）配置 |
-| [account-models.md](account-models.md) | 上游账号模型目录与同步 |
-| [email-invitations.md](email-invitations.md) | 邮件配置与成员邀请 |
-| [request-logs.md](request-logs.md) | 请求日志与结算异常 |
-| [automatic-settlement.md](automatic-settlement.md) | 额度自动结算规则 |
+- **其他操作** · [发布包快速启动](release-quickstart.md)
+- **开发与发布** · [参与贡献](../CONTRIBUTING.md) · [维护与发布](maintaining.md) · [更新日志](../CHANGELOG.md) · [安全问题报告](../SECURITY.md)
+- **设计** · [架构](design.md) · [调度与重试](reliability-redesign.md) · [sub2api 功能取舍](upstream-migration.md)
+- **验证记录** · [开发探针](probe.md) · [OpenAI 验收](openai-acceptance.md) · [SQLite 压测](sqlite-load-test.md)
+- **第三方来源** · [第三方声明](../THIRD_PARTY_NOTICES.md) · [sub2api 源码指纹](sub2api-source.json)
 
-## 设计与兼容性
-
-| 文档 | 内容 |
-| --- | --- |
-| [design.md](design.md) | 整体架构与实现方案 |
-| [reliability-redesign.md](reliability-redesign.md) | 账号调度、重试、健康与冷却设计 |
-| [compatibility.md](compatibility.md) | 协议兼容范围、验证记录与已知限制 |
-| [openai-acceptance.md](openai-acceptance.md) | OpenAI 真实账号验收与复现方法 |
-
-## 开发与开源
-
-| 文档 | 内容 |
-| --- | --- |
-| [probe.md](probe.md) | 开发探针 |
-| [upstream-migration.md](upstream-migration.md) | 从 sub2api 迁移的功能取舍 |
-| [sub2api-source.json](sub2api-source.json) | 改编自 sub2api 的源文件及 SHA-256（许可证要求，勿删） |
-| [maintaining.md](maintaining.md) | 发布与维护流程 |
-| [../CONTRIBUTING.md](../CONTRIBUTING.md) | 贡献指南 |
-| [../SECURITY.md](../SECURITY.md) | 安全问题报告 |
-
+</details>

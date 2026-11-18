@@ -13,6 +13,8 @@ go build -buildvcs=false -o bin/fiftyapi ./cmd/fiftyapi
 ./scripts/start-local.sh
 ```
 
+The local startup script reads the repository root’s `.env` as shell assignments and exports the values, overriding matching environment variables. Set `FIFTYAPI_LISTEN=127.0.0.1:28080` there to change the listen address.
+
 Use `./scripts/build-release.sh` to create a release package (requires Node 24+). It builds with `CGO_ENABLED=0` and defaults to `GOAMD64=v1` so distribution toolchains defaulting to v2 do not raise the x86-64 CPU requirements. Override `GOAMD64` explicitly when needed; ordinary `go build` keeps the system defaults. Rebuild binaries after upgrading Go to use the new runtime and standard library.
 
 On Rocky Linux with SELinux enabled, the default Docker named volume works as-is. If choosing a host directory, change the Compose data mount to `"${FIFTYAPI_DATA_PATH:-./data}:/data:Z"` and use a dedicated data directory. The entrypoint prepares data directory ownership automatically before running the service as UID/GID 10001 (an explicit non-root `--user` must already have write access). Configure firewalld for the actual public entry point; set `FIFTYAPI_LISTEN=127.0.0.1:8080` when only a local reverse proxy should access the service.

@@ -5,7 +5,7 @@
 ## 开发环境
 
 - Go 1.25+，推荐使用与 CI 一致的 Go 1.26.10；修改前端需要 Node 24+。
-- 构建与测试命令见 [README](README.zh-CN.md#开发与构建)。
+- 构建与测试命令见 [部署指南](docs/deployment.md#二进制启动)。
 
 ## 提交 PR 前
 
@@ -35,4 +35,4 @@ Before submitting:
 4. Update the relevant documentation. Keep Chinese and English text in sync; use complete messages with placeholders in `t()`, with English catalogs in `web/src/locales/en.json` and shared diagnostics in `internal/i18n/en.json`.
 5. Tests must use simulated upstreams; real-provider acceptance tests remain opt-in.
 
-Contributions are accepted under [LGPL-3.0](LICENSE). Build commands are in the [English README](README.md#development).
+Contributions are accepted under [LGPL-3.0](LICENSE). Build commands are in the [deployment guide](docs/en/deployment.md#binary).

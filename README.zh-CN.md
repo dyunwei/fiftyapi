@@ -7,9 +7,6 @@
 
 [![CI](https://github.com/dyunwei/fiftyapi/actions/workflows/ci.yml/badge.svg)](https://github.com/dyunwei/fiftyapi/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/dyunwei/fiftyapi?include_prereleases&sort=semver)](https://github.com/dyunwei/fiftyapi/releases)
-[![Docker Pulls](https://img.shields.io/docker/pulls/dyunwei/fiftyapi)](https://hub.docker.com/r/dyunwei/fiftyapi)
-[![Go](https://img.shields.io/github/go-mod/go-version/dyunwei/fiftyapi)](go.mod)
-[![License](https://img.shields.io/badge/license-LGPL--3.0-blue)](LICENSE)
 
 [English](README.md) | 简体中文
 
@@ -17,45 +14,7 @@
 
 </div>
 
-宽屏桌面仪表盘将统计卡片排列为一行，下方并排显示快捷操作、5 小时额度和每周额度。管理员显示 8 张统计卡片，成员显示 7 张；单条请求记录请从左侧 **请求日志** 进入。
-
-<details>
-<summary>更多截图：上游账号与邮件配置</summary>
-
-**上游账号**：顶部采用紧凑搜索栏，授权详情在弹窗中查看，节省卡片空间。
-
-![上游账号](docs/screenshots/upstream-accounts.png)
-
-**邮件配置**：相关字段并排，测试邮件放在右侧，桌面可一屏显示；手机自动改为单列。
-
-![邮件配置](docs/screenshots/email-settings.png)
-
-</details>
-
-截图使用当前界面和模拟数据。
-
-自动价格、原生 Antigravity、用户访问限制和集中版本设置见 [低维护账号共享](docs/low-maintenance.md)。
-
-## 为什么选择 FiftyAPI
-
-- **部署简单**：一个 Go 程序，内嵌 Vue 3 页面和 SQLite，无需 Redis 或其他服务。
-- **为几十人的团队设计**：Fifty 表示定位，不是 50 人的硬性限制。
-- **成员不接触上游凭据**：成员使用自己的 `sk-…` API Key，上游授权加密保存在服务端。
-
-## 功能
-
-| 功能 | 说明 |
-| --- | --- |
-| 🔑&nbsp;**上游账号** | Claude Code、OpenAI Codex、Antigravity OAuth 授权、令牌刷新、模型目录同步 |
-| 📦&nbsp;**sub2api 迁移** | 导入用户、原 API Key 和受支持的上游账号，支持预览与重复导入 |
-| 🔌&nbsp;**API&nbsp;网关** | 接入 Sub2Api、New API、其他 FiftyAPI 及兼容上游，支持模型别名 |
-| 🧭&nbsp;**原生协议** | Chat Completions、Messages、Responses（HTTP / SSE / WebSocket） |
-| 💰&nbsp;**美元额度** | 每人 5 小时与 7 天窗口，所有 Key 和供应商共享 |
-| ⚖️&nbsp;**调度** | 优先级、权重、并发上限、健康检查、冷却与安全重试 |
-| 📊&nbsp;**日志与结算** | 个人请求日志、模型定价、自动结算与操作审计 |
-| 👥&nbsp;**成员** | 首次访问设置管理员、自助注册、邮件邀请、账号贡献链接 |
-| 🌐&nbsp;**界面** | 简体中文 / English，适配手机 |
-| 💾&nbsp;**备份** | 本地备份及 S3 / Cloudflare R2 |
+一个 Go 程序内嵌管理界面和 SQLite，无需 Redis。成员使用自己的 API Key，共享上游账号，并按 5 小时和 7 天窗口管理个人预算。也可以接入兼容的 API 网关。
 
 ## 快速开始
 
@@ -83,58 +42,15 @@ docker run -d \
 
 Compose、HTTPS、升级与恢复见 [部署说明](docs/deployment.md)。
 
-## 从 sub2api 迁移
+## 下一步
 
-首次创建管理员时选择「**从 sub2api Docker 迁移**」，网页会逐步引导你导出、上传、检查并导入**用户、原 API Key 和受支持的上游账号**，无需先阅读文档。旧站宿主机只需运行一条命令，无需手输数据库密码或安装 Python/psql：
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/dyunwei/fiftyapi/main/scripts/migrate-sub2api.sh | sudo bash
-```
-
-网页也提供脚本直接下载。成员保留邮箱、密码和 Key；完成模型同步、定价和服务地址切换后即可使用。迁移仅在首次初始化向导中提供，完成或跳过后关闭导入功能。
-
-新迁入用户、邀请成员和首次创建的管理员，5 小时与 7 天预算默认均为 **$100**；自助注册用户为 **$0**。不迁移旧站余额、套餐和历史记录；网页默认将旧 Key 转为 FiftyAPI 权限和预算规则，可取消勾选以保持受限 Key 停用；旧站停用或已过期的 Key 始终保持停用。现有用户预算不变。详见 [迁移指南](docs/sub2api-migration.md)。
-
-## 客户端接入
-
-**Claude Code**
-
-```sh
-export ANTHROPIC_BASE_URL=http://localhost:28080
-export ANTHROPIC_AUTH_TOKEN=你的_FIFTYAPI_KEY
-claude
-```
-
-**Codex** 及其他客户端见 [客户端接入](docs/clients.md)。
-
-## 从源码构建
-
-需要 Go（版本见 [go.mod](go.mod)）。仓库已包含前端产物，只有修改前端时才需要 Node 24+。
-
-```sh
-go build -buildvcs=false -o bin/fiftyapi ./cmd/fiftyapi
-./scripts/start-local.sh      # 初始化口令：.local/setup-token
-```
-
-```sh
-make test       # Go race、vet、前端单元测试、源码检查
-make build      # 前端构建 + Go 程序
-make test-ui    # Playwright 浏览器测试
-```
-
-测试使用临时数据库和模拟上游，不会调用真实供应商。
+- [接入客户端](docs/clients.md)，为 Claude Code、Codex 或 Cherry Studio 选择对应协议。
+- [从 sub2api 迁移](docs/sub2api-migration.md)，在首次初始化时导入用户、原 API Key 和受支持的上游账号。
+- [浏览文档](docs/README.md)，查找管理员操作、兼容性和开发说明。
 
 ## 项目状态
 
 目前为**公开预览版**。Antigravity 和 OpenAI 已用真实账号验证；Claude OAuth 目前只有模拟验证。不支持图片/音频生成、支付和多实例部署。详见 [兼容性](docs/compatibility.md)。
-
-## 文档
-
-[文档索引](docs/README.md) · [部署](docs/deployment.md) · [客户端](docs/clients.md) · [网关接入](docs/gateway-upstreams.md) · [兼容性](docs/compatibility.md) · [更新日志](CHANGELOG.md)
-
-## 参与贡献
-
-欢迎提交 Issue 和 PR，见 [CONTRIBUTING.md](CONTRIBUTING.md)。安全漏洞请按 [SECURITY.md](SECURITY.md) 私下报告。
 
 ## 许可证与致谢
 

@@ -66,7 +66,7 @@ Chat Completions 只直通声明支持 Chat 的 API 上游。Claude 和 Antigrav
 
 ## 自动结算
 
-普通断流、取消和用量缺失不再要求人工核算；按已收到的可靠用量结算，未知或无效用量按 0 释放预占。启动时处理旧待核算及在途记录，使用原价格快照并保持幂等。先持久化用量证据，再事务提交账本和日志金额；写入失败保留待核算，不清理其财务证据。说明与验证见 [自动结算](automatic-settlement.md)。
+普通断流、取消和用量缺失不再要求人工核算；按已收到的可靠用量结算，未知或无效用量按 0 释放预占。启动时处理旧待核算及在途记录，使用原价格快照并保持幂等。先持久化用量证据，再事务提交账本和日志金额；写入失败保留待核算，不清理其财务证据。说明与验证见 [自动结算](request-logs.md#自动结算)。
 
 ## OpenAI 真实验收
 
@@ -84,7 +84,7 @@ Chat Completions 只直通声明支持 Chat 的 API 上游。Claude 和 Antigrav
 
 ## 原生 Chat 与多协议模型
 
-不再自动转换标准协议。API 上游支持多协议声明、逐模型覆盖、共享 ID/价格与协议隔离；Claude/Antigravity 使用 Messages，Codex OAuth 使用 Responses。新增原生 Chat JSON/SSE/usage、工具字段保留、截断核算、协议拒绝、旧模型价格保留及多协议端到端回归。当前没有新增真实第三方 API 账号验收，模拟通过不保证任意 New API 站点的能力。见 [配置和升级](model-protocols.md)。
+不再自动转换标准协议。API 上游支持多协议声明、逐模型覆盖、共享 ID/价格与协议隔离；Claude/Antigravity 使用 Messages，Codex OAuth 使用 Responses。新增原生 Chat JSON/SSE/usage、工具字段保留、截断核算、协议拒绝、旧模型价格保留及多协议端到端回归。当前没有新增真实第三方 API 账号验收，模拟通过不保证任意 New API 站点的能力。见 [配置和升级](gateway-upstreams.md#协议与边界)。
 
 ## 中英文支持
 

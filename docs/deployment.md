@@ -11,6 +11,8 @@ go build -buildvcs=false -o bin/fiftyapi ./cmd/fiftyapi
 ./scripts/start-local.sh
 ```
 
+本机启动脚本会把仓库根目录的 `.env` 作为 shell 赋值读取并导出，覆盖同名环境变量。可在其中设置 `FIFTYAPI_LISTEN=127.0.0.1:28080` 来调整监听地址。
+
 制作发布包使用 `./scripts/build-release.sh`（需要 Node 24+），生成 `CGO_ENABLED=0` 二进制。发布脚本默认 `GOAMD64=v1`，避免发行版工具链的 v2 默认值提高 x86-64 CPU 要求；可以通过环境变量显式覆盖。普通 `go build` 仍使用系统工具链默认值。升级 Go 后需要重新构建二进制才能使用新的运行时和标准库。
 
 Rocky Linux 启用 SELinux 时，默认 Docker 命名卷可直接使用；若选择宿主机目录，将 Compose 的数据挂载改为 `"${FIFTYAPI_DATA_PATH:-./data}:/data:Z"`，仅使用专属数据目录。入口脚本会自动准备目录权限，再以 UID/GID 10001 运行服务。对外提供服务时按实际入口配置 firewalld；仅通过本机反向代理访问时，将 `FIFTYAPI_LISTEN` 设为 `127.0.0.1:8080`。
@@ -125,7 +127,7 @@ client_max_body_size 4m;
 
 所有 Key 和供应商共享用户的 5 小时/7 天预算，首次正金额结算开始窗口，到期恢复，剩余额度不累计。任意窗口不足即阻止新调用。在途请求可能超出预估与额度；修改上限不会清空已用金额，明确“重置额度”会留下操作记录。
 
-请求先预占，再按可靠 usage 与原价格快照结算。断流/取消但已有可靠用量时自动结算；缺失或无效用量释放预占并保留待核算，处理前暂停该用户调用。账本写入失败时尽力释放预占，数据库不可写时由启动恢复继续处理。原始 token、请求档位、确认的执行档位分开记录，不保存完整提示词/回复。详见 [自动结算](automatic-settlement.md) 与 [低维护账号共享](low-maintenance.md)。日志默认保留 30 天，可设 1–3650 天，清理不重置额度账本。
+请求先预占，再按可靠 usage 与原价格快照结算。断流/取消但已有可靠用量时自动结算；缺失或无效用量释放预占并保留待核算，处理前暂停该用户调用。账本写入失败时尽力释放预占，数据库不可写时由启动恢复继续处理。原始 token、请求档位、确认的执行档位分开记录，不保存完整提示词/回复。详见 [自动结算](request-logs.md#自动结算) 与 [低维护账号共享](low-maintenance.md)。日志默认保留 30 天，可设 1–3650 天，清理不重置额度账本。
 
 ## 备份和恢复
 
@@ -225,7 +227,7 @@ Compose 已设置 60 秒停机宽限；直接 docker run 或进程管理器也�
 
 ## 协议升级
 
-迁移 009 将数据库升级到 schema 9，保留旧模型 ID、价格和记录。新增多协议能力，移除 Chat→Messages 自动转换；原来用 Chat 调 Claude/Antigravity/仅 Messages 网关的客户端需要改为 Messages 模式。上游 API 支持多选默认协议及逐模型覆盖。升级前备份，回退恢复旧备份；完整操作见 [模型协议](model-protocols.md)。
+迁移 009 将数据库升级到 schema 9，保留旧模型 ID、价格和记录。新增多协议能力，移除 Chat→Messages 自动转换；原来用 Chat 调 Claude/Antigravity/仅 Messages 网关的客户端需要改为 Messages 模式。上游 API 支持多选默认协议及逐模型覆盖。升级前备份，回退恢复旧备份；完整操作见 [模型协议](gateway-upstreams.md#协议与边界)。
 
 ## 并发设置入口
 

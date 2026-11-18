@@ -7,9 +7,6 @@ Share Claude Code, OpenAI Codex and Antigravity accounts with per-user dollar bu
 
 [![CI](https://github.com/dyunwei/fiftyapi/actions/workflows/ci.yml/badge.svg)](https://github.com/dyunwei/fiftyapi/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/dyunwei/fiftyapi?include_prereleases&sort=semver)](https://github.com/dyunwei/fiftyapi/releases)
-[![Docker Pulls](https://img.shields.io/docker/pulls/dyunwei/fiftyapi)](https://hub.docker.com/r/dyunwei/fiftyapi)
-[![Go](https://img.shields.io/github/go-mod/go-version/dyunwei/fiftyapi)](go.mod)
-[![License](https://img.shields.io/badge/license-LGPL--3.0-blue)](LICENSE)
 
 English | [简体中文](README.zh-CN.md)
 
@@ -17,45 +14,7 @@ English | [简体中文](README.zh-CN.md)
 
 </div>
 
-On wide desktop screens, the overview places summary cards in one row, with quick actions and the two budget windows below. Administrators see eight summary cards; members see seven. Open **Request logs** for individual requests.
-
-<details>
-<summary>More screenshots: upstream accounts and email settings</summary>
-
-**Upstream accounts** — a compact search bar and authorization details in a dialog keep cards concise.
-
-![Upstream accounts](docs/screenshots/upstream-accounts-en.png)
-
-**Email settings** — related fields share rows, with test email controls alongside. The desktop form fits on one screen; mobile uses a single column.
-
-![Email settings](docs/screenshots/email-settings-en.png)
-
-</details>
-
-Screenshots show the current interface with simulated data.
-
-For automatic prices, native Antigravity, user access limits, and centralized client defaults, see [low-maintenance sharing](docs/en/low-maintenance.md).
-
-## Why FiftyAPI
-
-- **Simple to run** – one Go binary with an embedded Vue 3 UI and SQLite. No Redis, no extra services.
-- **Built for teams of dozens** – "Fifty" describes the target size, not a hard user limit.
-- **Your keys, not upstream tokens** – members use their own `sk-…` API keys; upstream credentials stay encrypted on the server.
-
-## Features
-
-| Feature | Description |
-| --- | --- |
-| 🔑&nbsp;**Upstream&nbsp;accounts** | Claude Code, OpenAI Codex and Antigravity OAuth with token refresh and model sync |
-| 📦&nbsp;**sub2api&nbsp;migration** | Import users, original API keys and supported upstream accounts, with preview and safe retries |
-| 🔌&nbsp;**API&nbsp;gateways** | Connect Sub2Api, New API, another FiftyAPI or compatible upstreams, with model aliases |
-| 🧭&nbsp;**Native&nbsp;protocols** | Chat Completions, Messages, Responses (HTTP / SSE / WebSocket) |
-| 💰&nbsp;**Dollar&nbsp;budgets** | Per-user 5-hour and 7-day windows shared across all keys and providers |
-| ⚖️&nbsp;**Scheduling** | Priority, weights, concurrency limits, health checks, cooldown and safe retries |
-| 📊&nbsp;**Logs&nbsp;&&nbsp;settlement** | Personal request logs, model pricing, automatic settlement and audit trail |
-| 👥&nbsp;**Members** | Admin setup on first visit, self-registration, email invitations, account contribution links |
-| 🌐&nbsp;**UI** | English / 简体中文, mobile friendly |
-| 💾&nbsp;**Backups** | Local backups plus S3 / Cloudflare R2 |
+One Go binary bundles the console and SQLite. Members use individual API keys to share upstream accounts under per-user 5-hour and 7-day budgets. You can also connect compatible API gateways.
 
 ## Quick Start
 
@@ -83,62 +42,15 @@ docker run -d \
 
 Compose, HTTPS, upgrades and restore: see the [deployment guide](docs/en/deployment.md).
 
-## Migrate from sub2api
+## Next steps
 
-Choose **Migrate from sub2api Docker** during administrator setup. The web wizard guides export, upload, review and import of **users, original API keys and supported upstream accounts**, without requiring a separate guide. On the source Docker host, run:
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/dyunwei/fiftyapi/main/scripts/migrate-sub2api.sh | sudo bash
-```
-
-No manual database password or host Python/psql installation is needed. The wizard also offers a direct script download. Members retain their email, password and keys; verify models, configure prices and switch the service URL before use. Migration is available only during initial setup; completing or skipping the wizard closes the import capability.
-
-Imported users, invited members and the initial administrator receive **$100** budgets in each of the 5-hour and 7-day windows; self-registration starts at **$0**. Existing budgets are unchanged. Balances, plans and history are excluded. The wizard preselects conversion to FiftyAPI access and budget rules; uncheck it to keep restricted keys disabled. Source-disabled or expired keys remain disabled. See the [migration guide](docs/en/sub2api-migration.md).
-
-## Connect a client
-
-**Claude Code**
-
-```sh
-export ANTHROPIC_BASE_URL=http://localhost:28080
-export ANTHROPIC_AUTH_TOKEN=YOUR_FIFTYAPI_KEY
-claude
-```
-
-**Codex** and other clients: see [client configuration](docs/en/clients.md).
-
-## Build from source
-
-Requires Go (version in [go.mod](go.mod)). Frontend assets are prebuilt, so Node is only needed for UI development (Node 24+).
-
-```sh
-go build -buildvcs=false -o bin/fiftyapi ./cmd/fiftyapi
-./scripts/start-local.sh      # setup token: .local/setup-token
-```
-
-The local startup script loads `.env` from the repository root as shell assignments
-and exports its values (overriding matching shell environment variables). Set
-`FIFTYAPI_LISTEN=127.0.0.1:28080` there to change the local listening address.
-
-```sh
-make test       # Go race, vet, frontend unit tests, source checks
-make build      # frontend build + Go binary
-make test-ui    # Playwright browser tests
-```
-
-Tests use temporary databases and simulated upstreams; they never call real providers.
+- [Connect a client](docs/en/clients.md) and choose the protocol for Claude Code, Codex, or Cherry Studio.
+- [Migrate from sub2api](docs/en/sub2api-migration.md) during initial setup to import users, original API keys, and supported upstream accounts.
+- [Browse the docs](docs/en/README.md) for administration, compatibility, and development.
 
 ## Status
 
 FiftyAPI is in **public preview**. Antigravity and OpenAI have been verified with real accounts; Claude OAuth is verified only against simulated upstreams so far. Image/audio generation, payments and multi-instance deployment are out of scope. Details: [compatibility](docs/en/compatibility.md).
-
-## Documentation
-
-[Docs index](docs/en/README.md) · [Deployment](docs/en/deployment.md) · [Clients](docs/en/clients.md) · [Administration](docs/en/administration.md) · [Compatibility](docs/en/compatibility.md) · [Changelog](CHANGELOG.md)
-
-## Contributing
-
-Issues and pull requests are welcome – see [CONTRIBUTING.md](CONTRIBUTING.md). Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
 
 ## License & credits
 
