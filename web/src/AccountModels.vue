@@ -63,7 +63,7 @@ onBeforeUnmount(()=>request++)
   <div class="notice">{{ t('这里显示此账号已保存的模型目录，包含未定价和已停用模型。目录可见不代表已经通过实际调用验证。客户端须使用列出的协议，不进行标准协议之间的自动转换。') }}</div>
   <div v-if="account.provider==='antigravity'" class="notice">{{ t('Antigravity 使用原生 v1internal 协议透传，不提供 Messages、Chat 或 Responses 转换；客户端需要支持 Antigravity 原生协议。') }}</div>
   <div v-if="account.last_error" class="alert error">{{ t('最近同步未成功：') }}{{ t(account.last_error) }}{{ t('。下方保留上次成功保存的目录。') }}</div>
-  <div class="account-model-search"><label>{{ t('搜索模型') }}<input v-model="search" :aria-label="t('搜索账号模型')" maxlength="256" :placeholder="t('模型 ID 或上游 ID')" @keydown.enter.prevent="applySearch"></label><button type="button" class="secondary" :disabled="loading" @click="applySearch">{{ t('搜索') }}</button></div>
+  <div class="filter-bar compact-filters account-model-search"><label><span class="visually-hidden">{{ t('搜索模型') }}</span><input v-model="search" :aria-label="t('搜索账号模型')" maxlength="256" :placeholder="t('模型 ID 或上游 ID')" @keydown.enter.prevent="applySearch"></label><button type="button" class="secondary" :disabled="loading" @click="applySearch">{{ t('搜索') }}</button></div>
   <div v-if="error" class="alert error" role="alert">{{ t(error) }} <button type="button" class="text-button" @click="load()">{{ t('重试读取') }}</button></div>
   <p v-if="loading" class="subtle" role="status">{{ t('正在读取已同步模型…') }}</p>
   <template v-else-if="!error">

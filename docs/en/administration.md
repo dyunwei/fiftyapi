@@ -14,7 +14,11 @@ A request reserves estimated cost, then settles reliable reported usage against 
 
 ## Upstream accounts
 
+The compact toolbar on **Upstream accounts** searches the local list by account name, ID or platform. Click **Filter** or press Enter to apply; **Clear** restores all accounts.
+
 Use **Upstream accounts** to add Claude Code, OpenAI Codex or Antigravity OAuth accounts, or select **+ Connect upstream API** for API key gateways. OAuth links expire after 10 minutes; paste the full callback URL or `code#state`. If localhost cannot load the callback, copy its URL from the address bar.
+
+Select **Authorization details** in an account card’s action bar to open a read-only dialog with its authorization summary and health information. Details no longer expand inside the card.
 
 Authorization JSON imports accept up to 20 files totaling 1 MiB. Only credential fields are imported; embedded URLs, proxies and headers are not. Credentials are encrypted, never displayed or stored in browser storage. Avoid having several services refresh the same rotating token.
 

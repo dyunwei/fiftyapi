@@ -64,7 +64,7 @@ svg{width:20px;height:20px;flex-shrink:0}.workspace{background:radial-gradient(a
 @media(max-width:1000px){.mapping-toolbar{grid-template-columns:1fr}.mapping-fields{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.mapping-protocols{align-self:end}.mapping-fields .danger-text{justify-self:start}}
 @media(max-width:580px){.account-config-dialog{max-width:100%}.account-quota .routing-quota-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.account-quota .routing-quota{padding:10px}.account-quota .routing-quota small{overflow-wrap:anywhere}.mapping-fields{grid-template-columns:1fr}.mapping-protocols .protocol-options{grid-template-columns:1fr;justify-content:start;min-height:0}.mapping-search{flex-direction:column;align-items:stretch}.mapping-search .subtle{padding-bottom:0}}
 
-.account-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}.account-card{padding:16px}.account-card-top{justify-content:flex-start;gap:10px;margin-bottom:10px}.account-heading{min-width:0;flex:1}.account-heading h2{font-size:14px;overflow-wrap:anywhere}.account-heading .subtle{font-size:11px;margin-top:2px}.account-card-top .provider-icon{width:30px;height:30px;flex-shrink:0;font-size:15px}.account-content{display:block}.account-model-count{font-size:11px}.account-model-count span{display:inline}.account-routing-summary{font-size:11px;margin:7px 0;gap:4px 10px}.account-details{margin:8px 0;font-size:11px;color:#667085}.account-details summary{cursor:pointer;width:fit-content}.account-details .account-health-note{font-size:11px;margin:5px 0}.account-quota{border-left:0;border-top:1px solid #eaecf0;padding:10px 0 0;margin-top:10px}.account-quota-heading{font-size:11px}.account-quota-heading .text-button{font-size:11px}.account-quota .routing-quota-grid{margin:8px 0;gap:12px;grid-template-columns:repeat(2,minmax(0,1fr))}.account-quota .routing-quota{padding:0;border:0;background:transparent;border-radius:0;display:grid;grid-template-columns:auto 1fr;gap:5px 8px;align-items:center}.account-quota .routing-quota strong{font-size:11px;font-weight:500;color:#667085}.account-quota .routing-quota p{font-size:13px;margin:0;text-align:right}.account-quota .routing-quota .meter{grid-column:1/-1;margin:0;height:4px}.account-quota .routing-quota small{grid-column:1/-1;font-size:10px;margin:0}.account-quota>.subtle{font-size:10px;line-height:1.5}.account-quota>.subtle br{display:none}.account-actions{margin-top:10px;padding-top:10px;gap:6px 12px}.account-actions .secondary{font-size:11px;min-height:26px;padding:3px 8px}.account-actions .text-button,.account-actions .danger-text{font-size:11px}.account-error{margin-top:8px}
+.account-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}.account-card{padding:16px}.account-card-top{justify-content:flex-start;gap:10px;margin-bottom:10px}.account-heading{min-width:0;flex:1}.account-heading h2{font-size:14px;overflow-wrap:anywhere}.account-heading .subtle{font-size:11px;margin-top:2px}.account-card-top .provider-icon{width:30px;height:30px;flex-shrink:0;font-size:15px}.account-content{display:block}.account-model-count{font-size:11px}.account-model-count span{display:inline}.account-routing-summary{font-size:11px;margin:7px 0;gap:4px 10px}.account-authorization-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px}.account-authorization-heading h3{overflow-wrap:anywhere}.account-authorization-heading .subtle{margin-top:5px}.account-authorization .account-health-note{font-size:13px;line-height:1.7;margin-top:12px;overflow-wrap:anywhere}.account-quota{border-left:0;border-top:1px solid #eaecf0;padding:10px 0 0;margin-top:10px}.account-quota-heading{font-size:11px}.account-quota-heading .text-button{font-size:11px}.account-quota .routing-quota-grid{margin:8px 0;gap:12px;grid-template-columns:repeat(2,minmax(0,1fr))}.account-quota .routing-quota{padding:0;border:0;background:transparent;border-radius:0;display:grid;grid-template-columns:auto 1fr;gap:5px 8px;align-items:center}.account-quota .routing-quota strong{font-size:11px;font-weight:500;color:#667085}.account-quota .routing-quota p{font-size:13px;margin:0;text-align:right}.account-quota .routing-quota .meter{grid-column:1/-1;margin:0;height:4px}.account-quota .routing-quota small{grid-column:1/-1;font-size:10px;margin:0}.account-quota>.subtle{font-size:10px;line-height:1.5}.account-quota>.subtle br{display:none}.account-actions{margin-top:10px;padding-top:10px;gap:6px 12px}.account-actions .secondary{font-size:11px;min-height:26px;padding:3px 8px}.account-actions .text-button,.account-actions .danger-text{font-size:11px}.account-error{margin-top:8px}
 @media(max-width:1199px){.account-grid{grid-template-columns:1fr}}
 @media(min-width:1800px){.account-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:580px){.account-card{padding:13px}.account-quota .routing-quota{padding:0}.account-actions{gap:7px 12px}}
@@ -201,7 +201,7 @@ html[lang="en"] .nav-item{white-space:normal}
  .overview-workspace .page-content{height:calc(100dvh - 72px);padding:16px 22px;display:flex;flex-direction:column;gap:18px}
  .overview-workspace .page-content>.page-heading{display:none}
  .overview-workspace .page-content>*{flex-shrink:0;margin:0;min-width:0}
- .overview-workspace .dashboard-stats{grid-template-columns:repeat(8,minmax(0,1fr));gap:14px}
+ .overview-workspace .dashboard-stats{grid-template-columns:repeat(var(--stat-columns,8),minmax(0,1fr));gap:14px}
  .overview-workspace .dashboard-stat{min-height:0;padding:7px 14px;gap:12px}
  .overview-workspace .stat-label{line-height:1.25;margin-bottom:2px}
  .overview-workspace .dashboard-stat strong{line-height:1.15}
@@ -247,7 +247,7 @@ html[lang="en"] .nav-item{white-space:normal}
 }
 
 
-/* Eight summary cards share one row; narrower desktops stack the icon above the value. */
+/* Summary cards share one row; narrower desktops stack the icon above the value. */
 @media(min-width:1200px) and (max-width:1799px){
  .overview-workspace .dashboard-stat{flex-direction:column;align-items:flex-start;padding:10px;gap:8px}
  .overview-workspace .dashboard-stat>div{width:100%;min-width:0}
@@ -256,4 +256,20 @@ html[lang="en"] .nav-item{white-space:normal}
  .overview-workspace .stat-label{font-size:11px;min-height:2.5em}
  .overview-workspace .dashboard-stat strong{font-size:clamp(16px,1.2vw,22px);white-space:nowrap;letter-spacing:-.5px}
  .overview-workspace .dashboard-stat p{font-size:10px;overflow-wrap:anywhere}
+}
+/* Table filters use the same compact toolbar as request logs. */
+.visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.compact-filters{padding:0;border:0;gap:10px;align-items:center}
+.compact-filters label{position:relative;flex:1 1 110px;max-width:250px;min-width:0;margin:0;gap:0}
+.compact-filters input,.compact-filters select{flex:none;height:40px;max-width:100%;min-width:0;margin:0;font-size:12px;padding:9px 12px}
+.compact-filters .compact-date-filter{flex:0 1 auto;max-width:none;flex-direction:row;align-items:center;gap:8px;color:#667085;font-size:12px;font-weight:400}
+.compact-filters .compact-date-filter>span{white-space:nowrap}
+.compact-filters .compact-date-filter input{width:190px}
+.compact-filters .secondary{height:40px;min-height:40px;flex-shrink:0;white-space:nowrap}
+@media(max-width:580px){.compact-filters label{flex:1 1 140px;max-width:none}.compact-filters .compact-date-filter{flex:1 1 100%}.compact-filters .compact-date-filter input{flex:1;width:0}.compact-filters.account-model-search{flex-direction:row;align-items:center}.compact-filters.account-model-search label{flex:1}}
+
+@media(min-width:1200px){
+ .settings-workspace .page-content{padding:18px 22px}
+ .settings-workspace .settings-tabs{margin-bottom:16px}
+ .settings-workspace .page-footer{margin-top:20px;padding:10px 0}
 }

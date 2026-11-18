@@ -243,7 +243,6 @@
   "今日请求": "Requests today",
   "总计: {0}": "Total: {0}",
   "用户": "Users",
-  "当前账号": "Current account",
   "{0} 已启用": "{0} enabled",
   "今日 Token": "Tokens today",
   "总 Token": "Total tokens",
@@ -1073,5 +1072,10 @@
   "请求路径": "Request path",
   "上游状态": "Upstream status",
   "上游原因代码": "Upstream reason code",
-  "上游建议重试时间": "Upstream suggested retry time"
+  "上游建议重试时间": "Upstream suggested retry time",
+  "搜索账号": "Search accounts",
+  "账号名称、ID 或平台": "Account name, ID or platform",
+  "暂无符合条件的账号": "No accounts match your filters",
+  "授权详情": "Authorization details",
+  "暂无授权与健康详情": "No authorization or health details are available."
 }
