@@ -8,13 +8,13 @@ The first public version is **0.1.0**, tagged `v0.1.0`. Earlier internal iterati
 
 Keep `internal/buildinfo/VERSION`, `web/package.json` and the root/package versions in `web/package-lock.json` synchronized. During 0.x development, increment the minor version for incompatible behavior or non-reversible schema changes and the patch version for fixes.
 
-1. Update versions and the bilingual `CHANGELOG.md`, including migration and configuration implications.
+1. Update versions and the bilingual `CHANGELOG.md`, including migration and configuration implications. Attribute changes to actual release tags rather than adding unreleased changes to historical entries.
 2. Run `make test`, `make build` and `make test-ui`. Install Chromium with `cd web && npx playwright install chromium` if needed.
-3. Run `./scripts/build-release.sh` to prepare local artifacts. The binary targets the current build machine's OS/architecture. The package includes both README languages, both quickstarts, documentation, licenses, dependency notices and `SHA256SUMS`.
-4. Commit/push and wait for CI. For the first release, create and push the annotated tag `v0.1.0`.
-5. Draft a GitHub release with the changelog and attach the prepared files. Packaging alone does not publish anything.
+3. Run `./scripts/build-release.sh` for the current build machine's OS/architecture, or `./scripts/package-release.sh` for macOS amd64/arm64, Linux amd64/arm64 and Windows amd64 archives plus `dist/packages/checksums.txt`. Pass the matching source commit through `FIFTYAPI_BUILD_COMMIT`. amd64 defaults to GOAMD64 v1. Packages include both README languages, both quickstarts, documentation, licenses and dependency notices.
+4. Commit/push and wait for CI. Create and push an annotated tag matching `internal/buildinfo/VERSION`, such as `v0.2.0`.
+5. Draft a GitHub release for that tag with the changelog. Review upgrade notes and compatibility limitations before publishing.
 
-Publishing the GitHub release triggers `Publish Docker Hub image`. It builds the release tag for Linux amd64 and pushes to `<DOCKERHUB_USERNAME>/fiftyapi` using the repository secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`. A release tagged `v0.1.0` publishes `:v0.1.0`; stable releases also update `:latest`, while prereleases do not. The token must have write access to the Docker Hub repository. Pushing a Git tag or saving a release draft alone does not trigger publication.
+Publishing the GitHub release triggers `Publish release assets and Docker image`. It builds the five platform archives from the tag and uploads them to the release, and publishes a Linux amd64 Docker image using repository secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`. A release tagged `v0.2.0` publishes `:v0.2.0`; stable releases also update `:latest`, while prereleases do not. The token must have write access to the Docker Hub repository. Pushing a Git tag or saving a release draft alone does not trigger publication.
 
 ## Translations
 

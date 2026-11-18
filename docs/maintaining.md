@@ -8,13 +8,13 @@
 
 ## 发布一个版本
 
-1. 更新三处版本号，在 `CHANGELOG.md` 顶部写本版变更（尤其数据库迁移、配置变更和升级注意事项）。
+1. 更新三处版本号，在 `CHANGELOG.md` 顶部写本版中英文变更，说明数据库迁移、配置变更和升级注意事项。以实际发布标签为准划分变更，不把未发布内容补进旧版记录。
 2. 本地检查：`make test`、`make build`、`make test-ui`。
-3. 提交并推送，等待 GitHub Actions 全部通过。
-4. 打标签：`git tag -a v0.1.0 -m "v0.1.0" && git push origin v0.1.0`。
-5. 在 GitHub 页面 Releases → Draft a new release 选择标签，粘贴 CHANGELOG 内容；如附带二进制，上传 `dist/` 中的二进制、`SHA256SUMS`、许可证和依赖声明。
+3. `./scripts/build-release.sh` 准备当前构建机平台的程序和文档；`./scripts/package-release.sh` 生成 macOS amd64/arm64、Linux amd64/arm64、Windows amd64 的归档和 `dist/packages/checksums.txt`。正式打包时通过 `FIFTYAPI_BUILD_COMMIT` 传入对应提交号。amd64 默认使用 GOAMD64 v1。
+4. 提交并推送，等待 GitHub Actions 全部通过，再创建并推送与 `internal/buildinfo/VERSION` 一致的附注标签（如 `v0.2.0`）。
+5. 在 GitHub Releases 创建对应标签的草稿，使用本版 CHANGELOG 作为发布说明。发布前确认升级说明和兼容性限制。
 
-点击 Publish release 后，`Publish Docker Hub image` 工作流会使用仓库密钥 `DOCKERHUB_USERNAME` 和 `DOCKERHUB_TOKEN`，构建该标签源码并推送 Linux amd64 镜像到 `<DOCKERHUB_USERNAME>/fiftyapi`。例如 `v0.1.0` 发布会推送 `:v0.1.0`，正式版同时更新 `:latest`；预发布版不更新 `:latest`。Token 需要有目标 Docker Hub 仓库的写入权限。仅推送 Git 标签或保存 Release 草稿不会触发发布。
+点击 Publish release 后，`Publish release assets and Docker image` 工作流会从标签源码构建五个平台的归档并上传到 GitHub Release，同时使用仓库密钥 `DOCKERHUB_USERNAME` 和 `DOCKERHUB_TOKEN` 发布 Linux amd64 镜像。例如 `v0.2.0` 发布会推送 `:v0.2.0`，正式版同时更新 `:latest`；预发布版不更新 `:latest`。Token 需要有目标 Docker Hub 仓库的写入权限。仅推送 Git 标签或保存 Release 草稿不会触发发布。
 
 ## 许可证义务（LGPL-3.0）
 

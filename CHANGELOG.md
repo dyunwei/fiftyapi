@@ -5,23 +5,82 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 English | 中文说明见各版本下方折叠区域
 
+## 0.2.0 (2026-11-18)
+
+### Added
+
+- Automatic LiteLLM reference-price catalog synchronization, explicit catalog-key mapping, immutable tier/cache price snapshots, and manual price overrides.
+- Centralized client identity defaults and daily Codex release candidates, with explicit administrator activation.
+- Per-user model allowlists and concurrency limits shared across HTTP, SSE, and WebSocket requests.
+- A Python 3.11+ client configuration helper for Codex and Claude Code, with local backups, conflict-aware restore, and copyable setup/restore commands.
+- Persistent account-scoped OpenAI device identity and session holds across retries and restarts.
+
+### Changed
+
+- **Breaking:** Antigravity now forwards native `v1internal` requests and responses. Messages conversion has been removed; clients must support the native Antigravity protocol.
+- Claude and Codex forwarding preserve client instructions, metadata, and supported native request fields by default. Client identity normalization is configurable.
+- Price synchronization and public Codex release checks run daily by default; morning inference probes are off by default. Unknown prices or usage retain safe reservation release and administrator settlement behavior.
+- Compact table filters, account search, single-screen desktop dashboards and email settings, authorization-detail dialogs, and refreshed bilingual screenshots.
+- Compose supports configurable host listening addresses and data mounts; local startup loads repository `.env` settings.
+
+### Fixed
+
+- Antigravity model tests now build and preview native requests, use the native inference origin, and expose sanitized 429 retry diagnostics without automatic retries.
+- Model-test JSON responses are formatted for readability.
+
+### Upgrade notes
+
+- Back up the database and its original master key before upgrading from v0.1.1. New append-only migrations are `018_openai_session_identity.sql`, `019_price_catalog.sql`, `020_native_antigravity.sql`, and `021_user_access.sql`; startup applies them automatically. Existing accounts and historical accounting records are preserved. Rollback requires the pre-upgrade database and older binary.
+- Existing Antigravity sources become native-only. Messages clients must switch to a compatible source or use a native Antigravity client.
+- Static bundled prices have been removed. Confirm model pricing after upgrade; select a catalog key for unmatched aliases or retain manual prices. Unpriced models remain unavailable.
+- `FIFTYAPI_AUTO_MAINTENANCE=false` disables background public price/release checks while retaining cached data and manual sync. Necessary account refresh and catalog maintenance remain active.
+- This release was checked with simulated upstreams. Historical Antigravity converter acceptance does not establish compatibility for the new native path. Client-helper platform and extension limitations are documented in [client setup](docs/en/client-setup.md); provider verification scope is in [compatibility](docs/en/compatibility.md).
+
+<details>
+<summary>中文说明</summary>
+
+**新增**
+
+- LiteLLM 参考价格目录自动同步、显式目录键映射、档位与缓存价格快照，以及手动价格覆盖。
+- 集中管理客户端默认身份，每日发现 Codex 候选版本，由管理员明确启用。
+- 每位成员的模型白名单与并发限制，HTTP、SSE 和 WebSocket 共用。
+- Python 3.11+ 客户端配置助手，支持 Codex 与 Claude Code、本地备份、冲突检查、恢复，以及可复制的配置与恢复命令。
+- OpenAI 账号级持久化设备标识，重试和重启保留会话等待状态。
+
+**调整与修复**
+
+- **不兼容变更**：Antigravity 改为原生 `v1internal` 请求与响应透传，移除 Messages 转换，客户端须支持原生 Antigravity 协议。
+- Claude 与 Codex 默认保留客户端指令、元数据及支持的原生请求字段；客户端身份规范化可配置。
+- 默认每日同步价格并检查公开 Codex 候选版本，晨间推理探测默认关闭。价格或用量不确定时仍释放预占并由管理员核算。
+- 表格筛选栏更紧凑，新增账号搜索；桌面仪表盘与邮件配置可单屏显示，授权详情改为弹窗，更新中英文截图。
+- Compose 支持配置宿主机监听地址与数据挂载；本地启动脚本加载仓库 `.env`。
+- Antigravity 模型测试使用原生请求和推理地址，展示脱敏的 429 重试诊断，不自动重试；模型测试 JSON 响应格式化显示。
+
+**升级注意事项**
+
+- 从 v0.1.1 升级前备份数据库及原主密钥。新增迁移为 `018_openai_session_identity.sql`、`019_price_catalog.sql`、`020_native_antigravity.sql`、`021_user_access.sql`，启动时自动执行，保留账号和历史账务记录。回退须恢复升级前数据库并使用旧版程序。
+- 既有 Antigravity 来源改为仅原生协议；Messages 客户端须改用兼容来源，或使用支持原生 Antigravity 的客户端。
+- 移除静态内置价格，升级后确认模型价格；别名未匹配时手动选择目录键，或保留手动价格。未定价模型仍不可调用。
+- `FIFTYAPI_AUTO_MAINTENANCE=false` 可关闭后台公开价格与版本检查，保留本地缓存与手动同步；必要账号刷新与目录维护仍运行。
+- 本版使用模拟上游验证，历史 Antigravity 转换器验收不适用于新的原生路径。客户端助手的平台与扩展限制见 [客户端配置助手](docs/client-setup.md)，供应商验证范围见 [兼容性](docs/compatibility.md)。
+
+</details>
+
 ## 0.1.1 (2026-11-13)
 
 ### Added
 
-- Account-scoped persistent OpenAI device identity across HTTP and WebSocket, preserving independent sessions and threads.
 - Proxy management with health checks and proxy selection for upstream accounts and account contribution links.
 - Remaining budget progress for each member's 5-hour and 7-day windows in the team table.
 
 ### Changed
 
-- Temporary OpenAI rate limits now keep the original session binding across retries and restarts; explicit quota exhaustion retains safe failover.
 - Background model catalog synchronization now runs every 24 hours to reduce upstream requests.
 - The environment example now explains source builds versus the published `dyunwei/fiftyapi` Docker image.
 
 ### Upgrade notes
 
-- This release adds SQLite migrations `017_proxy_servers.sql` for proxy settings and account/contribution bindings, and `018_openai_session_identity.sql` for persistent OpenAI device identity and session holds. Existing migrations remain unchanged; new migrations run automatically at startup.
+- This release adds SQLite migration `017_proxy_servers.sql` for proxy settings and account/contribution bindings. Existing migrations remain unchanged and the new migration runs automatically at startup.
 - Back up the database and its master key before upgrading. To roll back, restore the pre-upgrade database together with the older binary.
 - Provider compatibility limitations remain unchanged; see [compatibility](docs/en/compatibility.md). No new live-provider compatibility is claimed.
 
@@ -30,19 +89,17 @@ English | 中文说明见各版本下方折叠区域
 
 **新增**
 
-- OpenAI 账号级持久化设备标识，HTTP 与 WebSocket 一致，保留各会话和线程的独立标识。
 - 代理管理、健康检查，以及上游账号和账号贡献链接的代理选择。
 - 成员列表展示每位成员 5 小时与 7 天窗口的剩余额度进度。
 
 **调整**
 
-- OpenAI 临时限流时保持原会话绑定，后续重试和重启不绕过等待；明确额度耗尽仍允许安全切换。
 - 后台模型目录同步间隔调整为 24 小时，减少上游请求。
 - 环境变量示例补充源码构建与使用已发布 `dyunwei/fiftyapi` Docker 镜像的说明。
 
 **升级注意事项**
 
-- 新增 SQLite 迁移 `017_proxy_servers.sql`，保存代理配置及账号、贡献链接绑定；`018_openai_session_identity.sql` 保存 OpenAI 设备标识和会话等待状态。现有迁移不变，新迁移在启动时自动执行。
+- 新增 SQLite 迁移 `017_proxy_servers.sql`，保存代理配置及账号、贡献链接绑定；现有迁移不变，新迁移在启动时自动执行。
 - 升级前备份数据库和主密钥。回退时须同时恢复升级前的数据库和旧版程序。
 - 上游兼容性限制保持不变，详见 [兼容性](docs/compatibility.md)；本版不新增真实供应商兼容性声明。
 

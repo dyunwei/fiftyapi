@@ -57,6 +57,6 @@ Automated tests cover initialization, sessions/CSRF/roles, migrations, credentia
 
 The [Chinese acceptance records](../openai-acceptance.md) preserve tested client identities, dates, models and usage-accounting conditions. External client version numbers in those records are distinct from FiftyAPI's public version.
 
-## OpenAI device identity and rate-limit regression (0.1.1)
+## OpenAI device identity and rate-limit regression (0.2.0)
 
 Simulated upstream tests use the default Codex identity `0.164.0` and fixture model `model`. They cover account device consistency across HTTP/SSE and Responses WebSocket, preservation of independent conversation fields, durable temporary-429 holds, recovery after cooldown, and quota-exhaustion failover for portable histories while keeping encrypted histories on their owner. No real Codex client or live provider was exercised for this change; these tests establish neither new live compatibility nor provider risk-control outcomes.
