@@ -5,18 +5,24 @@ import (
 	"encoding/json"
 	"errors"
 	"fiftyapi/internal/store"
+	"github.com/google/uuid"
 	"net/http"
 	"strings"
 	"time"
 )
 
 type ProbeResult struct {
-	Request    json.RawMessage `json:"request"`
-	Response   string          `json:"response"`
-	Status     int             `json:"status"`
-	DurationMS int64           `json:"duration_ms"`
-	Error      string          `json:"error,omitempty"`
-	Truncated  bool            `json:"truncated"`
+	Path           string          `json:"path"`
+	Signal         string          `json:"signal,omitempty"`
+	RetryAt        int64           `json:"retry_at,omitempty"`
+	UpstreamStatus string          `json:"upstream_status,omitempty"`
+	UpstreamReason string          `json:"upstream_reason,omitempty"`
+	Request        json.RawMessage `json:"request"`
+	Response       string          `json:"response"`
+	Status         int             `json:"status"`
+	DurationMS     int64           `json:"duration_ms"`
+	Error          string          `json:"error,omitempty"`
+	Truncated      bool            `json:"truncated"`
 }
 
 // probeWriter bounds the diagnostic retained in memory while still draining upstream.
@@ -75,7 +81,7 @@ func (h *Handler) Probe(ctx context.Context, account int64, model, protocol, hos
 	path := "/v1/" + protocol
 	if protocol == "antigravity" {
 		path = "/v1internal:streamGenerateContent"
-		body = map[string]any{"model": selected.UpstreamID, "request": map[string]any{"contents": []any{map[string]any{"role": "user", "parts": []any{map[string]string{"text": "hi"}}}}, "generationConfig": map[string]int{"maxOutputTokens": 64}}}
+		body = map[string]any{"model": selected.UpstreamID, "requestId": "agent-" + uuid.NewString(), "userAgent": "antigravity", "requestType": "agent", "request": map[string]any{"contents": []any{map[string]any{"role": "user", "parts": []any{map[string]string{"text": "hi"}}}}, "generationConfig": map[string]int{"maxOutputTokens": 64}}}
 	} else if protocol == "responses" {
 		body["input"] = "hi"
 		body["instructions"] = "Reply briefly to the greeting."
@@ -89,6 +95,7 @@ func (h *Handler) Probe(ctx context.Context, account int64, model, protocol, hos
 	}
 	raw, _ := json.Marshal(body)
 	out.Request = raw
+	out.Path = path
 	request := map[string]json.RawMessage{}
 	_ = json.Unmarshal(raw, &request)
 	r, _ := http.NewRequestWithContext(ctx, "POST", "http://"+host+path, strings.NewReader(string(raw)))
@@ -97,6 +104,10 @@ func (h *Handler) Probe(ctx context.Context, account int64, model, protocol, hos
 	result := h.forward(w, r, raw, request, store.Model{ID: selected.ID, UpstreamID: selected.UpstreamID, Provider: c.Config.Provider, Protocol: protocol}, c, 64)
 	out.DurationMS = time.Since(start).Milliseconds()
 	out.Status = result.status
+	out.Signal = result.signal
+	out.RetryAt = result.retryAfter
+	out.UpstreamStatus = result.upstreamStatus
+	out.UpstreamReason = result.upstreamReason
 	out.Response = w.body.String()
 	out.Truncated = w.truncated
 	if result.err != nil {

@@ -13,7 +13,9 @@ const testResponse=computed(()=>{
  catch{return response}
 })
 const testRequest=computed(()=>{
+ if(testResult.value?.request)return JSON.stringify(testResult.value.request,null,2)
  const body={model:testModel.value?.upstream_id,stream:false}
+ if(testProtocol.value==='antigravity')return JSON.stringify({model:testModel.value?.upstream_id,userAgent:'antigravity',requestType:'agent',request:{contents:[{role:'user',parts:[{text:'hi'}]}],generationConfig:{maxOutputTokens:64}}},null,2)
  if(testProtocol.value==='responses'){body.input='hi';body.instructions='Reply briefly to the greeting.'}
  else {body.messages=[{role:'user',content:'hi'}];if(testProtocol.value==='messages')body.max_tokens=64}
  return JSON.stringify(body,null,2)
@@ -49,17 +51,17 @@ onBeforeUnmount(()=>request++)
  <div class="account-models">
   <div v-if="testModel" class="model-test-panel" role="dialog" aria-modal="true" :aria-label="t('模型调用测试')" @keydown.esc.stop="!testRunning&&(testModel=null)">
    <div class="account-model-summary"><strong>{{ t('模型测试 ·') }} {{ testModel.id }}</strong><button type="button" class="secondary" :disabled="testRunning" @click="testModel=null">{{ t('关闭测试') }}</button></div>
-   <p class="subtle">{{ t('固定调用当前账号，发送 hi。测试会消耗上游额度，不计入本站用户账单。下方请求为协议输入，实际发送时会应用账号适配配置。') }}</p>
-   <label>{{ t('测试协议') }}<select v-model="testProtocol" :disabled="testRunning" @change="testResult=null"><option v-for="p in (testModel.protocols?.length?testModel.protocols:[testModel.protocol])" :key="p" :value="p">{{ p }}</option></select></label>
+   <p class="subtle">{{ t('固定调用当前账号，发送 hi。测试会消耗上游额度，不计入本站用户账单。下方为协议请求，收到结果后显示服务端构造的请求；认证和项目由账号提供，不在此展示。') }}</p>
+   <label>{{ t('测试协议') }}<select v-model="testProtocol" :disabled="testRunning" @change="testResult=null"><option v-for="p in (testModel.protocols?.length?testModel.protocols:[testModel.protocol])" :key="p" :value="p">{{ p==='antigravity'?'Antigravity':p }}</option></select></label>
    <strong>{{ t('请求内容') }}</strong><pre class="model-test-output">{{ testRequest }}</pre>
    <p v-if="testRunning" role="status">{{ t('正在向上游发送请求，等待模型响应…') }}</p>
    <p v-if="testError" class="alert error" role="alert">{{ t(testError) }}</p>
-   <template v-if="testResult"><p role="status">{{ testResult.error?t('测试失败'):t('测试完成') }} · HTTP {{ testResult.status }} · {{ testResult.duration_ms }} ms</p><p v-if="testResult.error" class="alert error">{{ t(testResult.error) }}</p><strong>{{ t('响应结果') }}</strong><pre class="model-test-output">{{ testResponse }}</pre><p v-if="testResult.truncated">{{ t('响应过长，仅显示前 256 KiB。') }}</p></template>
+   <template v-if="testResult"><p role="status">{{ testResult.error?t('测试失败'):t('测试完成') }} · HTTP {{ testResult.status }} · {{ testResult.duration_ms }} ms</p><p v-if="testResult.error" class="alert error">{{ t(testResult.error) }}</p><dl v-if="testResult.path||testResult.upstream_status||testResult.upstream_reason||testResult.retry_at" class="model-test-diagnostics"><template v-if="testResult.path"><dt>{{ t('请求路径') }}</dt><dd><code>{{testResult.path}}</code></dd></template><template v-if="testResult.upstream_status"><dt>{{t('上游状态')}}</dt><dd>{{testResult.upstream_status}}</dd></template><template v-if="testResult.upstream_reason"><dt>{{t('上游原因代码')}}</dt><dd>{{testResult.upstream_reason}}</dd></template><template v-if="testResult.retry_at"><dt>{{t('上游建议重试时间')}}</dt><dd>{{new Date(testResult.retry_at*1000).toLocaleString(locale,{hour12:false})}}</dd></template></dl><strong>{{ t('响应结果') }}</strong><pre class="model-test-output">{{ testResponse }}</pre><p v-if="testResult.truncated">{{ t('响应过长，仅显示前 256 KiB。') }}</p></template>
    <button type="button" :disabled="testRunning" @click="runTest">{{ testRunning?t('测试中…'):t('重新测试') }}</button>
   </div>
   <div class="account-model-summary"><div><strong>{{ account.name }}</strong><p class="subtle">{{ t('上次成功同步：') }}{{ syncTime }}</p></div><button type="button" class="secondary" :disabled="busy||loading||!account.enabled" @click="emit('sync',account)">{{ t('验证并同步') }}</button></div>
   <div class="notice">{{ t('这里显示此账号已保存的模型目录，包含未定价和已停用模型。目录可见不代表已经通过实际调用验证。客户端须使用列出的协议，不进行标准协议之间的自动转换。') }}</div>
-  <div v-if="account.provider==='antigravity'" class="notice">{{ t('Antigravity 使用专用适配提供 Messages；不通过 Chat 或 Responses 自动转换接入。') }}</div>
+  <div v-if="account.provider==='antigravity'" class="notice">{{ t('Antigravity 使用原生 v1internal 协议透传，不提供 Messages、Chat 或 Responses 转换；客户端需要支持 Antigravity 原生协议。') }}</div>
   <div v-if="account.last_error" class="alert error">{{ t('最近同步未成功：') }}{{ t(account.last_error) }}{{ t('。下方保留上次成功保存的目录。') }}</div>
   <div class="account-model-search"><label>{{ t('搜索模型') }}<input v-model="search" :aria-label="t('搜索账号模型')" maxlength="256" :placeholder="t('模型 ID 或上游 ID')" @keydown.enter.prevent="applySearch"></label><button type="button" class="secondary" :disabled="loading" @click="applySearch">{{ t('搜索') }}</button></div>
   <div v-if="error" class="alert error" role="alert">{{ t(error) }} <button type="button" class="text-button" @click="load()">{{ t('重试读取') }}</button></div>
@@ -88,6 +90,7 @@ onBeforeUnmount(()=>request++)
  .account-model-table th,.account-model-table td{padding:12px 8px}
 }
 
+.model-test-diagnostics{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 16px;overflow-wrap:anywhere}.model-test-diagnostics dd{margin:0}
 .model-test-panel{position:fixed;inset:10vh max(4vw,calc((100vw - 900px)/2));z-index:1000;background:var(--surface,#fff);color:var(--text,#222);border:1px solid #999;border-radius:12px;padding:24px;overflow:auto;box-shadow:0 0 0 100vmax #0008}
 .model-test-output{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace;font-size:13px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere;background:#8881;padding:12px;max-height:35vh;overflow:auto}
 </style>

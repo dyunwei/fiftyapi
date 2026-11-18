@@ -129,23 +129,24 @@ func (h *Handler) Models(w http.ResponseWriter, r *http.Request) {
 }
 
 type result struct {
-	usage                        store.TokenUsage
-	known                        bool
-	complete                     bool
-	status                       int
-	err                          error
-	sent                         bool
-	dispatched                   bool
-	seenInput                    bool
-	seenOutput                   bool
-	invalidUsage                 bool
-	inputTotal                   int64
-	retryable                    bool
-	signal                       string
-	cooldownUntil, retryAfter    int64
-	modelCooldown                bool
-	primaryUsed, secondaryUsed   *float64
-	primaryReset, secondaryReset *int64
+	upstreamStatus, upstreamReason string
+	usage                          store.TokenUsage
+	known                          bool
+	complete                       bool
+	status                         int
+	err                            error
+	sent                           bool
+	dispatched                     bool
+	seenInput                      bool
+	seenOutput                     bool
+	invalidUsage                   bool
+	inputTotal                     int64
+	retryable                      bool
+	signal                         string
+	cooldownUntil, retryAfter      int64
+	modelCooldown                  bool
+	primaryUsed, secondaryUsed     *float64
+	primaryReset, secondaryReset   *int64
 }
 
 func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {

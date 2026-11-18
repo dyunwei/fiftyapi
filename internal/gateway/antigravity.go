@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fiftyapi/internal/accounts"
+	"fiftyapi/internal/providers"
 	"fiftyapi/internal/store"
 	"io"
 	"net/http"
-	"net/url"
 	"strings"
 )
 
@@ -30,30 +30,13 @@ func (h *Handler) antigravity(w http.ResponseWriter, r *http.Request, body []byt
 	}
 	request["project"] = project["project"]
 	stream := strings.HasSuffix(r.URL.Path, ":streamGenerateContent")
-	action := "/v1internal:generateContent"
-	if stream {
-		action = "/v1internal:streamGenerateContent"
-	}
-	endpoint := c.Config.GatewayURL
-	if endpoint == "" {
-		u, e := url.Parse(c.Config.ModelsURL)
-		if e != nil {
-			return out
-		}
-		u.Path = action
-		u.RawQuery = ""
-		if stream {
-			u.RawQuery = "alt=sse"
-		}
-		endpoint = u.String()
-	}
-	u, err := url.Parse(endpoint)
-	if err != nil || u.Scheme != "https" || u.User != nil || u.Host == "" {
-		out.err = errors.New("上游端点必须使用 HTTPS")
+	endpoint, err := providers.AntigravityInferenceEndpoint(c.Config, stream)
+	if err != nil {
+		out.err = err
 		return out
 	}
 	encoded, _ := json.Marshal(request)
-	req, err := http.NewRequestWithContext(r.Context(), http.MethodPost, u.String(), bytes.NewReader(encoded))
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodPost, endpoint, bytes.NewReader(encoded))
 	if err != nil {
 		out.err = err
 		return out
@@ -86,6 +69,9 @@ func (h *Handler) antigravity(w http.ResponseWriter, r *http.Request, body []byt
 		}
 		out.err = errors.New("上游拒绝请求，请检查模型权限或账号状态")
 		classifyRejection(&out, resp)
+		if out.status == http.StatusTooManyRequests {
+			out.err = errors.New("上游返回 HTTP 429：请求受限，可能是限流、额度或模型容量限制")
+		}
 		return out
 	}
 	observeHeaders(&out, resp.Header)

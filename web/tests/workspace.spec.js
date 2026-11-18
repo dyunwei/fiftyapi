@@ -720,3 +720,39 @@ test('成员访问限制保存模型与并发，不设置速度权限',async({pa
  await dialog.getByLabel('允许全部已定价模型',{exact:true}).check();await dialog.getByLabel('用户最大并发',{exact:true}).fill('0')
  await dialog.getByRole('button',{name:'保存',exact:true}).click();await expect(dialog).toHaveCount(0)
 })
+
+test('Antigravity 原生测试预览与 429 诊断不再显示 Messages 请求',async({page})=>{
+ await page.context().addCookies(adminCookies)
+ await page.route('**/api/admin/accounts',route=>route.fulfill({json:[{id:991,name:'原生 Antigravity 测试',provider:'antigravity',enabled:true,state:'catalog_ready',model_count:1}]}))
+ const model={id:'native-alias',upstream_id:'native-upstream-model',protocol:'antigravity',protocols:['antigravity'],enabled:true,priced:false,routable:false}
+ await page.route('**/api/admin/accounts/991/models?*',route=>route.fulfill({json:{account_id:991,items:[model],total:1,page:1,page_size:10,synced_at:1794965280}}))
+ let finishFirst,calls=0
+ const pending=new Promise(resolve=>{finishFirst=resolve})
+ const nativeRequest={model:'native-upstream-model',requestId:'agent-server-fixture',userAgent:'antigravity',requestType:'agent',request:{contents:[{role:'user',parts:[{text:'hi'}]}],generationConfig:{maxOutputTokens:64}}}
+ await page.route('**/api/admin/accounts/991/models/test',async route=>{
+  calls++;expect(route.request().postDataJSON()).toEqual({model:'native-alias',protocol:'antigravity'})
+  if(calls===1){await pending;await route.fulfill({json:{request:nativeRequest,path:'/v1internal:streamGenerateContent',status:429,duration_ms:502,error:'上游测试失败：上游返回 HTTP 429：请求受限，可能是限流、额度或模型容量限制',signal:'rate_limit',upstream_status:'RESOURCE_EXHAUSTED',upstream_reason:'RATE_LIMIT_EXCEEDED',retry_at:Math.floor(Date.now()/1000)+30,response:''}})}
+  else await route.fulfill({json:{request:nativeRequest,path:'/v1internal:streamGenerateContent',status:200,duration_ms:20,response:JSON.stringify({response:{candidates:[{content:{parts:[{text:'fixture-native-ok'}]},finishReason:'STOP'}]}})}})
+ })
+ await page.goto(baseURL+'/#accounts')
+ await page.getByRole('button',{name:'查看模型',exact:true}).click()
+ const catalog=page.getByRole('dialog',{name:'已同步模型',exact:true})
+ await expect(catalog).toContainText('原生 v1internal 协议透传')
+ await expect(catalog).not.toContainText('专用适配提供 Messages')
+ await catalog.getByRole('button',{name:'测试',exact:true}).click()
+ const panel=page.getByRole('dialog',{name:'模型调用测试',exact:true})
+ await expect(panel.getByRole('status')).toContainText('正在向上游发送请求')
+ const request=panel.locator('.model-test-output').first()
+ await expect(request).toContainText('"contents"');await expect(request).not.toContainText('"messages"');await expect(request).not.toContainText('"stream"')
+ finishFirst()
+ await expect(panel).toContainText('HTTP 429')
+ await expect(request).toContainText('agent-server-fixture')
+ await expect(panel).toContainText('/v1internal:streamGenerateContent')
+ await expect(panel).toContainText('RESOURCE_EXHAUSTED');await expect(panel).toContainText('RATE_LIMIT_EXCEEDED');await expect(panel).toContainText('上游建议重试时间')
+ await page.setViewportSize({width:390,height:844});await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
+ expect(calls).toBe(1)
+ await panel.getByRole('button',{name:'重新测试',exact:true}).click()
+ await expect(panel).toContainText('fixture-native-ok');await expect(panel).toContainText('测试完成 · HTTP 200')
+ expect(calls).toBe(2)
+ await expect(panel).not.toContainText('RESOURCE_EXHAUSTED')
+})

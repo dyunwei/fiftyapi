@@ -81,7 +81,6 @@
   "模型调用测试": "Model request test",
   "模型测试 ·": "Model test ·",
   "关闭测试": "Close test",
-  "固定调用当前账号，发送 hi。测试会消耗上游额度，不计入本站用户账单。下方请求为协议输入，实际发送时会应用账号适配配置。": "Sends hi using this account. Consumes upstream quota without charging local users. The request below shows protocol input; account adapter settings apply when sending.",
   "测试协议": "Test protocol",
   "请求内容": "Request body",
   "正在向上游发送请求，等待模型响应…": "Sending upstream request; waiting for the model…",
@@ -95,7 +94,6 @@
   "上次成功同步：": "Last successful sync:",
   "验证并同步": "Verify and sync",
   "这里显示此账号已保存的模型目录，包含未定价和已停用模型。目录可见不代表已经通过实际调用验证。客户端须使用列出的协议，不进行标准协议之间的自动转换。": "Saved models for this account, including unpriced and disabled entries. Catalog visibility does not confirm successful inference. Clients must use the listed protocols; standard protocols are not automatically converted.",
-  "Antigravity 使用专用适配提供 Messages；不通过 Chat 或 Responses 自动转换接入。": "Antigravity provides Messages through a dedicated adapter; Chat and Responses are not automatically converted.",
   "最近同步未成功：": "Last sync failed:",
   "。下方保留上次成功保存的目录。": ". The last successfully saved catalog is shown below.",
   "搜索模型": "Search models",
@@ -1073,5 +1071,11 @@
   "允许的模型 ID，每行一个；留空禁止全部模型": "Allowed model IDs, one per line; blank denies all models",
   "0 不限制，启用时至少 1024。用于 Claude 显式思考；Claude 自适应思考请设置强度上限，Codex 不支持独立思考 token 硬上限。": "Zero means unlimited; enabled budgets must be at least 1024. Applies to explicit Claude thinking. Use effort caps for adaptive thinking; Codex has no separate hard reasoning-token cap.",
   "默认透传客户端 metadata；关闭后仅发送规范化的 user_id。": "Client metadata passes through by default. Disabling this sends only a normalized user_id.",
-  "默认关闭，直接透传客户端系统提示；启用后补充 Claude Code 身份提示。": "Disabled by default to preserve client system instructions. Enabling this adds the Claude Code identity prompt."
+  "默认关闭，直接透传客户端系统提示；启用后补充 Claude Code 身份提示。": "Disabled by default to preserve client system instructions. Enabling this adds the Claude Code identity prompt.",
+  "固定调用当前账号，发送 hi。测试会消耗上游额度，不计入本站用户账单。下方为协议请求，收到结果后显示服务端构造的请求；认证和项目由账号提供，不在此展示。": "Send hi using this account. The test consumes upstream quota but does not charge local users. The preview shows the server-built protocol request once results arrive; account authentication and project details are not displayed.",
+  "Antigravity 使用原生 v1internal 协议透传，不提供 Messages、Chat 或 Responses 转换；客户端需要支持 Antigravity 原生协议。": "Antigravity forwards its native v1internal protocol without Messages, Chat, or Responses conversion. Clients must support the native Antigravity protocol.",
+  "请求路径": "Request path",
+  "上游状态": "Upstream status",
+  "上游原因代码": "Upstream reason code",
+  "上游建议重试时间": "Upstream suggested retry time"
 }

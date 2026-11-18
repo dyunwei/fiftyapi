@@ -1,5 +1,8 @@
 # Compatibility and verification
 
+Antigravity catalog tests now show native previews and safe 429 diagnostics and restore the default inference origin. Simulated verification on 2026-11-18 uses identity 2.23.0 and native-probe-model; no live-provider acceptance was run.
+
+
 ## Current refactor verification boundary
 
 Current behavior is defined in [low-maintenance sharing](low-maintenance.md): native Antigravity v1internal replaces Messages conversion; Claude metadata/system pass through by default; automatic tier prices consume user budgets; unknown usage releases reservations and remains pending. User model allowlists and concurrency apply without separate speed permissions.

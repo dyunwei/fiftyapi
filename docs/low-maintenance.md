@@ -50,3 +50,13 @@ Antigravity 示例（本地 Key 通过 Authorization Bearer 提供）：
 本次以临时数据库和模拟上游验证；默认 Codex 身份 0.164.0，模型为 `model` 等 fixture ID，覆盖 Responses JSON/SSE、Messages、原生 Antigravity、目录同步、档位价格、缓存、价格快照、异常恢复和并发权限。本次没有运行真实供应商验收，没有为重构后的 Antigravity 或新的身份默认值建立真实客户端兼容保证。历史转换器验收不适用于当前原生链路。
 
 2026-11-17 另行下载公开 LiteLLM 价格文件进行解析检查：4,171,564 字节，得到 4,190 个目录键，其中含有效 Fast 费率的键 577 个、Flex 433 个、Ultrafast 20 个。目录键数量包含别名，不代表独立模型数，也不代表这些模型已完成推理验收。文件 SHA-256：`63050115948432fd1abf146ad4f0670acb612163f98e084ceed1522ec210a2d5`。`make test`、`make build`、`make test-ui` 通过，浏览器测试 27 项。
+
+## Antigravity 本地测试诊断
+
+模型目录页面的“测试”直接构造原生 `v1internal` envelope，包含 `requestId`、`userAgent`、`requestType` 和 `request.contents`；不生成 Messages 请求。结果返回后，请求预览以服务端构造的请求为准，不展示账号认证和项目。默认推理使用 `daily-cloudcode-pa.googleapis.com`，模型目录继续使用其发现地址；显式配置的推理地址保持原值，自定义站点不会自动转到官方地址。
+
+测试页面中的 HTTP 429 表示所选上游返回请求限制，不等同于本地用户预算不足，也不能单凭该状态断定模型无权限。若上游提供明确的 Google 状态、允许展示的 ErrorInfo 原因代码或 Retry-After/RetryInfo，页面会显示这些诊断与建议重试时间；不展示原始错误消息、项目和配额元数据，不自动重试或切换模型。只有管理员再次点击测试才会再发送请求。
+
+2026-11-18 修复上述预览、文案和默认推理地址回归。模拟上游以 Antigravity 2.23.0 身份和 fixture 模型 `native-probe-model` 验证原生 envelope、429/RetryInfo、敏感信息保护与不重复调用；未调用真实供应商，不能据此确认实际账号的 429 已消失。
+
+验证命令 `make test`、`make build`、`make test-ui` 均通过，包含 28 项浏览器测试。

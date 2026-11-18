@@ -14,21 +14,24 @@ import (
 func errorSignal(raw []byte) string {
 	var root struct {
 		Error struct {
-			Code   string `json:"code"`
-			Type   string `json:"type"`
-			Status string `json:"status"`
+			Code   json.RawMessage `json:"code"`
+			Type   string          `json:"type"`
+			Status string          `json:"status"`
 		} `json:"error"`
 		Response struct {
 			Error struct {
-				Code string `json:"code"`
-				Type string `json:"type"`
+				Code json.RawMessage `json:"code"`
+				Type string          `json:"type"`
 			} `json:"error"`
 		} `json:"response"`
 	}
 	if json.Unmarshal(raw, &root) != nil {
 		return ""
 	}
-	for _, code := range []string{root.Error.Code, root.Error.Type, root.Error.Status, root.Response.Error.Code, root.Response.Error.Type} {
+	var directCode, responseCode string
+	_ = json.Unmarshal(root.Error.Code, &directCode)
+	_ = json.Unmarshal(root.Response.Error.Code, &responseCode)
+	for _, code := range []string{directCode, root.Error.Type, root.Error.Status, responseCode, root.Response.Error.Type} {
 		switch code {
 		case "usage_limit_reached", "quota_exceeded", "insufficient_quota":
 			return "quota_exhausted"
@@ -95,6 +98,7 @@ func observeHeaders(out *result, h http.Header) {
 func classifyRejection(out *result, resp *http.Response) {
 	observeHeaders(out, resp.Header)
 	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
+	out.upstreamStatus, out.upstreamReason = safeRejectionDetails(raw)
 	if signal := errorSignal(raw); signal != "" && out.signal != "quota_exhausted" {
 		out.signal = signal
 	}
@@ -198,4 +202,37 @@ func googleRetryHint(raw []byte) int64 {
 		}
 	}
 	return until
+}
+
+// Keep diagnostics useful without exposing upstream messages, projects,
+// quota metadata, credentials, or arbitrary strings supplied by a provider.
+func safeRejectionDetails(raw []byte) (string, string) {
+	var root struct {
+		Error struct {
+			Status  string `json:"status"`
+			Details []struct {
+				Type   string `json:"@type"`
+				Reason string `json:"reason"`
+			} `json:"details"`
+		} `json:"error"`
+	}
+	if json.Unmarshal(raw, &root) != nil {
+		return "", ""
+	}
+	status := ""
+	switch root.Error.Status {
+	case "RESOURCE_EXHAUSTED", "UNAUTHENTICATED", "PERMISSION_DENIED", "INVALID_ARGUMENT", "NOT_FOUND", "UNAVAILABLE", "INTERNAL", "DEADLINE_EXCEEDED", "FAILED_PRECONDITION":
+		status = root.Error.Status
+	}
+	reason := ""
+	for _, detail := range root.Error.Details {
+		if detail.Type != "type.googleapis.com/google.rpc.ErrorInfo" {
+			continue
+		}
+		switch detail.Reason {
+		case "RATE_LIMIT_EXCEEDED", "QUOTA_EXCEEDED", "MODEL_QUOTA_EXHAUSTED", "MODEL_CAPACITY_EXHAUSTED", "SERVICE_DISABLED", "ACCESS_TOKEN_EXPIRED", "ACCESS_TOKEN_SCOPE_INSUFFICIENT", "IAM_PERMISSION_DENIED", "BILLING_DISABLED":
+			reason = detail.Reason
+		}
+	}
+	return status, reason
 }

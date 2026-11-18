@@ -11,7 +11,6 @@ import (
 	"io"
 	"mime"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 )
@@ -163,19 +162,11 @@ func antigravityTurn(ctx context.Context, client *http.Client, c Config, t Token
 	}
 	request["toolConfig"] = map[string]any{"functionCallingConfig": map[string]string{"mode": mode}}
 	body, _ := json.Marshal(map[string]any{"project": modelBody.Project, "requestId": requestID, "userAgent": "antigravity", "requestType": "agent", "model": model, "request": request})
-	u, err := url.Parse(c.ModelsURL)
-	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil {
-		return result, errors.New("推理端点无效")
+	endpoint, err := AntigravityInferenceEndpoint(c, true)
+	if err != nil {
+		return result, err
 	}
-	// sub2api prioritizes daily for inference, production for project discovery.
-	if u.Host == "cloudcode-pa.googleapis.com" {
-		u.Host = "daily-cloudcode-pa.googleapis.com"
-	}
-	u.Path = "/v1internal:streamGenerateContent"
-	u.RawPath = ""
-	u.RawQuery = "alt=sse"
-	u.Fragment = ""
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
 		return result, errors.New("无法构造推理请求")
 	}

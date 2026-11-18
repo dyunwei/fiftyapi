@@ -50,3 +50,13 @@ Append-only migrations 019–021 preserve encrypted accounts, master-key binding
 This refactor is verified using temporary databases and simulated upstreams, default Codex identity 0.164.0, and fixture model IDs such as `model`. Coverage includes Responses JSON/SSE, Messages, native Antigravity, catalog synchronization, tier prices, caches, snapshots, recovery, and concurrency/access rules. No live-provider acceptance was run. No new real-client compatibility is established for native Antigravity or identity changes. Historical converter acceptance does not apply to the native path.
 
 On 2026-11-17, a separate parse check downloaded the public LiteLLM price file: 4,171,564 bytes yielded 4,190 catalog keys, including 577 keys with valid Fast rates, 433 with Flex, and 20 with Ultrafast. Keys include aliases, are not unique model counts, and do not establish inference compatibility. SHA-256: `63050115948432fd1abf146ad4f0670acb612163f98e084ceed1522ec210a2d5`. `make test`, `make build`, and `make test-ui` passed, including 27 browser tests.
+
+## Diagnosing local Antigravity tests
+
+The catalog's Test action builds a native `v1internal` envelope with `requestId`, `userAgent`, `requestType`, and `request.contents`, rather than Messages. Once results arrive, the preview uses the server-built request while omitting account authentication and project details. Default inference uses `daily-cloudcode-pa.googleapis.com`; discovery retains its configured endpoint. Explicit inference URLs are preserved and custom sites never automatically switch to an official origin.
+
+HTTP 429 on this test means the selected upstream restricted the request. It does not indicate a local user budget failure or by itself establish missing model permission. When supplied, known Google status/ErrorInfo codes and Retry-After/RetryInfo hints are displayed. Raw error messages, projects, and quota metadata remain private. No automatic retry or model switch occurs; another request requires the administrator to click Test again.
+
+The 2026-11-18 fix corrects stale copy, the preview, and the default inference-origin regression. Simulated tests use Antigravity identity 2.23.0 and fixture model `native-probe-model`, covering native envelopes, 429/RetryInfo, private-data protection, and single dispatch. No live provider was contacted, so this does not establish that a real account's 429 has cleared.
+
+Validation passed: `make test`, `make build`, and `make test-ui`, including 28 browser tests.
