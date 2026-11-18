@@ -17,6 +17,8 @@ English | [简体中文](README.zh-CN.md)
 
 </div>
 
+The overview shows all eight summary cards in one row on wide desktop screens, with quick actions, the 5-hour budget, and the weekly budget together in the row below. Card spacing and chart height adapt to the desktop viewport. Open **Request logs** for individual requests.
+
 For automatic prices, native Antigravity, user access limits, and centralized client defaults, see [low-maintenance sharing](docs/en/low-maintenance.md).
 
 ## Why FiftyAPI

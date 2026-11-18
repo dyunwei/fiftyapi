@@ -756,3 +756,52 @@ test('Antigravity 原生测试预览与 429 诊断不再显示 Messages 请求',
  expect(calls).toBe(2)
  await expect(panel).not.toContainText('RESOURCE_EXHAUSTED')
 })
+
+
+test('仪表盘统计单行、快捷操作与额度并排且桌面保持单屏',async({page})=>{
+ await page.context().addCookies(adminCookies)
+ await page.route('**/api/dashboard?*',async route=>{const response=await route.fetch();const data=await response.json();await route.fulfill({response,json:{...data,keys:4,accounts:4,users:3,total_requests:145,total_tokens:10724800,total_amount:7987009,average_ms:13850}})})
+ let logRequests=0
+ page.on('request',request=>{if(new URL(request.url()).pathname==='/api/logs')logRequests++})
+ for(const language of ['zh-CN','en']){
+  await page.goto(baseURL)
+  await page.evaluate(language=>localStorage.setItem('fiftyapi.locale',language),language)
+  await page.reload()
+  await expect(page.locator('.quota-card')).toHaveCount(2)
+  await expect(page.locator('.dashboard-footnote')).toHaveCount(0)
+  await expect(page.getByRole('heading',{name:/最近使用记录|Recent usage/})).toHaveCount(0)
+  for(const width of [1280,1440,1920]){
+   await page.setViewportSize({width,height:1000})
+   const quick=await page.locator('.quick-panel').boundingBox()
+   const quotas=await page.locator('.quota-card').all()
+   const first=await quotas[0].boundingBox(),second=await quotas[1].boundingBox()
+   expect(Math.abs(quick.y-first.y)).toBeLessThan(1)
+   expect(Math.abs(first.y-second.y)).toBeLessThan(1)
+   expect(quick.x+quick.width).toBeLessThan(first.x)
+   expect(first.x+first.width).toBeLessThan(second.x)
+  }
+  for(const viewport of [{width:1280,height:720},{width:1366,height:768},{width:1440,height:900},{width:1920,height:1080}]){
+   await page.setViewportSize(viewport)
+   const cards=await page.locator('.dashboard-stat').all()
+   expect(cards).toHaveLength(8)
+   const boxes=await Promise.all(cards.map(card=>card.boundingBox()))
+   for(const box of boxes)expect(Math.abs(box.y-boxes[0].y)).toBeLessThan(1)
+   for(let i=1;i<boxes.length;i++)expect(boxes[i].x).toBeGreaterThanOrEqual(boxes[i-1].x+boxes[i-1].width)
+   const valuesOverflow=await page.locator('.dashboard-stat strong').evaluateAll(elements=>elements.some(el=>el.scrollWidth>el.clientWidth+1))
+   expect(valuesOverflow,`${language} ${viewport.width} numeric values`).toBe(false)
+   const overflow=await page.evaluate(()=>({x:document.documentElement.scrollWidth>innerWidth,y:document.documentElement.scrollHeight>innerHeight}))
+   if(overflow.x||overflow.y)await page.screenshot({path:`/tmp/fiftyapi-spacing-overflow-${language}-${viewport.width}.png`,fullPage:true})
+   expect(overflow,`${language} ${viewport.width}×${viewport.height}`).toEqual({x:false,y:false})
+   await expect(page.locator('.page-footer')).toBeInViewport()
+  }
+  await expect(page.locator('.dashboard-stat strong').first()).toHaveCSS('font-size','22px')
+  await page.setViewportSize({width:1440,height:1000})
+  await page.screenshot({path:`/tmp/fiftyapi-restored-${language}.png`,fullPage:true})
+ }
+ expect(logRequests).toBe(0)
+ await page.setViewportSize({width:390,height:844})
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
+ const quick=await page.locator('.quick-panel').boundingBox()
+ const quota=await page.locator('.quota-card').first().boundingBox()
+ expect(quota.y).toBeGreaterThanOrEqual(quick.y+quick.height)
+})

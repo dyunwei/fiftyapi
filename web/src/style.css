@@ -183,3 +183,77 @@ html[lang="en"] .nav-item{white-space:normal}
 .setup-token-help p{margin:0 0 8px}
 .setup-token-help p:last-child{margin-bottom:0}
 .setup-token-help pre{margin:8px 0;padding:8px;background:#f8fafc;border-radius:4px;white-space:pre-wrap;overflow-wrap:anywhere;user-select:all}
+
+
+/* Share one desktop row while preserving the original card typography and spacing. */
+.overview-actions{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:16px;margin-bottom:24px}
+.overview-actions>.quick-panel,.overview-actions>.quota-grid{margin-bottom:0;min-width:0}
+.overview-actions .quick-grid{grid-template-columns:minmax(0,1fr)}
+.overview-actions .quick-action>span:nth-child(2){min-width:0}
+.overview-actions .quick-icon{flex-shrink:0}
+.overview-actions .quota-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media(max-width:1100px){.overview-actions{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:580px){.overview-actions{gap:16px;margin-bottom:16px}.overview-actions .quota-grid{grid-template-columns:minmax(0,1fr)}}
+
+
+/* Fit the overview to desktop height by reducing whitespace in the content area. */
+@media(min-width:1200px){
+ .overview-workspace .page-content{height:calc(100dvh - 72px);padding:16px 22px;display:flex;flex-direction:column;gap:18px}
+ .overview-workspace .page-content>.page-heading{display:none}
+ .overview-workspace .page-content>*{flex-shrink:0;margin:0;min-width:0}
+ .overview-workspace .dashboard-stats{grid-template-columns:repeat(8,minmax(0,1fr));gap:14px}
+ .overview-workspace .dashboard-stat{min-height:0;padding:7px 14px;gap:12px}
+ .overview-workspace .stat-label{line-height:1.25;margin-bottom:2px}
+ .overview-workspace .dashboard-stat strong{line-height:1.15}
+ .overview-workspace .dashboard-stat p{line-height:1.25;margin-top:2px}
+ .overview-workspace .stat-icon{width:36px;height:36px}
+ .overview-workspace .overview-actions{gap:18px}
+ .overview-workspace .quick-panel,.overview-workspace .quota-card{padding:10px 16px}
+ .overview-workspace .quick-panel>h2{margin-bottom:6px}
+ .overview-workspace .quick-grid{gap:10px}
+ .overview-workspace .quick-action{padding:5px 10px;gap:10px}
+ .overview-workspace .quick-action strong,.overview-workspace .quick-action small{line-height:1.3}
+ .overview-workspace .quick-icon{width:32px;height:32px}
+ .overview-workspace .quota-grid{gap:18px}
+ .overview-workspace .card-kicker{margin-bottom:8px}
+ .overview-workspace .quota-amount{font-size:28px;margin-bottom:10px}
+ .overview-workspace .meter{margin-bottom:8px}
+ .overview-workspace .quota-detail{line-height:1.3}
+ .overview-workspace .dashboard-filter{padding:5px 14px}
+ .overview-workspace .dashboard-filter select{padding:5px 10px}
+ .overview-workspace .dashboard-filter .secondary{min-height:32px;padding:4px 10px}
+ .overview-workspace .analytics-grid{flex:1;min-height:180px;gap:18px}
+ .overview-workspace .analytics-grid>.analytics-panel{height:100%;margin-bottom:0}
+ .overview-workspace .analytics-grid .panel-heading{min-height:44px;padding:10px 16px}
+ .overview-workspace .analytics-grid .distribution-layout{padding:10px 14px;gap:8px}
+ .overview-workspace .analytics-grid .donut{width:clamp(64px,calc(100dvh - 700px),138px);height:clamp(64px,calc(100dvh - 700px),138px)}
+ .overview-workspace .analytics-grid .donut>div{width:68%;height:68%}
+ .overview-workspace .donut strong{font-size:18px}
+ .overview-workspace .donut span{font-size:8px}
+ .overview-workspace .chart-legend{padding:8px 10px 4px;gap:8px}
+ .overview-workspace .trend-chart{padding:4px 12px 10px 4px}
+ .overview-workspace .error-summary{padding:12px 16px;gap:28px}
+ .overview-workspace .error-empty{padding:16px}
+ .overview-workspace .page-footer{padding:4px 0;line-height:1.4}
+}
+@media(min-width:1200px) and (max-height:760px){
+ .overview-workspace .page-content{padding:10px 18px;gap:12px}
+ .overview-workspace .dashboard-stat{padding:5px 14px}
+ .overview-workspace .quick-panel,.overview-workspace .quota-card{padding:8px 14px}
+ .overview-workspace .quick-panel>h2{margin-bottom:4px}
+ .overview-workspace .quick-action{padding:3px 8px}
+ .overview-workspace .quick-grid{gap:8px}
+ .overview-workspace .analytics-grid .panel-heading{min-height:40px;padding:8px 14px}
+}
+
+
+/* Eight summary cards share one row; narrower desktops stack the icon above the value. */
+@media(min-width:1200px) and (max-width:1799px){
+ .overview-workspace .dashboard-stat{flex-direction:column;align-items:flex-start;padding:10px;gap:8px}
+ .overview-workspace .dashboard-stat>div{width:100%;min-width:0}
+ .overview-workspace .stat-icon{width:30px;height:30px}
+ .overview-workspace .stat-icon svg{width:19px;height:19px}
+ .overview-workspace .stat-label{font-size:11px;min-height:2.5em}
+ .overview-workspace .dashboard-stat strong{font-size:clamp(16px,1.2vw,22px);white-space:nowrap;letter-spacing:-.5px}
+ .overview-workspace .dashboard-stat p{font-size:10px;overflow-wrap:anywhere}
+}
