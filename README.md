@@ -17,7 +17,22 @@ English | [简体中文](README.zh-CN.md)
 
 </div>
 
-The overview shows all eight summary cards in one row on wide desktop screens, with quick actions, the 5-hour budget, and the weekly budget together in the row below. Card spacing and chart height adapt to the desktop viewport. Open **Request logs** for individual requests.
+On wide desktop screens, the overview places summary cards in one row, with quick actions and the two budget windows below. Administrators see eight summary cards; members see seven. Open **Request logs** for individual requests.
+
+<details>
+<summary>More screenshots: upstream accounts and email settings</summary>
+
+**Upstream accounts** — a compact search bar and authorization details in a dialog keep cards concise.
+
+![Upstream accounts](docs/screenshots/upstream-accounts-en.png)
+
+**Email settings** — related fields share rows, with test email controls alongside. The desktop form fits on one screen; mobile uses a single column.
+
+![Email settings](docs/screenshots/email-settings-en.png)
+
+</details>
+
+Screenshots show the current interface with simulated data.
 
 For automatic prices, native Antigravity, user access limits, and centralized client defaults, see [low-maintenance sharing](docs/en/low-maintenance.md).
 
