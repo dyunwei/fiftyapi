@@ -5,6 +5,41 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 English | 中文说明见各版本下方折叠区域
 
+## 0.2.1 (2026-11-19)
+
+### Changed
+
+- Hide the page scrollbar while keeping native scrolling and scrollbars in dialogs, data panels, and wide tables.
+- Simplify the documentation navigation and consolidate related guides.
+
+### Fixed
+
+- Write Codex configuration using explicit TOML sections.
+- Pass the morning inference probe setting through Docker Compose.
+
+### Upgrade notes
+
+- Upgrading from v0.2.0 requires no database migrations or configuration format changes. Docker Compose now honors the existing morning inference probe setting.
+
+<details>
+<summary>中文说明</summary>
+
+**调整**
+
+- 隐藏整页纵向滚动条，保留原生滚动方式以及弹窗、数据面板和宽表格的滚动条。
+- 简化文档导航并合并相关指南。
+
+**修复**
+
+- 使用显式 TOML 节写入 Codex 配置。
+- 修复 Docker Compose 未传入晨间推理探测设置的问题。
+
+**升级说明**
+
+- 从 v0.2.0 升级无需数据库迁移或修改配置格式。Docker Compose 现在会读取已有的晨间推理探测设置。
+
+</details>
+
 ## 0.2.0 (2026-11-18)
 
 ### Added
