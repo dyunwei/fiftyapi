@@ -102,7 +102,7 @@ The key is entered at a hidden prompt. The only network request is `/v1/models` 
 
 Codex persists the key using `experimental_bearer_token`, allowing a desktop-launched VS Code to read it without shell environment variables or changes to `auth.json`. Official documentation discourages this field for general credential management; this helper uses plaintext local storage for extension access. Claude Code merges user settings.json env and maps all three model aliases to the selected model. Conflicting inherited auth, endpoint or cloud-provider environment variables must be cleared first. Project or managed settings may still override user settings. The Claude Code VS Code extension remains unverified.
 
-Other parsed settings are preserved, but TOML comments and formatting are normalized. Every write backs up the full original bytes. Restore handles only managed fields, refusing conflicts with edits by other tools. A newly created file is removed on restore if no other settings remain.
+Other parsed settings are preserved. The helper rewrites Codex TOML using section headers, with one `[projects."path"]` section per project and comments retained in the original file backup. Every write backs up the full original bytes. Restore handles only managed fields, refusing conflicts with edits by other tools. A newly created file is removed on restore if no other settings remain.
 
 The page shows automatic setup by default; file-editing instructions are under “Manual setup (optional)”.
 

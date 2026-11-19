@@ -8,6 +8,7 @@ import json
 import math
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -44,6 +45,12 @@ def atomic(path, data):
             os.unlink(name)
 
 
+def toml_key(key):
+    if re.fullmatch(r'[A-Za-z0-9_-]+', key):
+        return key
+    return value(key)
+
+
 def value(v):
     if isinstance(v, str):
         return json.dumps(v, ensure_ascii=False)
@@ -52,7 +59,7 @@ def value(v):
     if isinstance(v, (datetime.datetime, datetime.date, datetime.time)):
         return v.isoformat()
     if isinstance(v, dict):
-        return '{ ' + ', '.join(value(k) + ' = ' + value(x) for k, x in v.items()) + ' }'
+        return '{ ' + ', '.join(toml_key(k) + ' = ' + value(x) for k, x in v.items()) + ' }'
     if isinstance(v, list):
         return '[' + ', '.join(value(x) for x in v) + ']'
     if isinstance(v, float) and math.isnan(v):
@@ -60,14 +67,33 @@ def value(v):
     return str(v)
 
 
+def toml_sections(data, path=()):
+    assignments = [
+        toml_key(key) + ' = ' + value(item)
+        for key, item in data.items()
+        if not isinstance(item, dict)
+    ]
+    if path and (assignments or not data):
+        assignments.insert(0, '[' + '.'.join(path) + ']')
+    if assignments:
+        yield '\n'.join(assignments)
+    for key, item in data.items():
+        if isinstance(item, dict):
+            yield from toml_sections(item, (*path, toml_key(key)))
+
+
 def decode(client, raw):
     return (tomllib.loads(raw.decode('utf-8')) if client == 'codex' else json.loads(raw)) if raw else {}
 
 
 def encode(client, data):
-    result = ('\n'.join(value(k) + ' = ' + value(v) for k, v in data.items()) + '\n') if client == 'codex' else json.dumps(data, ensure_ascii=False, indent=2) + '\n'
-    decode(client, result.encode())
-    return result.encode()
+    if client == 'codex':
+        result = '\n\n'.join(toml_sections(data)) + '\n'
+    else:
+        result = json.dumps(data, ensure_ascii=False, indent=2) + '\n'
+    output = result.encode()
+    decode(client, output)
+    return output
 
 
 def get(data, keys):
@@ -195,7 +221,8 @@ def configure(args, state):
     for keys, v in changes:
         put(preview, keys, {'present': True, 'value': v})
     encode(client, preview)
-    print('TOML formatting/comments are normalized; all parsed settings are retained. Full original bytes are backed up.')
+    if client == 'codex':
+        print('TOML is rewritten using section headers. Parsed settings are retained and the original file is backed up, including comments.')
     if input('Apply configuration? [y/N] ').lower() != 'y':
         return
     # Save recovery information before changing the client file.

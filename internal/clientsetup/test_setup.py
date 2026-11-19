@@ -23,6 +23,30 @@ class SetupTests(unittest.TestCase):
         source = b'''# comments\nmodel="old"\n[other]\nquoted="a\\nb"\ndate=2026-01-02\narray=[{x=1}, {x=2}]\n[mcp_servers.demo]\ncommand="echo"\nargs=["hello"]\n'''
         self.assertEqual(h.decode('codex', source), h.decode('codex', h.encode('codex', h.decode('codex', source))))
 
+    def test_codex_projects_use_separate_sections(self):
+        source = b'''projects = { "/work/one.git" = { trust_level = "trusted" }, "/work/two" = { trust_level = "trusted" } }
+model = "existing-model"
+[model_providers.fiftyapi]
+name = "FiftyAPI"
+[empty]
+'''
+        expected = b'''model = "existing-model"
+
+[projects."/work/one.git"]
+trust_level = "trusted"
+
+[projects."/work/two"]
+trust_level = "trusted"
+
+[model_providers.fiftyapi]
+name = "FiftyAPI"
+
+[empty]
+'''
+        original = h.decode('codex', source)
+        self.assertEqual(h.encode('codex', original), expected)
+        self.assertEqual(h.decode('codex', expected), original)
+
     def test_restore_preserves_unrelated_edits_and_rejects_conflicts(self):
         for client in ['claude', 'codex']:
             path = Path(self.tmp.name) / client
