@@ -110,13 +110,17 @@ func TestAntigravityClientCancellationReleasesSlot(t *testing.T) {
 		w.(http.Flusher).Flush()
 		select {
 		case <-r.Context().Done():
+			close(canceled)
 		case <-time.After(3 * time.Second):
 		}
-		close(canceled)
 	}))
 	defer upstream.Close()
 	g := setupGateway(t, "antigravity", upstream)
-	server := httptest.NewServer(http.HandlerFunc(g.h.Serve))
+	finished := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer close(finished)
+		g.h.Serve(w, r)
+	}))
 	defer server.Close()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -137,26 +141,29 @@ func TestAntigravityClientCancellationReleasesSlot(t *testing.T) {
 	case <-time.After(3 * time.Second):
 		t.Fatal("client cancellation did not reach upstream")
 	}
-	deadline := time.Now().Add(3 * time.Second)
-	for time.Now().Before(deadline) {
-		logs, e := g.s.Logs(context.Background(), g.user, false, 0, "", 0)
-		if e == nil && len(logs) == 1 && logs[0].Amount == nil {
-			pending, e := g.s.PendingCharges(context.Background())
-			if e != nil || len(pending) != 1 || pending[0].Reservation != 0 {
-				t.Fatal("canceled request lost uncertain usage or held reservation")
-			}
-			slot, _ := g.h.slots.Load(g.account)
-			state := slot.(*accountSlot)
-			state.mu.Lock()
-			active := state.active
-			state.mu.Unlock()
-			if active == 0 {
-				return
-			}
-		}
-		time.Sleep(5 * time.Millisecond)
+	// Usage evidence is persisted before the pending charge is released.
+	// Wait for the handler to finish both writes before checking the result.
+	select {
+	case <-finished:
+	case <-time.After(3 * time.Second):
+		t.Fatal("canceled request handler did not finish")
 	}
-	t.Fatal("canceled request did not finish logging and release slot")
+	logs, err := g.s.Logs(context.Background(), g.user, false, 0, "", 0)
+	if err != nil || len(logs) != 1 || logs[0].Amount != nil {
+		t.Fatalf("expected one unbilled cancellation log, got %d logs (error: %v)", len(logs), err)
+	}
+	pending, err := g.s.PendingCharges(context.Background())
+	if err != nil || len(pending) != 1 || pending[0].ID != logs[0].ID || pending[0].Reservation != 0 {
+		t.Fatal("canceled request lost uncertain usage or held reservation")
+	}
+	slot, _ := g.h.slots.Load(g.account)
+	state := slot.(*accountSlot)
+	state.mu.Lock()
+	active := state.active
+	state.mu.Unlock()
+	if active != 0 {
+		t.Fatalf("canceled request left %d active account slots", active)
+	}
 }
 
 func TestAntigravityConcurrentGatewayLoad(t *testing.T) {
