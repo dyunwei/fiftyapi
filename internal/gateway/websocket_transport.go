@@ -32,14 +32,26 @@ type websocketState struct {
 	order         []string
 	lastModel     string
 	base          *http.Client
+	reader        *upstreamSocketReader
 }
 
 func (s *websocketState) Owner() int64 { s.mu.Lock(); defer s.mu.Unlock(); return s.owner }
-func (s *websocketState) close() {
+func (s *websocketState) close()       { s.closeConn(nil) }
+
+// An old reader must never clear a replacement connection.
+func (s *websocketState) closeConn(expected *ws.Conn) {
 	s.mu.Lock()
+	if expected != nil && s.conn != expected {
+		s.mu.Unlock()
+		return
+	}
 	conn := s.conn
 	base := s.base
 	owner, openedAt := s.owner, s.openedAt
+	if s.reader != nil {
+		s.reader.cancel()
+	}
+	s.reader = nil
 	s.conn = nil
 	s.base = nil
 	s.owner = 0
@@ -62,12 +74,15 @@ func (s *websocketState) previous(id string) (string, bool) {
 	entry, ok := s.cache[id]
 	return entry.model, ok && s.conn != nil
 }
-func (s *websocketState) remember(id, model string) {
+func (s *websocketState) rememberOn(conn *ws.Conn, id, model string) {
 	if id == "" || len(id) > 256 {
 		return
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.conn != conn {
+		return
+	}
 	if s.cache == nil {
 		s.cache = map[string]wsCachedResponse{}
 	}
@@ -120,6 +135,7 @@ func (t *websocketUpstreamTransport) RoundTrip(req *http.Request) (*http.Respons
 	state := t.turn.state
 	state.mu.Lock()
 	conn, owner := state.conn, state.owner
+	socketReader := state.reader
 	lastCompleted := state.lastCompleted
 	state.mu.Unlock()
 	if conn != nil && owner != t.credential.AccountID {
@@ -185,7 +201,12 @@ func (t *websocketUpstreamTransport) RoundTrip(req *http.Request) (*http.Respons
 		state.lastCompleted = time.Time{}
 		state.owner = t.credential.AccountID
 		state.base = t.base
+		readCtx, readCancel := context.WithCancel(t.turn.ctx)
+		socketReader = &upstreamSocketReader{messages: make(chan upstreamSocketMessage, 1), cancel: readCancel}
+		state.reader = socketReader
 		state.mu.Unlock()
+		go state.readUpstream(readCtx, conn, socketReader)
+		go state.heartbeatUpstream(readCtx, conn)
 	} else {
 		t.base.CloseIdleConnections()
 	}
@@ -208,26 +229,41 @@ func (t *websocketUpstreamTransport) RoundTrip(req *http.Request) (*http.Respons
 	delete(payload, "background")
 	encoded, _ := json.Marshal(payload)
 	ctx, cancel := context.WithCancel(req.Context())
+	socketReader.active.Store(true)
 	if err = conn.Write(ctx, ws.MessageText, encoded); err != nil {
 		cancel()
-		state.close()
+		state.closeConn(conn)
 		return nil, websocketFailure("upstream_write", err, reused, "none")
 	}
 	reader, writer := io.Pipe()
-	body := &websocketResponseBody{PipeReader: reader, cancel: cancel, state: state}
+	body := &websocketResponseBody{PipeReader: reader, cancel: cancel, state: state, conn: conn}
 	go func() {
 		defer writer.Close()
 		defer cancel()
 		last := "none"
 		for {
-			kind, message, e := conn.Read(ctx)
+			var frame upstreamSocketMessage
+			select {
+			case <-ctx.Done():
+				writer.CloseWithError(websocketFailure("upstream_read", ctx.Err(), reused, last))
+				return
+			case next, ok := <-socketReader.messages:
+				frame = next
+				if !ok {
+					frame.err = socketReader.err
+					if frame.err == nil {
+						frame.err = io.EOF
+					}
+				}
+			}
+			kind, message, e := frame.kind, frame.data, frame.err
 			if e != nil {
-				state.close()
+				state.closeConn(conn)
 				writer.CloseWithError(websocketFailure("upstream_read", e, reused, last))
 				return
 			}
 			if kind != ws.MessageText {
-				state.close()
+				state.closeConn(conn)
 				writer.CloseWithError(websocketFailure("upstream_binary_frame", nil, reused, last))
 				return
 			}
@@ -244,7 +280,7 @@ func (t *websocketUpstreamTransport) RoundTrip(req *http.Request) (*http.Respons
 				} `json:"response"`
 			}
 			if json.Unmarshal(message, &event) != nil || event.Type == "" {
-				state.close()
+				state.closeConn(conn)
 				writer.CloseWithError(websocketFailure("upstream_invalid_event", nil, reused, last))
 				return
 			}
@@ -259,14 +295,14 @@ func (t *websocketUpstreamTransport) RoundTrip(req *http.Request) (*http.Respons
 			}
 			terminal := event.Type == "response.completed" || event.Type == "response.failed" || event.Type == "response.incomplete" || event.Type == "error"
 			if event.Type == "response.completed" {
-				state.remember(event.Response.ID, t.turn.model)
+				state.rememberOn(conn, event.Response.ID, t.turn.model)
 			}
 			if terminal {
 				body.finished.Store(true)
 			}
 			if _, e = writer.Write(append(append([]byte("data: "), message...), []byte("\n\n")...)); e != nil {
 				if !terminal {
-					state.close()
+					state.closeConn(conn)
 				}
 				return
 			}
@@ -288,17 +324,82 @@ type websocketResponseBody struct {
 	finished atomic.Bool
 	cancel   context.CancelFunc
 	state    *websocketState
+	conn     *ws.Conn
 }
 
 func (b *websocketResponseBody) Close() error {
 	err := b.PipeReader.Close()
 	b.cancel()
 	if !b.finished.Load() {
-		b.state.close()
+		b.state.closeConn(b.conn)
 	}
 	return err
 }
 func websocketRejection(req *http.Request, status int, code string) *http.Response {
 	body, _ := json.Marshal(map[string]any{"error": map[string]string{"code": code}})
 	return &http.Response{StatusCode: status, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(string(body))), Request: req}
+}
+
+// One reader remains alive for the socket lifetime, including between turns.
+// This consumes close/ping frames immediately rather than on the next request.
+type upstreamSocketMessage struct {
+	kind ws.MessageType
+	data []byte
+	err  error
+}
+type upstreamSocketReader struct {
+	messages chan upstreamSocketMessage
+	cancel   context.CancelFunc
+	active   atomic.Bool
+	err      error
+}
+
+func (s *websocketState) readUpstream(ctx context.Context, conn *ws.Conn, reader *upstreamSocketReader) {
+	defer close(reader.messages)
+	for {
+		kind, data, err := conn.Read(ctx)
+		if err != nil {
+			log.Printf("Upstream WebSocket read ended connection_id=%s cause=%s active=%t", s.connectionID, failureCategory(err), reader.active.Load())
+			reader.err = err
+			s.closeConn(conn)
+			return
+		}
+		if !reader.active.Load() {
+			log.Printf("Upstream WebSocket unexpected idle event connection_id=%s", s.connectionID)
+			s.closeConn(conn)
+			return
+		}
+		var event struct {
+			Type string `json:"type"`
+		}
+		_ = json.Unmarshal(data, &event)
+		switch event.Type {
+		case "response.completed", "response.failed", "response.incomplete", "error":
+			reader.active.Store(false)
+		}
+		select {
+		case reader.messages <- upstreamSocketMessage{kind: kind, data: data}:
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+func (s *websocketState) heartbeatUpstream(ctx context.Context, conn *ws.Conn) {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			pingCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+			err := conn.Ping(pingCtx)
+			cancel()
+			if err != nil {
+				log.Printf("Upstream WebSocket heartbeat failed connection_id=%s cause=%s", s.connectionID, failureCategory(err))
+				s.closeConn(conn)
+				return
+			}
+		}
+	}
 }
