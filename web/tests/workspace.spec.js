@@ -178,6 +178,8 @@ test('账号配置表单、默认值、平台字段与请求头校验',async({pa
  await page.getByLabel('用户名',{exact:true}).fill('admin');await page.getByLabel('密码',{exact:true}).fill(password)
  await page.getByRole('button',{name:'登录',exact:false}).click()
  await page.locator('.nav-item').filter({hasText:'上游账号'}).click()
+ await expect(page.locator('.account-card .account-actions').first()).toBeInViewport()
+ await expect(page.locator('.header-account-actions')).toHaveCount(0)
  await page.getByRole('button',{name:'配置',exact:true}).click()
  const dialog=page.getByRole('dialog')
  await expect(dialog.getByLabel('账号最大并发',{exact:true})).toHaveCount(0)
