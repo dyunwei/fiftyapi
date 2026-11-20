@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Exercise only a local image with temporary credentials/data; publish nothing."""
 import base64
+import http.client
 import http.cookiejar
 import json
 import os
@@ -84,7 +85,10 @@ with tempfile.TemporaryDirectory(prefix='fiftyapi-docker-') as directory:
                 connection.sendall(upgrade.encode())
                 with connection.makefile('rb') as response:
                     assert int(response.readline().split()[1])==expected
-                    while response.readline().strip():pass
+                    headers=http.client.parse_headers(response)
+                    if expected==403:
+                        rejected_request_id=headers.get('X-Request-ID')
+                        assert rejected_request_id, 'rejected authenticated upgrade must return a request ID'
 
         if automatic:
             docker('stop','--time','60',name)
@@ -117,7 +121,14 @@ with tempfile.TemporaryDirectory(prefix='fiftyapi-docker-') as directory:
         assert not saved['config'].get('password')
         assert saved['config']['public_url']=='http://gateway.internal:8080'
         logs=json.load(request('/api/admin/logs?page=1&page_size=20'))
-        assert logs['items']==[] and logs['total']==0
+        # The two successful handshakes sent no inference. The rejected Origin
+        # leaves one diagnostic so the key owner can investigate the failure.
+        assert logs['total']==1 and len(logs['items'])==1, 'expected only the rejected upgrade diagnostic'
+        log=logs['items'][0]
+        assert log['id']==rejected_request_id and log['status']==403 and log['amount']==0
+        diagnostic=log['diagnostics']
+        assert diagnostic['protocol']=='responses' and diagnostic['code']=='client_websocket_handshake'
+        assert diagnostic['dispatched'] is False
 
         if bind_mount:
             assert docker('exec','--user','10001:10001',name,'stat','-c','%u:%g:%a','/data/ownership-fixture')=='10001:10001:600'
