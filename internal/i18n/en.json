@@ -1,4 +1,5 @@
 {
+  "传输探测正在进行，请稍后再试": "Transport checks are busy. Try again shortly.",
   "客户端 WebSocket 握手失败": "Client WebSocket handshake failed",
   "告警收件邮箱无效": "Invalid maintenance alert recipient",
   "原会话账号暂时限流，请稍后重试或新建会话": "The session account is temporarily rate limited; retry later or start a new session",

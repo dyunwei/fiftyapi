@@ -7,6 +7,8 @@ Antigravity 目录测试的原生预览、默认推理地址与 429 安全诊断
 
 使用模拟 OpenAI 上游、Codex 身份 `0.164.0` 和夹具模型 `model`，覆盖 Responses HTTP JSON、HTTP SSE、双向 WebSocket、已认证的握手失败、模型协议不匹配、本地额度阻塞和上游限流。客户端助手使用模拟目录验证 Responses 与 Messages 自检。此项没有运行真实供应商或原生客户端。
 
+传输自检使用 Python 3.11 助手和本机 FiftyAPI 临时数据库验证 Responses 和 Messages 的 SSE 事件间隔、Responses WebSocket 握手、以及探测前后额度和请求日志；使用模拟 HTTP 端点验证 SSE 事件合并可检出。此项只测试客户端到网关，未配置模型、未联系供应商，也未运行原生客户端。
+
 ## 当前重构的验证边界
 
 当前行为以 [低维护账号共享](low-maintenance.md) 为准：Antigravity 使用原生 v1internal，不再提供 Messages 转换；Claude 默认透传 metadata/system；加速档位按自动价格计入预算；未知用量释放预占并保留待核算。模型允许列表与并发按用户控制，不单独授权加速档位。

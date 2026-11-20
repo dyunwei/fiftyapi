@@ -36,7 +36,7 @@ onMounted(async()=>{try{models.value=await props.api('/models')}catch(e){if(e.na
    <p class="subtle">{{ t('需要 Python 3.11+，不要使用 sudo。修改前自动备份；密钥明文保存在本机，TOML 注释与排版会规范化。') }}</p>
    <details class="usage-details">
     <summary>{{ t('客户端接入自检') }}</summary>
-    <p class="subtle">{{ t('在配置客户端的同一终端运行。检查配置、网络、密钥和模型协议，无需调用推理。') }}</p>
+    <p class="subtle">{{ t('在配置客户端的同一终端运行。检查配置、网络、密钥、模型协议及 SSE 事件到达情况，Codex 还会检查 WebSocket 握手。探测不消耗推理额度。') }}</p>
     <section class="usage-code"><header><code>{{ t('自检命令') }}</code><button type="button" class="secondary" @click="$emit('copy',check)">{{ t('复制') }}</button></header><pre><code>{{ check }}</code></pre></section>
    </details>
    <details class="usage-details restore-guide">

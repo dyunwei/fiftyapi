@@ -22,6 +22,7 @@ type Handler struct {
 	store        *store.Store
 	accounts     *accounts.Service
 	counter      atomic.Uint64
+	sseChecks    atomic.Int32
 	instanceID   string
 	slots        sync.Map
 	wsMu         sync.Mutex

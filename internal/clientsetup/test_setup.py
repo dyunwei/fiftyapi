@@ -8,6 +8,8 @@ from unittest.mock import patch
 from types import SimpleNamespace
 from contextlib import redirect_stdout
 import io
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from threading import Thread
 
 spec = importlib.util.spec_from_file_location('helper', Path(__file__).with_name('setup.py'))
 h = importlib.util.module_from_spec(spec)
@@ -94,7 +96,7 @@ name = "FiftyAPI"
                 self.assertTrue(state['active'])
                 before = Path(state['path']).read_bytes()
                 output = io.StringIO()
-                with redirect_stdout(output):
+                with redirect_stdout(output), patch.object(h, 'check_sse', return_value=None), patch.object(h, 'check_websocket', return_value=None):
                     h.check(client)
                 self.assertEqual(Path(state['path']).read_bytes(), before)
                 self.assertIn('Gateway reachable; API key accepted', output.getvalue())
@@ -105,6 +107,52 @@ name = "FiftyAPI"
                 self.assertFalse(Path(state['path']).exists())
                 h.apply(client, state, True)
                 self.assertTrue(Path(state['path']).exists())
+
+    def test_transport_checks_over_loopback(self):
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                if self.headers.get('Authorization') != 'Bearer fixture-key':
+                    self.send_error(401)
+                    return
+                if self.path == '/v1/responses':
+                    if self.headers.get('Connection') != 'Upgrade' or self.headers.get('Upgrade') != 'websocket':
+                        self.send_error(400)
+                        return
+                    nonce = self.headers['Sec-WebSocket-Key']
+                    accept = h.base64.b64encode(h.hashlib.sha1(
+                        (nonce + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').encode()).digest()).decode()
+                    self.send_response(101)
+                    self.send_header('Upgrade', 'websocket')
+                    self.send_header('Connection', 'Upgrade')
+                    self.send_header('Sec-WebSocket-Accept', accept)
+                    self.end_headers()
+                    return
+                self.send_response(200)
+                self.send_header('Content-Type', 'text/event-stream')
+                self.end_headers()
+                live = self.path.startswith('/v1/responses?')
+                for i in range(1, 4):
+                    self.wfile.write(f'event: fiftyapi.transport_check\ndata: {i}\n\n'.encode())
+                    self.wfile.flush()
+                    if live and i < 3:
+                        h.time.sleep(0.4)
+
+            def log_message(self, *_):
+                pass
+
+        with ThreadingHTTPServer(('127.0.0.1', 0), Handler) as server:
+            worker = Thread(target=server.serve_forever)
+            worker.start()
+            try:
+                base = 'http://127.0.0.1:' + str(server.server_port)
+                with patch.dict(h.os.environ, {'NO_PROXY': '127.0.0.1'}, clear=True):
+                    self.assertIsNone(h.check_sse(base, 'fixture-key', 'responses'))
+                    self.assertIn('too close', h.check_sse(base, 'fixture-key', 'messages'))
+                    self.assertIsNone(h.check_websocket(base, 'fixture-key'))
+                    self.assertIn('401', h.check_websocket(base, 'wrong-key'))
+            finally:
+                server.shutdown()
+                worker.join()
 
     def test_symlink_refused(self):
         path = Path(self.tmp.name) / 'link'

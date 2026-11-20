@@ -2,7 +2,7 @@
   "结算状态": "Settlement status",
   "客户端与网关的 WebSocket 握手失败。请确认客户端已启用 WebSocket，并检查反向代理的升级设置。": "The client WebSocket handshake failed. Check that WebSocket is enabled in the client and that the reverse proxy handles upgrades.",
   "客户端接入自检": "Client connection check",
-  "在配置客户端的同一终端运行。检查配置、网络、密钥和模型协议，无需调用推理。": "Run in the same terminal where you configured the client. Checks settings, network, key and model protocol without inference.",
+  "在配置客户端的同一终端运行。检查配置、网络、密钥、模型协议及 SSE 事件到达情况，Codex 还会检查 WebSocket 握手。探测不消耗推理额度。": "Run in the same terminal where you configured the client. Checks settings, network, key, model protocol and SSE delivery. For Codex, it also tests the WebSocket handshake. Checks use no inference quota.",
   "自检命令": "Check command",
   "维护告警收件邮箱": "Maintenance alert recipient",
   "留空关闭告警": "Leave blank to disable alerts",

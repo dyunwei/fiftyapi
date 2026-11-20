@@ -98,6 +98,8 @@ Copy the command for your platform and client from **Use API key → Client conn
 
 Run it as the same user and in the same terminal environment used to configure the client. The helper compares the local configuration with the saved setup and checks connectivity, API key acceptance and model protocol through `/v1/models`. It does not edit configuration, send inference requests or print secrets. For Codex it reports whether WebSocket is configured. Open **Request diagnostics** in the request log to see the observed transport. [Request diagnostics](administration.md#request-diagnostics)
 
+The gateway sends three local SSE events on the client API path, and the helper reports the gaps between arrivals. If events arrive together, check reverse proxy buffering or compression. For Codex, the helper also verifies a WebSocket upgrade on `/v1/responses`, then disconnects without sending an inference request. A failed WebSocket handshake fails the check when WebSocket is enabled in Codex. Claude Code checks SSE only. The SSE check requires an updated gateway; older gateways may return HTTP 400 or 405. Results cover the network path used by the helper. Upstream WebSocket support and model inference require separate verification.
+
 ## Automatic client setup
 
 Select a client, OS and model under “Use key”, then copy the automatic setup command. Requires Python 3.11+ (`python3.11` on macOS/Linux, `py -3.11` on Windows). The current site serves the auditable helper at `/setup.py`. No administrator access or client installation is required.

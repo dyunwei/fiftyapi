@@ -186,7 +186,14 @@ func (a *API) Handler() http.Handler {
 	mux.HandleFunc("PUT /api/admin/accounts/{id}/config", a.protect(true, true, a.setAccountConfig))
 	mux.Handle("/", serveUI())
 	if a.gateway != nil {
-		mux.HandleFunc("GET /v1/responses", a.gateway.ServeWebSocket)
+		mux.HandleFunc("GET /v1/responses", func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodGet && r.URL.Query().Get("fiftyapi_transport_check") == "sse" {
+				a.gateway.TransportCheck(w, r)
+				return
+			}
+			a.gateway.ServeWebSocket(w, r)
+		})
+		mux.HandleFunc("GET /v1/messages", a.gateway.TransportCheck)
 		mux.HandleFunc("GET /responses", a.gateway.ServeWebSocket)
 		for _, route := range []string{"POST /v1internal:streamGenerateContent", "POST /v1internal:generateContent", "POST /v1/messages", "POST /v1/messages/count_tokens", "POST /v1/responses", "POST /v1/responses/compact", "POST /responses", "POST /responses/compact"} {
 			mux.HandleFunc(route, a.gateway.Serve)

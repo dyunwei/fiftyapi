@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """FiftyAPI local client configuration helper. Python 3.11+, standard library only."""
 import argparse
+import base64
 import copy
 import datetime
 import getpass
+import hashlib
+import http.client
 import json
 import math
 import os
@@ -13,6 +16,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 try:
     import tomllib
 except ImportError:
@@ -162,15 +166,103 @@ def config_path(client):
     return (Path(os.environ.get(env, str(Path.home() / directory))) / filename).expanduser().absolute()
 
 
-def catalog_models(base, key, protocol):
-    class NoRedirect(urllib.request.HTTPRedirectHandler):
-        def redirect_request(self, *unused, **kwargs):
-            return None
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *unused, **kwargs):
+        return None
 
+
+def catalog_models(base, key, protocol):
     req = urllib.request.Request(base + '/v1/models', headers={'Authorization': 'Bearer ' + key})
     with urllib.request.build_opener(NoRedirect).open(req, timeout=20) as response:
         catalog = json.loads(response.read(2 * 1024 * 1024))
     return [m['id'] for m in catalog.get('data', []) if protocol in (m.get('protocols') or [m.get('protocol')])]
+
+
+def check_sse(base, key, protocol):
+    url = base + '/v1/' + protocol + '?fiftyapi_transport_check=sse'
+    req = urllib.request.Request(url, headers={'Authorization': 'Bearer ' + key, 'Accept': 'text/event-stream'})
+    try:
+        with urllib.request.build_opener(NoRedirect).open(req, timeout=5) as response:
+            if response.headers.get_content_type() != 'text/event-stream':
+                return 'Expected SSE but received another response. Check the gateway version and proxy routing.'
+            arrival = []
+            fields = []
+            for _ in range(16):
+                line = response.readline(256)
+                if not line or len(line) == 256:
+                    break
+                line = line.rstrip(b'\r\n')
+                if line:
+                    fields.append(line)
+                    continue
+                if fields == [b'event: fiftyapi.transport_check', f'data: {len(arrival)+1}'.encode()]:
+                    arrival.append(time.monotonic())
+                fields.clear()
+                if len(arrival) == 3:
+                    break
+    except urllib.error.HTTPError as exc:
+        with exc:
+            return f'HTTP {exc.code}. Check proxy routing, gateway version and access.'
+    except (OSError, ValueError, http.client.HTTPException):
+        return 'Connection failed or timed out. Check the network and proxy.'
+    if len(arrival) != 3:
+        return 'The three test events did not arrive in order. Check proxy routing and stream timeouts.'
+    gaps = [round((b - a) * 1000) for a, b in zip(arrival, arrival[1:])]
+    print(f'SSE event gaps: {gaps[0]} ms, {gaps[1]} ms')
+    if min(gaps) < 250:
+        return 'Events arrived together or too close. Check proxy buffering and compression.'
+    return None
+
+
+class UpgradeRequest:
+    def request(self, method, url, body=None, headers=None, *, encode_chunked=False):
+        # urllib sets Connection: close; retain its proxy and TLS handling while
+        # restoring the upgrade header on this one HTTP/1.1 handshake.
+        headers = {**(headers or {}), 'Connection': 'Upgrade'}
+        super().request(method, url, body, headers, encode_chunked=encode_chunked)
+
+
+class UpgradeHTTPConnection(UpgradeRequest, http.client.HTTPConnection):
+    pass
+
+
+class UpgradeHTTPSConnection(UpgradeRequest, http.client.HTTPSConnection):
+    pass
+
+
+class UpgradeHTTPHandler(urllib.request.HTTPHandler):
+    def http_open(self, req):
+        return self.do_open(UpgradeHTTPConnection, req)
+
+
+class UpgradeHTTPSHandler(urllib.request.HTTPSHandler):
+    def https_open(self, req):
+        return self.do_open(UpgradeHTTPSConnection, req)
+
+
+def check_websocket(base, key):
+    nonce = base64.b64encode(os.urandom(16)).decode('ascii')
+    req = urllib.request.Request(base + '/v1/responses', headers={
+        'Authorization': 'Bearer ' + key, 'Upgrade': 'websocket',
+        'Sec-WebSocket-Version': '13', 'Sec-WebSocket-Key': nonce,
+    })
+    opener = urllib.request.build_opener(NoRedirect, UpgradeHTTPHandler, UpgradeHTTPSHandler)
+    try:
+        response = opener.open(req, timeout=5)
+    except urllib.error.HTTPError as exc:
+        response = exc  # urllib represents the protocol switch as an HTTPError.
+    except (OSError, ValueError, http.client.HTTPException):
+        return 'Handshake failed or timed out. Check the network and proxy upgrade settings.'
+    with response:
+        if response.code != 101:
+            return f'Expected HTTP 101, got {response.code}. Check the reverse proxy upgrade settings and access.'
+        accept = base64.b64encode(hashlib.sha1((nonce + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').encode('ascii')).digest()).decode('ascii')
+        connection = response.headers.get('Connection', '').lower().split(',')
+        if ('upgrade' not in [value.strip() for value in connection]
+                or response.headers.get('Upgrade', '').lower() != 'websocket'
+                or response.headers.get('Sec-WebSocket-Accept') != accept):
+            return 'The HTTP 101 response has invalid WebSocket handshake headers.'
+    return None
 
 
 def check(client):
@@ -210,9 +302,17 @@ def check(client):
     except (OSError, ValueError):
         raise ValueError('Could not read the gateway model catalog. Check the URL, network and TLS.') from None
     print('Gateway reachable; API key accepted')
-    if model not in models:
-        raise ValueError(f'The configured model is unavailable or does not advertise {protocol}.')
-    print(f'Configured model advertises {protocol}. See your request logs for the observed transport.')
+    model_ok = model in models
+    print(f'Model: {"matches" if model_ok else "unavailable or incompatible with"} {protocol}')
+    sse_error = check_sse(base, key, protocol)
+    print('SSE:', sse_error or 'test events arrived separately')
+    websocket_required = client == 'codex' and provider['supports_websockets']
+    websocket_error = check_websocket(base, key) if client == 'codex' else None
+    if client == 'codex':
+        label = 'WebSocket' if websocket_required else 'WebSocket (optional)'
+        print(label + ':', websocket_error or 'HTTP 101 handshake verified')
+    if not model_ok or sse_error or (websocket_required and websocket_error):
+        raise ValueError('One or more required checks failed. See the results above.')
 
 
 def claude_conflicts():
