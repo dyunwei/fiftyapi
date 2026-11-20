@@ -40,11 +40,8 @@ func TestAutomaticSettlementUsesSnapshotAndReleasesUnknown(t *testing.T) {
 		t.Fatal(err)
 	}
 	u := RequestLog{ID: "unknown", UserID: user, KeyID: key, Model: "model", Provider: "antigravity", Status: 502, Error: "上游没有返回 usage", CreatedAt: now.Unix()}
-	if err := s.FinalizeRequest(ctx, u); err == nil {
-		t.Fatal("unknown usage treated as free")
-	}
-	if err := s.Reserve(ctx, "blocked", user, key, "model", price, 1, now); err == nil {
-		t.Fatal("unresolved usage did not block further calls")
+	if err := s.FinalizeRequest(ctx, u); err != nil {
+		t.Fatal(err)
 	}
 	windows, err := s.Quota(ctx, user)
 	if err != nil {
@@ -61,8 +58,8 @@ func TestAutomaticSettlementUsesSnapshotAndReleasesUnknown(t *testing.T) {
 	}
 	for _, l := range logs {
 		if l.ID == "unknown" {
-			if l.Amount != nil || l.Input != nil {
-				t.Fatal("unknown usage was zero-settled")
+			if l.Amount == nil || *l.Amount != 0 || l.Input != nil {
+				t.Fatal("unknown usage was not settled at zero")
 			}
 		} else if l.Amount == nil || *l.Amount != 20 {
 			t.Fatal("known usage lost")
@@ -102,7 +99,13 @@ func TestSettlementFailurePreservesEvidenceAndRetriesAtomically(t *testing.T) {
 	if err = s.DB.QueryRow("SELECT count(*) FROM request_logs WHERE id='retry'").Scan(&count); err != nil || count != 1 {
 		t.Fatal("pending financial evidence was pruned", err)
 	}
+	if err := s.Reserve(ctx, "next", user, key, "model", Price{}, 1, time.Now()); err != nil {
+		t.Fatalf("existing settlement exception blocked another call: %v", err)
+	}
 	if _, err = s.DB.Exec("DROP TRIGGER fail_settlement"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Settle(ctx, "next", 0, time.Now()); err != nil {
 		t.Fatal(err)
 	}
 	for i := 0; i < 2; i++ {
@@ -150,8 +153,8 @@ func TestRecoverySettlesLegacyPendingAndIncompleteEvidence(t *testing.T) {
 		t.Fatal(err)
 	}
 	pending, _ := s.PendingCharges(ctx)
-	if len(pending) != 2 {
-		t.Fatal("unknown recovery records were discarded")
+	if len(pending) != 0 {
+		t.Fatal("unknown recovery records remained pending")
 	}
 	windows, _ := s.Quota(ctx, user)
 	for _, w := range windows {
@@ -168,14 +171,14 @@ func TestRecoverySettlesLegacyPendingAndIncompleteEvidence(t *testing.T) {
 			if l.Amount == nil || *l.Amount != 10 {
 				t.Fatal("known recovery usage lost")
 			}
-		} else if l.Amount != nil {
-			t.Fatal("unknown recovery usage treated as free")
+		} else if l.Amount == nil || *l.Amount != 0 {
+			t.Fatal("unknown recovery usage was not settled at zero")
 		}
 	}
 
 }
 
-func TestInvalidSnapshotRemainsManualAndNoPartialChargeOnLogFailure(t *testing.T) {
+func TestInvalidSnapshotSettlesFreeAndNoPartialChargeOnLogFailure(t *testing.T) {
 	s, user, key := quotaStore(t)
 	ctx := context.Background()
 	if err := s.Reserve(ctx, "bad-price", user, key, "model", Price{}, 20, time.Now()); err != nil {
@@ -187,17 +190,14 @@ func TestInvalidSnapshotRemainsManualAndNoPartialChargeOnLogFailure(t *testing.T
 	if _, err := s.DB.Exec("UPDATE request_charges SET price_snapshot='null' WHERE id='bad-price'"); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.FinalizeRequest(ctx, accountingLog("bad-price", user, key, 10, 2)); err == nil {
-		t.Fatal("missing price snapshot treated as free")
-	}
-	if err := s.RecoverInFlight(ctx); err != nil {
+	if err := s.FinalizeRequest(ctx, accountingLog("bad-price", user, key, 10, 2)); err != nil {
 		t.Fatal(err)
 	}
-	pending, _ := s.PendingCharges(ctx)
-	if len(pending) != 2 {
-		t.Fatal("corrupt or incomplete evidence silently discarded")
+	logs, err := s.Logs(ctx, user, false, 0, "", 0)
+	if err != nil || len(logs) != 1 || logs[0].Amount == nil || *logs[0].Amount != 0 ||
+		logs[0].Input == nil || *logs[0].Input != 10 {
+		t.Fatal("invalid snapshot should settle free and retain usage evidence", logs, err)
 	}
-
 	if _, err := s.DB.Exec(`CREATE TRIGGER fail_log BEFORE INSERT ON request_logs WHEN NEW.id='bad-log' BEGIN SELECT RAISE(ABORT,'forced log failure'); END`); err != nil {
 		t.Fatal(err)
 	}

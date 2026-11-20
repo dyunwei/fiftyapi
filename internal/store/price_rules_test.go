@@ -33,7 +33,7 @@ func TestTierSettlementUsesImmutableRulesAndServedTier(t *testing.T) {
 		t.Fatal("served tier evidence missing")
 	}
 }
-func TestUnpricedActualTierReleasesReservationAndStaysPending(t *testing.T) {
+func TestUnpricedActualTierSettlesFreeAndReleasesReservation(t *testing.T) {
 	s, user, key := quotaStore(t)
 	ctx := context.Background()
 	p := Price{Input: 1000000, Output: 1000000}
@@ -42,13 +42,13 @@ func TestUnpricedActualTierReleasesReservationAndStaysPending(t *testing.T) {
 	}
 	l := accountingLog("unknown-tier", user, key, 10, 3)
 	l.BillingUsage = BillingUsage{Tier: "ultrafast", Confirmed: true}
-	if err := s.FinalizeRequest(ctx, l); err == nil {
-		t.Fatal("unknown tier charged standard price")
+	if err := s.FinalizeRequest(ctx, l); err != nil {
+		t.Fatal(err)
 	}
 	pending, _ := s.PendingCharges(ctx)
 	windows, _ := s.Quota(ctx, user)
-	if len(pending) != 1 || windows[0].Used != 0 || windows[0].Reserved != 0 {
-		t.Fatal("failed settlement lost evidence or held reservation", pending, windows)
+	if len(pending) != 0 || windows[0].Used != 0 || windows[0].Reserved != 0 {
+		t.Fatal("unpriced request remained pending or affected quota", pending, windows)
 	}
 }
 func TestCacheWriteDurationAndSingleRounding(t *testing.T) {

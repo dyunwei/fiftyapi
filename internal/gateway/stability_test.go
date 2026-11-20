@@ -78,12 +78,7 @@ func TestAntigravityFailuresAndCooldown(t *testing.T) {
 			if scenario == "truncated" {
 				expected = 13
 			}
-			unknown := scenario != "truncated" && scenario != "429"
-			wantPending := 0
-			if unknown {
-				wantPending = 1
-			}
-			if len(pending) != wantPending || quota[0].Used != expected || quota[0].Reserved != 0 {
+			if len(pending) != 0 || quota[0].Used != expected || quota[0].Reserved != 0 {
 				t.Fatal("automatic settlement policy violated", quota, pending)
 			}
 
@@ -94,7 +89,7 @@ func TestAntigravityFailuresAndCooldown(t *testing.T) {
 			if err != nil || len(logs) == 0 {
 				t.Fatal("missing failure log")
 			}
-			if unknown && logs[0].Amount != nil || !unknown && (logs[0].Amount == nil || *logs[0].Amount != expected) {
+			if logs[0].Amount == nil || *logs[0].Amount != expected {
 				t.Fatal("automatic settlement missing or incorrect")
 			}
 		})
@@ -141,7 +136,7 @@ func TestAntigravityClientCancellationReleasesSlot(t *testing.T) {
 	case <-time.After(3 * time.Second):
 		t.Fatal("client cancellation did not reach upstream")
 	}
-	// Usage evidence is persisted before the pending charge is released.
+	// Usage evidence is persisted before the reservation is released.
 	// Wait for the handler to finish both writes before checking the result.
 	select {
 	case <-finished:
@@ -149,12 +144,12 @@ func TestAntigravityClientCancellationReleasesSlot(t *testing.T) {
 		t.Fatal("canceled request handler did not finish")
 	}
 	logs, err := g.s.Logs(context.Background(), g.user, false, 0, "", 0)
-	if err != nil || len(logs) != 1 || logs[0].Amount != nil {
+	if err != nil || len(logs) != 1 || logs[0].Amount == nil || *logs[0].Amount != 0 {
 		t.Fatalf("expected one unbilled cancellation log, got %d logs (error: %v)", len(logs), err)
 	}
 	pending, err := g.s.PendingCharges(context.Background())
-	if err != nil || len(pending) != 1 || pending[0].ID != logs[0].ID || pending[0].Reservation != 0 {
-		t.Fatal("canceled request lost uncertain usage or held reservation")
+	if err != nil || len(pending) != 0 {
+		t.Fatal("canceled request remained pending")
 	}
 	slot, _ := g.h.slots.Load(g.account)
 	state := slot.(*accountSlot)

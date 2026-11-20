@@ -94,7 +94,7 @@ Reliable received usage is settled after cancellation or interruption. Missing/i
 
 ## Inference access status
 
-The member overview shows which budget windows have no allocation, are exhausted, or have their remaining budget held by in-flight requests. An exhausted active window shows its expected reset time. If a pending settlement blocks inference, open the affected request's diagnostics directly from the overview. Refresh the page after an administrator resolves the settlement or after in-flight requests finish.
+The member overview shows which budget windows have no allocation, are exhausted, or have their remaining budget held by in-flight requests. An exhausted active window shows its expected reset time. Refresh the overview after in-flight requests finish to see the latest quota. Settlement exceptions are visible in request logs.
 
 ## Client connection check
 

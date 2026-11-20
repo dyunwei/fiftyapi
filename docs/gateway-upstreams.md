@@ -62,7 +62,7 @@ Key 加密保存在账号凭据中，读取账号配置不会返回原值。编�
 | compact | `/v1/responses/compact`，需显式开启且上游支持 |
 | 模型目录 | `/v1/models`，只对外列出已定价、已启用且有就绪账号的模型 |
 | Codex manifest | 上游实际提供时保留元数据并映射 slug；通用目录不能伪造 context window 等信息 |
-| 用量异常 | 流中断有可靠 usage 按原价快照自动结算；缺失或无效 usage 释放预占并保留待核算 |
+| 用量异常 | 流中断有可靠 usage 按原价快照自动结算；缺失或无效 usage 按零结算、释放预占并记录原因 |
 
 转发只替换映射的请求模型；Messages 缺少输出上限时补默认值。保留客户端的 system、工具/历史、采样参数和 store/stream 选择；不执行 Claude/Codex OAuth 身份注入、Token 刷新或厂商专用参数删除。
 
@@ -74,7 +74,7 @@ Chat 直通 /v1/chat/completions。仅替换模型为配置的上游 ID；system
 
 流式请求设置 stream_options.include_usage=true，以便接收可靠用量，保留其他 stream_options 字段。响应的 Chat JSON/SSE、工具参数、推理及扩展字段保留；账本仅提取 prompt_tokens/completion_tokens/cached_tokens，缓存输入不重复计费。多个候选 n=1–128，预占考虑候选数量；服务档位依据本地价格目录计价，未定价档位拒绝；不设置单独的加速权限。
 
-要求上游按 stream 选择 JSON 或 SSE。不聚合 SSE 为 Chat JSON，也不把 JSON 改写成 Chat SSE。流式必须收到 [DONE]，截断不补成功标记；已观测可靠 usage 仍结算，缺失或无效 usage 会释放预占并保留待核算，详见 [自动结算](request-logs.md#自动结算)。一次逻辑请求沿用统一调度、队列、失败切换、日志和结算，不另开账本。
+要求上游按 stream 选择 JSON 或 SSE。不聚合 SSE 为 Chat JSON，也不把 JSON 改写成 Chat SSE。流式必须收到 [DONE]，截断不补成功标记；已观测可靠 usage 仍结算，缺失或无效 usage 会按零结算、释放预占并记录原因，详见 [自动结算](request-logs.md#自动结算)。一次逻辑请求沿用统一调度、队列、失败切换、日志和结算，不另开账本。
 
 /v1/models 返回 protocols、supported_endpoints 和 supported_endpoint_types。部分客户端不会读取扩展字段，仍需选择正确的供应商/接口模式；不能根据模型名称推断。Chat 模型只声明 openai，Messages 只声明 anthropic，Responses 只声明 openai-response；多协议模型同时声明实际配置的能力。
 

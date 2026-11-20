@@ -9,11 +9,13 @@ Simulated OpenAI upstreams, Codex identity `0.164.0` and fixture model `model` c
 
 Transport checks were verified with the Python 3.11 helper and a local FiftyAPI instance using a temporary database. Coverage includes Responses and Messages SSE delivery, the Responses WebSocket handshake, and unchanged usage and inference logs. A simulated HTTP endpoint verifies detection of coalesced SSE events. Verification covers the client-to-gateway connection and used no model, provider or native client.
 
-Timing metric tests use a simulated OpenAI upstream, Codex identity `0.164.0` and fixture model `model` to verify Responses SSE first-output samples, JSON exclusion and timed-out account queue samples. Browser tests cover member restrictions, pending settlement diagnostics, connection labels and administrator metrics. No native client or live provider was used.
+Timing metric tests use a simulated OpenAI upstream, Codex identity `0.164.0` and fixture model `model` to verify Responses SSE first-output samples, JSON exclusion and timed-out account queue samples. Browser tests cover member quota restrictions, request diagnostics, connection labels and administrator metrics. No native client or live provider was used.
+
+Settlement regression tests call the gateway directly with Go HTTP fixtures (no client version) and use simulated upstreams and model `model` to cover zero settlement for Responses HTTP JSON/SSE, Messages SSE, and native Antigravity SSE. They also verify that a settlement write failure does not prevent reserving the next request. A browser test confirms that historical pending settlement data does not trigger a restriction on the member overview. No live provider was used.
 
 ## Current refactor verification boundary
 
-Current behavior is defined in [low-maintenance sharing](low-maintenance.md): native Antigravity v1internal replaces Messages conversion; Claude metadata/system pass through by default; automatic tier prices consume user budgets; unknown usage releases reservations and remains pending. User model allowlists and concurrency apply without separate speed permissions.
+Current behavior is defined in [low-maintenance sharing](low-maintenance.md): native Antigravity v1internal replaces Messages conversion; Claude metadata/system pass through by default; automatic tier prices consume user budgets; unknown usage settles at zero and releases reservations. User model allowlists and concurrency apply without separate speed permissions.
 
 This change uses simulated upstreams and temporary databases, Codex identity 0.164.0 and fixture model IDs such as `model`. Coverage includes Responses HTTP/JSON/SSE/WebSocket, Messages, native Antigravity, caches, immutable price snapshots and recovery. No live provider or real client acceptance was run. Historical Antigravity converter tool tests do not establish current native compatibility.
 

@@ -119,22 +119,16 @@ test('管理员初始化、密钥一次性显示、成员权限与退出',async(
   {kind:'5h',limit:10000000,used:10000000,reserved:0,expires_at:resetAt},
   {kind:'7d',limit:10000000,used:1000,reserved:9999000,expires_at:resetAt+7200},
  ]}))
- await page.route('**/api/logs?*', route=>{
-  const requestID=new URL(route.request().url()).searchParams.get('request_id')
-  expect(requestID).toBe(pendingID)
-  return route.fulfill({json:{items:[{id:pendingID,status:502,settlement_status:'pending'}]}})
- })
- await page.route('**/api/logs/'+pendingID+'/attempts',route=>route.fulfill({json:[]}))
  await page.getByRole('button',{name:'刷新',exact:true}).first().click()
  const restriction=page.getByRole('region',{name:'调用受限'})
  await expect(restriction).toContainText('5 小时额度窗口已用完')
  await expect(restriction).toContainText('7 天额度窗口的剩余额度已被在途请求预占')
  await expect(restriction).toContainText('重置')
- await restriction.getByRole('button',{name:'查看请求诊断'}).click()
- await expect(dialog).toContainText(pendingID)
- await expect(dialog).toContainText('结算异常')
- await dialog.getByRole('button',{name:'关闭',exact:true}).last().click()
- for (const pattern of ['**/api/dashboard?*','**/api/quota','**/api/logs?*','**/api/logs/'+pendingID+'/attempts']) await page.unroute(pattern)
+ await expect(restriction).not.toContainText('待核算')
+ await page.unroute('**/api/quota')
+ await page.getByRole('button',{name:'刷新',exact:true}).first().click()
+ await expect(restriction).toHaveCount(0)
+ await page.unroute('**/api/dashboard?*')
  const modelQueries=[]
  await page.route('**/api/models?*',async route=>{
   const q=new URL(route.request().url()).searchParams;modelQueries.push(Object.fromEntries(q))

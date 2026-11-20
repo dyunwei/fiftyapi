@@ -9,11 +9,13 @@ Antigravity 目录测试的原生预览、默认推理地址与 429 安全诊断
 
 传输自检使用 Python 3.11 助手和本机 FiftyAPI 临时数据库验证 Responses 和 Messages 的 SSE 事件间隔、Responses WebSocket 握手、以及探测前后额度和请求日志；使用模拟 HTTP 端点验证 SSE 事件合并可检出。此项只测试客户端到网关，未配置模型、未联系供应商，也未运行原生客户端。
 
-仪表盘耗时指标在模拟 OpenAI 上游用 Codex 身份 `0.164.0` 和夹具模型 `model` 验证了 Responses SSE 首段采样、JSON 排除和账号队列超时采样。浏览器验证了成员受限状态、待核算诊断、协议与传输标签以及管理员指标。未运行真实客户端或供应商。
+仪表盘耗时指标在模拟 OpenAI 上游用 Codex 身份 `0.164.0` 和夹具模型 `model` 验证了 Responses SSE 首段采样、JSON 排除和账号队列超时采样。浏览器验证了成员额度受限状态、请求诊断、协议与传输标签以及管理员指标。未运行真实客户端或供应商。
+
+结算回归使用 Go HTTP 测试夹具直接调用网关（无客户端版本），用模拟上游和模型 `model` 覆盖 Responses HTTP JSON/SSE、Messages SSE、Antigravity 原生 SSE 的零结算，并验证结算写入异常期间仍可预占下一次调用。浏览器测试验证历史待核算信息不会触发成员首页的「调用受限」。未调用真实供应商。
 
 ## 当前重构的验证边界
 
-当前行为以 [低维护账号共享](low-maintenance.md) 为准：Antigravity 使用原生 v1internal，不再提供 Messages 转换；Claude 默认透传 metadata/system；加速档位按自动价格计入预算；未知用量释放预占并保留待核算。模型允许列表与并发按用户控制，不单独授权加速档位。
+当前行为以 [低维护账号共享](low-maintenance.md) 为准：Antigravity 使用原生 v1internal，不再提供 Messages 转换；Claude 默认透传 metadata/system；加速档位按自动价格计入预算；未知用量按零结算并释放预占。模型允许列表与并发按用户控制，不单独授权加速档位。
 
 本次使用模拟上游和临时数据库，默认 Codex 身份 0.164.0、fixture 模型 `model` 等，覆盖 Responses HTTP/JSON/SSE/WebSocket、Messages、原生 Antigravity、缓存、价格快照与恢复。没有运行真实供应商或真实客户端验收；尤其不能将旧 Antigravity 转换器的工具测试当作当前原生接入的兼容保证。
 

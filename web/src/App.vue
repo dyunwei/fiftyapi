@@ -160,20 +160,6 @@ const quotaRestrictions = computed(() => quota.value.flatMap(w => {
  if (w.used + w.reserved >= w.limit) return [t('{0}的剩余额度已被在途请求预占，请在请求结束后刷新。', [name])]
  return []
 }))
-async function viewPendingRequest(id) {
- await action(async () => {
-  const query = new URLSearchParams({ request_id: id, page: 1, page_size: 1 })
-  const result = await api('/logs?' + query)
-  if (page.value !== 'overview') return
-  if (result.items.length) {
-   open('attempts', result.items[0])
-  } else {
-   await refresh()
-   notify(t('未找到该请求，请检查最新的调用状态。'))
-  }
- })
-}
-
 async function loadBalance(){
  const request=++balanceRequest,epoch=sessionEpoch
  try{const result=await api('/quota');if(request===balanceRequest&&epoch===sessionEpoch){quota.value=result;balanceError.value=''}}
@@ -392,19 +378,15 @@ const modalTitle=computed(()=>({'account-authorization':t('授权与健康详情
    <div class="page-content"><div class="page-heading" :class="{'page-toolbar':page!=='overview'}" v-if="['overview','keys','accounts','proxies','users'].includes(page)"><div v-if="page==='overview'"><span class="eyebrow">{{ page==='overview'?'WORKSPACE OVERVIEW':page.toUpperCase() }}</span><h1>{{ title }}</h1><p>{{ description }}</p></div><div v-if="page==='keys'" class="notice toolbar-notice">{{ t('点击密钥旁的图标复制完整密钥。不同密钥共享你的 5 小时和每周额度。') }}</div><div v-if="page==='accounts'" class="notice toolbar-notice">{{ t('授权后会自动发现模型。目录就绪表示已取得模型列表，具体模型权限以实际调用为准。') }}</div><div v-if="page==='proxies'" class="notice toolbar-notice">{{ t('自动握手检测代理服务器连通性与认证状态。可为上游账号和贡献链接选择代理。') }}</div><div class="heading-actions"><button v-if="page==='keys'" class="secondary" @click="open('key-usage')">{{ t('使用说明') }}</button><button v-if="page==='keys'" class="primary" @click="open('key')">{{ t('＋ 创建密钥') }}</button><button v-if="page==='accounts'" class="primary" @click="open('gateway')">{{ t('+接入上游API') }}</button><button v-if="page==='accounts'" class="primary" @click="open('oauth')">{{ t('＋ 添加账号') }}</button><button v-if="page==='accounts'" class="secondary" @click="open('import')">{{ t('导入账号') }}</button><button v-if="page==='accounts'" class="secondary" @click="open('contribution-links')">{{ t('贡献链接') }}</button><button v-if="page==='proxies'" class="secondary" :disabled="busy||!proxies.length" @click="checkAllProxies">{{ t('检测全部代理') }}</button><button v-if="page==='proxies'" class="primary" @click="open('proxy')">{{ t('＋ 添加代理') }}</button><button v-if="page==='users'" class="primary" @click="open('user')">{{ t('＋ 添加成员') }}</button></div></div>
     <div v-if="error&&!modal" class="alert error" role="alert">{{ t(error) }}</div>
     <template v-if="page==='overview'">
-     <section v-if="!admin && (dashboard.pending_request_id || quotaRestrictions.length)" class="notice member-restrictions" :aria-label="t('调用受限')">
+     <section v-if="!admin && quotaRestrictions.length" class="notice member-restrictions" :aria-label="t('调用受限')">
       <strong>{{ t('调用受限') }}</strong>
-      <p v-if="dashboard.pending_request_id">
-       {{ t('存在待核算请求，管理员处理后可继续调用。') }}
-       <button type="button" class="text-button" :disabled="busy" @click="viewPendingRequest(dashboard.pending_request_id)">{{ t('查看请求诊断') }}</button>
-      </p>
       <p v-for="message in quotaRestrictions" :key="message">{{ message }}</p>
      </section>
      <section v-if="admin && dashboard.maintenance_todo" class="notice" :aria-label="t('维护待办')">
       <strong>{{ t('维护待办') }}</strong>
       <div class="actions">
        <button v-if="dashboard.maintenance_todo.reauth" class="text-button" @click="openMaintenanceTodo('reauth')">{{ t('{0} 个账号待重授权', [dashboard.maintenance_todo.reauth]) }}</button>
-       <button v-if="dashboard.maintenance_todo.settlement" class="text-button" @click="openMaintenanceTodo('settlement')">{{ t('{0} 位成员因待核算被暂停', [dashboard.maintenance_todo.settlement]) }}</button>
+       <button v-if="dashboard.maintenance_todo.settlement" class="text-button" @click="openMaintenanceTodo('settlement')">{{ t('{0} 位成员有结算异常', [dashboard.maintenance_todo.settlement]) }}</button>
        <button v-if="dashboard.maintenance_todo.backup" class="text-button" @click="openMaintenanceTodo('backup')">{{ t('最近一次备份失败') }}</button>
       </div>
      </section>

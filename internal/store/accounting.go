@@ -9,7 +9,8 @@ import (
 	"time"
 )
 
-const unknownUsageNote = "未取得可靠用量，已释放预占，等待管理员核算"
+var errUnknownUsage = errors.New("未取得可靠用量")
+
 const observedUsageNote = "已按记录的用量自动结算并释放预占"
 const settlementFailureNote = "自动结算失败，需要管理员核算"
 
@@ -98,29 +99,24 @@ func (s *Store) autoSettleRequestAs(ctx context.Context, id string, actor *int64
 	if message == "" && !input.Valid && !output.Valid {
 		message = "未取得已保存的可靠用量"
 	}
-	amount := int64(0)
 	message = strings.ReplaceAll(message, settlementFailureNote, "此前自动结算失败，本次已恢复")
 	message = strings.ReplaceAll(message, "结算失败，需要管理员核算", "此前结算失败")
 	message = strings.ReplaceAll(message, "用量待核算", "用量此前未确认")
-	known := input.Valid && output.Valid && input.Int64 >= 0 && output.Int64 >= 0 && cached.Int64 >= 0 && write.Int64 >= 0
-	if known {
-		price, priceErr := decodePriceSnapshot(snapshot)
-		if priceErr != nil {
-			return priceErr
+	message = strings.ReplaceAll(message, "未取得可靠用量，已释放预占，等待管理员核算", "用量此前未确认")
+	amount, usageErr := recordedUsageCost(snapshot, billing, input, output, cached, write)
+	if usageErr != nil {
+		if actor != nil {
+			return usageErr
 		}
-		var metadata BillingUsage
-		if json.Unmarshal([]byte(billing), &metadata) != nil {
-			return errors.New("计费用量元数据无效")
+		amount = 0
+		if errors.Is(usageErr, errUnknownUsage) {
+			message = appendAccountingNote(message, "未取得可靠用量，按 0 结算并释放预占")
+		} else {
+			message = appendAccountingNote(message, usageErr.Error())
+			message = appendAccountingNote(message, "无法可靠计费，按 0 结算并释放预占")
 		}
-		amount, err = price.Cost(TokenUsage{BillingUsage: metadata, Input: input.Int64, Output: output.Int64, Cached: cached.Int64, CacheWrite: write.Int64})
-		if err != nil {
-			return err
-		}
-		if message != "" {
-			message = appendAccountingNote(message, observedUsageNote)
-		}
-	} else {
-		return errors.New(unknownUsageNote)
+	} else if message != "" {
+		message = appendAccountingNote(message, observedUsageNote)
 	}
 	if err = settleTx(ctx, tx, id, amount, time.Now()); err != nil {
 		return err
@@ -135,6 +131,28 @@ func (s *Store) autoSettleRequestAs(ctx context.Context, id string, actor *int64
 		}
 	}
 	return tx.Commit()
+}
+
+func recordedUsageCost(snapshot, billing string, input, output, cached, write sql.NullInt64) (int64, error) {
+	if !input.Valid || !output.Valid || input.Int64 < 0 || output.Int64 < 0 || cached.Int64 < 0 || write.Int64 < 0 {
+		return 0, errUnknownUsage
+	}
+	price, err := decodePriceSnapshot(snapshot)
+	if err != nil {
+		return 0, err
+	}
+	var metadata BillingUsage
+	if err := json.Unmarshal([]byte(billing), &metadata); err != nil {
+		return 0, errors.New("计费用量元数据无效")
+	}
+	amount, err := price.Cost(TokenUsage{BillingUsage: metadata, Input: input.Int64, Output: output.Int64, Cached: cached.Int64, CacheWrite: write.Int64})
+	if err != nil {
+		return 0, err
+	}
+	if amount > maxSettlementAmount {
+		return 0, errors.New("结算金额超出范围")
+	}
+	return amount, nil
 }
 
 func ensureChargeLogTx(ctx context.Context, tx *sql.Tx, id string) error {

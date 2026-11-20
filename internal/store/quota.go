@@ -11,7 +11,7 @@ import (
 
 var ErrQuota = errors.New("额度不足，请等待重置或联系管理员")
 
-var ErrPendingUsage = errors.New("存在待核算请求，请联系管理员处理后继续使用")
+const maxSettlementAmount = 1000000000000000
 
 type QuotaError struct {
 	Blocks []QuotaBlock
@@ -94,13 +94,6 @@ func (s *Store) Reserve(ctx context.Context, id string, user, key int64, model s
 			return ErrUserConcurrency
 		}
 	}
-	var pending int
-	if err = tx.QueryRowContext(ctx, "SELECT count(*) FROM request_charges WHERE user_id=? AND status='pending'", user).Scan(&pending); err != nil {
-		return err
-	}
-	if pending > 0 {
-		return ErrPendingUsage
-	}
 	w5, err := activeWindow(ctx, tx, user, "5h", now.Unix())
 	if err != nil {
 		return err
@@ -145,7 +138,7 @@ func (s *Store) Settle(ctx context.Context, id string, amount int64, now time.Ti
 	return tx.Commit()
 }
 func settleTx(ctx context.Context, tx *sql.Tx, id string, amount int64, now time.Time) error {
-	if amount < 0 || amount > 1000000000000000 {
+	if amount < 0 || amount > maxSettlementAmount {
 		return errors.New("结算金额超出范围")
 	}
 	var err error

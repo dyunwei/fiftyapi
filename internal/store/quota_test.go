@@ -117,8 +117,8 @@ func TestWindowGenerationAndSettlement(t *testing.T) {
 		t.Fatal(e)
 	}
 	pending, _ := s.PendingCharges(ctx)
-	if len(pending) != 1 {
-		t.Fatal("crash recovery discarded unknown usage")
+	if len(pending) != 0 {
+		t.Fatal("crash recovery left unknown usage pending")
 	}
 	q, _ = s.Quota(ctx, user)
 	if q[0].Reserved != 0 {

@@ -65,11 +65,11 @@ func TestInvalidUsageAfterGoodSampleIsNotBilled(t *testing.T) {
 				t.Fatal("invalid usage billed from earlier sample", err, q)
 			}
 			pending, _ := g.s.PendingCharges(context.Background())
-			if len(pending) != 1 {
-				t.Fatal("invalid usage did not remain reviewable")
+			if len(pending) != 0 {
+				t.Fatal("invalid usage remained pending")
 			}
 			logs, _ := g.s.Logs(context.Background(), g.user, false, 0, "", 0)
-			if len(logs) != 1 || logs[0].Amount != nil || logs[0].Input != nil {
+			if len(logs) != 1 || logs[0].Amount == nil || *logs[0].Amount != 0 || logs[0].Input != nil {
 				t.Fatal("invalid sample persisted as reliable usage")
 			}
 		})

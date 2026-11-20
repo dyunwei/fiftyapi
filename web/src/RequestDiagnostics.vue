@@ -12,7 +12,7 @@ const advice = {
   model_unavailable: '重新读取模型列表并选择可用模型；需要此模型时请联系管理员。',
   local_quota: '检查下方受限的额度窗口。若没有重置时间或需要继续调用，请联系管理员。',
   user_concurrency: '当前请求数已达个人并发上限。等其他请求结束后再试。',
-  pending_usage: '请联系管理员处理待核算请求，处理后即可继续使用。',
+  pending_usage: '该历史请求因待核算被拒绝，可以重新发起调用。',
   upstream_rate_limit: '上游暂时限制调用。请在建议时间后重试；若持续发生，请联系管理员。',
   client_websocket_handshake: '客户端与网关的 WebSocket 握手失败。请确认客户端已启用 WebSocket，并检查反向代理的升级设置。',
   upstream_websocket_handshake: '网关未能与上游建立 WebSocket。请把诊断发给管理员检查上游配置。',

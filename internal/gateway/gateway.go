@@ -329,8 +329,6 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 			diagnostics.Quota = quota.Blocks
 		case errors.Is(err, store.ErrUserConcurrency):
 			diagnostics.Code = "user_concurrency"
-		case errors.Is(err, store.ErrPendingUsage):
-			diagnostics.Code = "pending_usage"
 		case errors.Is(err, store.ErrModelAccess):
 			diagnostics.Code = "model_access"
 		}

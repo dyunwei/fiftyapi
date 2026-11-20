@@ -80,7 +80,7 @@ type MaintenanceCounts struct {
 }
 
 func (c *SMTP) SendMaintenanceAlert(ctx context.Context, email string, counts MaintenanceCounts) error {
-	body := fmt.Sprintf("FiftyAPI 有新的维护待办。请登录管理控制台查看详情。\n\n待重授权账号：%d\n被待核算阻塞的成员：%d\n备份失败：%d\n\nFiftyAPI has new maintenance tasks. Sign in to the admin dashboard for details.\n\nAccounts requiring reauthorization: %d\nMembers blocked by settlement: %d\nBackup failure: %d\n", counts.Reauth, counts.Settlement, counts.Backup, counts.Reauth, counts.Settlement, counts.Backup)
+	body := fmt.Sprintf("FiftyAPI 有新的维护待办。请登录管理控制台查看详情。\n\n待重授权账号：%d\n有结算异常的成员：%d\n备份失败：%d\n\nFiftyAPI has new maintenance tasks. Sign in to the admin dashboard for details.\n\nAccounts requiring reauthorization: %d\nMembers with settlement exceptions: %d\nBackup failure: %d\n", counts.Reauth, counts.Settlement, counts.Backup, counts.Reauth, counts.Settlement, counts.Backup)
 	return c.send(ctx, email, "FiftyAPI 维护告警 / Maintenance alert", body)
 }
 

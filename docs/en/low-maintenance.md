@@ -27,7 +27,7 @@ Imported text prices include input, output, cache reads, cache writes, Anthropic
 
 Raw token counts are never multiplied. Admission reserves budget using conservative rates for the requested tier. Settlement prefers the served tier reported by upstream; absent tier information uses the requested tier and is labeled accordingly in logs. Observed context size and cache duration select the settlement rate. Each request keeps immutable complete pricing rules and source revision. Manual prices override synchronization and cover Standard only; selecting a catalog key resumes automatic pricing.
 
-Unpriced tiers are rejected before dispatch. Missing or invalid usage, or a missing price discovered after dispatch, releases reservations while keeping the charge pending. Further calls by that user pause until administrator settlement. Confirmed unexecuted rejections settle at zero. Reliable usage observed before interruption is still charged.
+Unpriced tiers are rejected before dispatch. Missing or invalid usage, or a missing price discovered after dispatch, settles at zero, releases reservations, and records the reason. Administrators can review ledger write failures. Settlement exceptions do not block later requests. Confirmed unexecuted rejections settle at zero. Reliable usage observed before interruption is still charged.
 
 Money is parsed into fixed-point integers. Unrepresentable rates are not rounded into free prices. Reservations are estimates, not hard upstream generation caps, and final usage may exceed them. Paid built-in tools, image/audio/video, and regional surcharges are not fully metered; text reference cost is not a complete supplier invoice for those requests.
 

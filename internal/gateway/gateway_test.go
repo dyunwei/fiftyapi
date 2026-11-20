@@ -119,7 +119,7 @@ func TestNativeGatewaySettlementAndTruncation(t *testing.T) {
 			truncated = true
 			w = g.request(path, `{"model":"model","stream":true,"max_tokens":20,"input":"hello","messages":[{"role":"user","content":"hello"}]}`)
 			pending, _ := g.s.PendingCharges(context.Background())
-			if len(pending) != map[bool]int{true: 1, false: 0}[provider == "openai"] {
+			if len(pending) != 0 {
 				t.Fatalf("incorrect incomplete usage settlement: %s", w.Body.String())
 			}
 			q, _ = g.s.Quota(context.Background(), g.user)

@@ -171,7 +171,7 @@ Open **Timing metrics** next to the dashboard's time-range selector to see avera
 
 ## Maintenance tasks and alerts
 
-The admin dashboard links to accounts requiring reauthorization, members blocked by pending settlements, and the latest failed backup. Enter a maintenance alert recipient under **System settings → Email configuration** to send alerts through the existing SMTP configuration. Leave it blank to disable email alerts. The service checks on startup and every five minutes, batches new issues into one message, and suppresses repeats while each issue remains active. SMTP failures are retried at the next check.
+The admin dashboard links to accounts requiring reauthorization, members with settlement exceptions, and the latest failed backup. Enter a maintenance alert recipient under **System settings → Email configuration** to send alerts through the existing SMTP configuration. Leave it blank to disable email alerts. The service checks on startup and every five minutes, batches new issues into one message, and suppresses repeats while each issue remains active. SMTP failures are retried at the next check.
 
 ## Automatic maintenance
 
