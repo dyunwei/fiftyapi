@@ -123,6 +123,7 @@ func (t *websocketUpstreamTransport) RoundTrip(req *http.Request) (*http.Respons
 		t.base.CloseIdleConnections()
 		return websocketRejection(req, 400, "previous_response_not_found"), nil
 	}
+	reused := conn != nil
 	var handshake http.Header
 	if conn == nil {
 		u := *req.URL
@@ -164,7 +165,7 @@ func (t *websocketUpstreamTransport) RoundTrip(req *http.Request) (*http.Respons
 				}
 				return response, nil
 			}
-			return nil, errors.New("websocket upstream connection failed")
+			return nil, websocketFailure("upstream_handshake", err, reused, "none")
 		}
 		conn.SetReadLimit(2 << 20)
 		if response != nil {
@@ -195,23 +196,24 @@ func (t *websocketUpstreamTransport) RoundTrip(req *http.Request) (*http.Respons
 	if err = conn.Write(ctx, ws.MessageText, encoded); err != nil {
 		cancel()
 		state.close()
-		return nil, errors.New("websocket request write failed")
+		return nil, websocketFailure("upstream_write", err, reused, "none")
 	}
 	reader, writer := io.Pipe()
 	body := &websocketResponseBody{PipeReader: reader, cancel: cancel, state: state}
 	go func() {
 		defer writer.Close()
 		defer cancel()
+		last := "none"
 		for {
 			kind, message, e := conn.Read(ctx)
 			if e != nil {
 				state.close()
-				writer.CloseWithError(errors.New("upstream websocket disconnected"))
+				writer.CloseWithError(websocketFailure("upstream_read", e, reused, last))
 				return
 			}
 			if kind != ws.MessageText {
 				state.close()
-				writer.CloseWithError(errors.New("unexpected binary websocket frame"))
+				writer.CloseWithError(websocketFailure("upstream_binary_frame", nil, reused, last))
 				return
 			}
 			var event struct {
@@ -228,9 +230,10 @@ func (t *websocketUpstreamTransport) RoundTrip(req *http.Request) (*http.Respons
 			}
 			if json.Unmarshal(message, &event) != nil || event.Type == "" {
 				state.close()
-				writer.CloseWithError(errors.New("upstream websocket event invalid"))
+				writer.CloseWithError(websocketFailure("upstream_invalid_event", nil, reused, last))
 				return
 			}
+			last = safeEventType(event.Type)
 			code := event.Error.Code
 			if code == "" {
 				code = event.Response.Error.Code

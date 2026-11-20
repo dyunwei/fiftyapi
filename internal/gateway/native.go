@@ -140,6 +140,7 @@ func (h *Handler) forward(w http.ResponseWriter, r *http.Request, body []byte, r
 	out.dispatched = true
 	resp, err := client.Do(req)
 	if err != nil {
+		out.failureDetail = "stage=upstream_connect cause=" + failureCategory(err)
 		out.err = errors.New("上游连接失败，无法确认用量")
 		return out
 	}
@@ -172,7 +173,7 @@ func consumeProtocolResponse(w http.ResponseWriter, r *http.Request, resp *http.
 			}
 			var data map[string]json.RawMessage
 			if json.Unmarshal(payload, &data) != nil {
-				return errors.New("上游 SSE 格式错误")
+				return &transportFailure{detail: "invalid_sse_event"}
 			}
 			kind := event
 			var t string
@@ -210,7 +211,7 @@ func consumeProtocolResponse(w http.ResponseWriter, r *http.Request, resp *http.
 			}
 			if kind == "error" || kind == "response.failed" || kind == "response.incomplete" {
 				applyStreamSignal(&out, payload)
-				return errors.New("上游流式请求失败或未完成")
+				return &transportFailure{detail: "terminal_event=" + safeEventType(kind)}
 			}
 			if stream {
 				if !out.sent {
@@ -233,6 +234,7 @@ func consumeProtocolResponse(w http.ResponseWriter, r *http.Request, resp *http.
 		})
 		if !errors.Is(err, completed) || !out.complete {
 			out.complete = false
+			out.failureDetail = "stage=stream cause=" + failureCategory(err)
 			out.err = errors.New("上游流被中断或缺少完成事件")
 			if out.sent {
 				emitSSE(w, "error", []byte(`{"type":"error","error":{"type":"upstream_error","message":"Upstream stream incomplete"}}`))

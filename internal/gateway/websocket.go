@@ -10,8 +10,10 @@ import (
 	"fiftyapi/internal/accounts"
 	"fiftyapi/internal/providers"
 	"fiftyapi/internal/store"
+	"fmt"
 	ws "github.com/coder/websocket"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"sync"
@@ -39,6 +41,7 @@ func (h *Handler) ServeWebSocket(w http.ResponseWriter, r *http.Request) {
 	w = tracked
 	w.Header().Set("X-Request-ID", id)
 	accepted := false
+	rejection := "客户端 WebSocket 握手失败"
 	defer func() {
 		if accepted {
 			return
@@ -47,35 +50,43 @@ func (h *Handler) ServeWebSocket(w http.ResponseWriter, r *http.Request) {
 		defer cancel()
 		zero := int64(0)
 		d := &store.RequestDiagnostics{Protocol: "responses", ClientTransport: httpTransport(w.Header().Get("Content-Type")), Code: "client_websocket_handshake"}
-		_ = h.store.LogRequest(ctx, store.RequestLog{Diagnostics: d, ID: id, UserID: user.ID, KeyID: key, Status: tracked.status, Amount: &zero, Error: "客户端 WebSocket 握手失败", DurationMS: time.Since(start).Milliseconds(), CreatedAt: start.Unix()})
+		summary := fmt.Sprintf("WebSocket handshake rejected request_id=%s status=%d reason=%s", id, tracked.status, rejection)
+		log.Print(summary)
+		h.store.RecordRuntime(ctx, store.RuntimeLog{Level: "warn", Module: "gateway", Event: "websocket_handshake_rejected", Message: summary, Status: tracked.status})
+		_ = h.store.LogRequest(ctx, store.RequestLog{Diagnostics: d, ID: id, UserID: user.ID, KeyID: key, Status: tracked.status, Amount: &zero, Error: rejection, DurationMS: time.Since(start).Milliseconds(), CreatedAt: start.Unix()})
 	}()
 	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Minute)
 	defer cancel()
 	socketID, ok := h.registerWebSocket(cancel)
 	if !ok {
-		failure(w, 503, "服务正在停止，请稍后重连")
+		rejection = "服务正在停止，请稍后重连"
+		failure(w, 503, rejection)
 		return
 	}
 	defer h.unregisterWebSocket(socketID)
 	if _, err = h.store.RelayInstanceID(r.Context()); err != nil {
-		failure(w, 503, "网关暂不可用")
+		rejection = "网关暂不可用"
+		failure(w, 503, rejection)
 		return
 	}
 	if _, err = providers.NextRelayChain(r.Header.Get(providers.RelayChainHeader), h.instanceID); err != nil {
-		failure(w, 508, "检测到网关转发循环")
+		rejection = "检测到网关转发循环"
+		failure(w, 508, rejection)
 		return
 	}
 	value, _ := h.wsUsers.LoadOrStore(user.ID, &atomic.Int32{})
 	count := value.(*atomic.Int32)
 	if count.Add(1) > 4 {
 		count.Add(-1)
-		failure(w, 429, "同一用户最多保持 4 个 WebSocket 连接")
+		rejection = "同一用户最多保持 4 个 WebSocket 连接"
+		failure(w, 429, rejection)
 		return
 	}
 	defer count.Add(-1)
 	if h.wsTotal.Add(1) > 128 {
 		h.wsTotal.Add(-1)
-		failure(w, 503, "WebSocket 连接已满")
+		rejection = "WebSocket 连接已满"
+		failure(w, 503, rejection)
 		return
 	}
 	defer h.wsTotal.Add(-1)

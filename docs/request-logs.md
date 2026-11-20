@@ -64,3 +64,9 @@ Codex Responses 的 `response.completed`、Claude Messages 的 `message_stop` �
 - 旧 `/api/admin/charges`、`/api/admin/charges/{id}/settle` 兼容保留。
 
 日志不保存提示词、完整响应、上游 Key 或 SMTP 密码。费用策略见 [自动结算](request-logs.md#自动结算)。
+
+### 管理员故障诊断
+
+新发生的上游请求失败和客户端 WebSocket 握手拒绝同时写入容器/终端日志及管理员「运行日志」（模块 `gateway`，保留 7 天）。通过摘要中的 `request_id` 关联请求日志；握手拒绝保留连接数超限等具体原因。请求失败摘要包含账号（运行日志账号列）、尝试序号、传输、状态、是否发出/完成/观察到输出及固定故障分类。
+
+原生 WebSocket 读取失败记录新建/复用连接、最后事件类别、关闭码（若收到）、超时或取消分类。不记录关闭原因原文、上游正文、URL、请求头或凭据；未收到关闭帧时可能只能确定读取失败，不能据此断言上游或代理的内部根因。此信息仅在升级后产生，不补录历史失败。Docker Compose 可用 `docker compose logs --timestamps --tail 200 fiftyapi` 查看。

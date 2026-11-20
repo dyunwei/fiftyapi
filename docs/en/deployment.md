@@ -176,3 +176,5 @@ The admin dashboard links to accounts requiring reauthorization, members with se
 ## Automatic maintenance
 
 `FIFTYAPI_AUTO_MAINTENANCE` defaults to `true` for daily public price sync and Codex release checks; set it to `false` for offline operation. `FIFTYAPI_MORNING_PROBES` defaults to `false`; enabling it explicitly permits daily inference probes that consume upstream quota. With Docker Compose, set `FIFTYAPI_MORNING_PROBES=true` in `.env` and run `docker compose up -d fiftyapi` to apply the container environment. Account catalog sync and necessary OAuth refresh remain active. Missing or invalid request usage releases reservations and requires administrator settlement; further requests by that user pause until resolution. See [low-maintenance sharing](low-maintenance.md).
+
+Gateway request failures are also available in administrator Runtime logs under module `gateway` and in container output. See [failure diagnostics](request-logs.md#administrator-failure-diagnostics) for correlation fields and privacy limits.

@@ -8,6 +8,7 @@ import (
 	"fiftyapi/internal/accounts"
 	"fiftyapi/internal/providers"
 	"fiftyapi/internal/store"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -129,6 +130,7 @@ func (h *Handler) Models(w http.ResponseWriter, r *http.Request) {
 }
 
 type result struct {
+	failureDetail                  string
 	upstreamTransport              string
 	upstreamStatus, upstreamReason string
 	usage                          store.TokenUsage
@@ -477,6 +479,15 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 		}
 		holdBinding := chosen.Route.Provider == "openai" && out.signal == "rate_limit"
 		eligible := !holdBinding && out.retryable && writer.writeErr == nil && !writer.committed && !out.invalidUsage && out.usage.Input+out.usage.Output+out.usage.Cached+out.usage.CacheWrite == 0 && r.Context().Err() == nil
+		if out.err != nil {
+			detail := out.failureDetail
+			if detail == "" {
+				detail = "stage=request cause=classified_failure"
+			}
+			summary := fmt.Sprintf("Request failure request_id=%s account_id=%d attempt=%d transport=%s status=%d dispatched=%t completed=%t output=%t signal=%s %s", id, chosen.ID, attempt, out.upstreamTransport, out.status, out.dispatched, out.complete, writer.firstOutput != nil, out.signal, detail)
+			log.Print(summary)
+			h.store.RecordRuntime(r.Context(), store.RuntimeLog{Level: "warn", Module: "gateway", Event: "request_failure", AccountID: chosen.ID, Message: summary, Status: out.status, DurationMS: time.Since(started).Milliseconds()})
+		}
 		reason := routingReason(out)
 		observation := store.AccountObservation{RequestAttempt: store.RequestAttempt{RequestID: id, Attempt: attempt, AccountID: chosen.ID, Model: m.ID, Status: out.status, DurationMS: time.Since(started).Milliseconds(), Dispatched: out.dispatched, Retryable: eligible && (portable || refreshed) && attempt < 3, Reason: reason, CreatedAt: started.Unix()}, Success: out.complete && out.err == nil, Failure: writer.writeErr == nil && out.err != nil && out.signal != "refreshed" && out.signal != "rate_limit" && out.signal != "quota_exhausted" && out.signal != "model_unavailable" && out.status != 400 && out.status != 403 && r.Context().Err() == nil, CooldownUntil: out.cooldownUntil, HoldBinding: holdBinding, QuotaExhausted: out.signal == "quota_exhausted", PrimaryUsed: out.primaryUsed, PrimaryReset: out.primaryReset, SecondaryUsed: out.secondaryUsed, SecondaryReset: out.secondaryReset}
 		if writer.firstOutput != nil {
