@@ -57,6 +57,7 @@ test('邮箱和真实姓名注册、零额度登录及管理员查看',async({pa
  expect(me.user).toMatchObject({role:'user',email:'new.member@example.com',display_name:'注册测试姓名',limit_5h_microusd:0,limit_7d_microusd:0})
  expect((await page.request.get(baseURL+'/api/admin/users')).status()).toBe(403)
  await page.setViewportSize({width:1440,height:1000})
+ await page.locator('.header-user').click()
  await page.getByRole('button',{name:'退出登录',exact:false}).click()
  await page.getByLabel('用户名',{exact:true}).fill('admin')
  await page.getByLabel('密码',{exact:true}).fill(adminPassword)

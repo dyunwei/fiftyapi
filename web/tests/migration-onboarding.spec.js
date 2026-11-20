@@ -81,6 +81,7 @@ test('first setup guides Docker export, upload, review, import and model setup; 
  const adminMe=await (await page.request.get(baseURL+'/api/me')).json()
  const closed=await page.request.post(baseURL+'/api/admin/migrations/sub2api',{data:{data:bundle,preview:true},headers:{'X-CSRF-Token':adminMe.csrf_token}})
  expect(closed.status()).toBe(403)
+ await page.locator('.header-user').click()
  await page.getByRole('button',{name:'退出登录',exact:false}).click()
  await page.getByLabel('用户名',{exact:true}).fill('migrated@example.com')
  await page.getByLabel('密码',{exact:true}).fill(memberPassword)

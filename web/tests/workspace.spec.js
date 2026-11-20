@@ -100,6 +100,7 @@ test('管理员初始化、密钥一次性显示、成员权限与退出',async(
  await dialog.getByRole('button',{name:'生成授权链接'}).click()
  await expect(dialog.getByRole('link',{name:'打开授权页面'})).toHaveAttribute('href',/^https:\/\/accounts\.google\.com/)
  await page.keyboard.press('Escape')
+ await page.locator('.header-user').click()
  await page.getByRole('button',{name:'退出登录'}).click()
  await page.getByLabel('用户名',{exact:true}).fill('alice@example.test')
  await page.getByLabel('密码',{exact:true}).fill(memberPassword)
