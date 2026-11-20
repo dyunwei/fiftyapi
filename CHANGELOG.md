@@ -5,6 +5,26 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 English | 中文说明见各版本下方折叠区域
 
+## 0.3.1 (2026-11-20)
+
+### Fixed
+
+- Pending settlements no longer block subsequent inference requests. Requests without reliable usage or a calculable charge settle at zero and release their quota reservations.
+- On startup, interrupted and legacy pending requests settle using reliable usage and the original price snapshot when available. Ledger write failures remain visible to administrators.
+
+### Upgrade notes
+
+- Upgrading from v0.3.0 requires no database migration. Restart on v0.3.1 to recover existing pending requests.
+
+<details>
+<summary>中文说明</summary>
+
+- 修复待核算请求导致后续模型调用被拒绝的问题。无法取得可靠用量或无法可靠计费的请求按零结算并释放预占额度。
+- 启动时恢复中断及历史待核算请求。有可靠用量时按原价格快照结算。管理员仍可查看账本写入异常。
+- 从 v0.3.0 升级无需数据库迁移。重启到 v0.3.1 后会处理已有待核算记录。
+
+</details>
+
 ## 0.3.0 (2026-11-20)
 
 ### Added

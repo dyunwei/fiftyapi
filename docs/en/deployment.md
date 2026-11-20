@@ -109,7 +109,7 @@ This path also serves HTTP POST. Configure the remaining paths and your domain/H
 
 1. Stop the service and back up the database, any existing WAL/SHM files, and the original master key.
 2. Replace the binary or rebuild the container using the same data path and key.
-3. Start one instance; migrations apply automatically. FiftyAPI v0.3.0 uses schema 23.
+3. Start one instance; migrations apply automatically. FiftyAPI v0.3.1 uses schema 23.
 4. Verify account/model status and client protocols. Maximum concurrency is configured under **Scheduling & health**; saving connection settings does not change it.
 
 Rollback requires the older program together with its pre-upgrade database backup. Never open a migrated database with an older binary. The public version number starts at 0.1.0; that does not reset the database schema or discard existing data.
