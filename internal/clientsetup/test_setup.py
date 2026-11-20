@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 from types import SimpleNamespace
+from contextlib import redirect_stdout
 import io
 
 spec = importlib.util.spec_from_file_location('helper', Path(__file__).with_name('setup.py'))
@@ -91,6 +92,13 @@ name = "FiftyAPI"
                 h.configure(args, None)
                 state = json.loads((h.ROOT / (client + '.json')).read_bytes())
                 self.assertTrue(state['active'])
+                before = Path(state['path']).read_bytes()
+                output = io.StringIO()
+                with redirect_stdout(output):
+                    h.check(client)
+                self.assertEqual(Path(state['path']).read_bytes(), before)
+                self.assertIn('Gateway reachable; API key accepted', output.getvalue())
+                self.assertNotIn('sk-simulated', output.getvalue())
                 h.configure(args, state)
                 state = json.loads((h.ROOT / (client + '.json')).read_bytes())
                 h.apply(client, state, False)

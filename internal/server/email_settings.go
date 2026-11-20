@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"net/mail"
 	"strings"
 
 	"fiftyapi/internal/credentials"
@@ -16,14 +17,15 @@ const emailSettingName = "email_settings_v1"
 const emailSettingBinding = "fiftyapi:email-settings:v1"
 
 type emailSettings struct {
-	Enabled   bool   `json:"enabled"`
-	PublicURL string `json:"public_url"`
-	Host      string `json:"host"`
-	Port      string `json:"port"`
-	From      string `json:"from"`
-	Username  string `json:"username"`
-	Password  string `json:"password,omitempty"`
-	TLSMode   string `json:"tls_mode"`
+	AlertRecipient string `json:"alert_recipient,omitempty"`
+	Enabled        bool   `json:"enabled"`
+	PublicURL      string `json:"public_url"`
+	Host           string `json:"host"`
+	Port           string `json:"port"`
+	From           string `json:"from"`
+	Username       string `json:"username"`
+	Password       string `json:"password,omitempty"`
+	TLSMode        string `json:"tls_mode"`
 }
 
 func (c emailSettings) smtp() *mailer.SMTP {
@@ -36,10 +38,16 @@ func (c emailSettings) validate() error {
 	if c.PublicURL != "" && !validPublicURL(c.PublicURL) {
 		return errors.New("公共访问地址应为 HTTP 或 HTTPS 源站地址，不含路径、参数或片段")
 	}
-	if c.Enabled {
-		if !validPublicURL(c.PublicURL) {
-			return errors.New("请填写邀请链接使用的公共访问地址")
+	if c.Enabled && !validPublicURL(c.PublicURL) {
+		return errors.New("请填写邀请链接使用的公共访问地址")
+	}
+	if c.AlertRecipient != "" {
+		address, err := mail.ParseAddress(c.AlertRecipient)
+		if err != nil || address.Address != c.AlertRecipient || len(c.AlertRecipient) > 254 {
+			return errors.New("告警收件邮箱无效")
 		}
+	}
+	if c.Enabled || c.AlertRecipient != "" {
 		return c.smtp().Validate()
 	}
 	return nil
@@ -131,6 +139,7 @@ func (a *API) saveEmailSettings(w http.ResponseWriter, r *http.Request, id ident
 	if in.Password == "" && !in.ClearPassword {
 		in.Password = old.Password
 	}
+	in.AlertRecipient = strings.TrimSpace(in.AlertRecipient)
 	in.Host = strings.TrimSpace(in.Host)
 	in.Port = strings.TrimSpace(in.Port)
 	in.From = strings.TrimSpace(in.From)
@@ -188,17 +197,16 @@ func (a *API) testEmailSettings(w http.ResponseWriter, r *http.Request, id ident
 		writeError(w, 400, "收件邮箱无效")
 		return
 	}
-	sender, _, err := a.invitationSender(r.Context())
+	settings, _, err := a.readEmailSettings(r.Context())
 	if err != nil {
 		writeError(w, 500, "无法读取邮件配置")
 		return
 	}
-	smtp, ok := sender.(*mailer.SMTP)
-	if !ok || smtp == nil {
+	if !settings.Enabled && settings.AlertRecipient == "" {
 		writeError(w, 400, "请先保存并启用 SMTP 配置")
 		return
 	}
-	if err = smtp.SendTest(r.Context(), in.Email); err != nil {
+	if err = settings.smtp().SendTest(r.Context(), in.Email); err != nil {
 		writeError(w, 400, err.Error())
 		return
 	}

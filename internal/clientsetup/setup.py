@@ -17,6 +17,7 @@ try:
     import tomllib
 except ImportError:
     sys.exit("Python 3.11+ required. Try python3.11 or install a current Python version.")
+import urllib.error
 import urllib.parse
 import urllib.request
 import warnings
@@ -156,6 +157,70 @@ def apply(client, state, enable):
     save_state(client, state)
 
 
+def config_path(client):
+    env, directory, filename = ('CODEX_HOME', '.codex', 'config.toml') if client == 'codex' else ('CLAUDE_CONFIG_DIR', '.claude', 'settings.json')
+    return (Path(os.environ.get(env, str(Path.home() / directory))) / filename).expanduser().absolute()
+
+
+def catalog_models(base, key, protocol):
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, *unused, **kwargs):
+            return None
+
+    req = urllib.request.Request(base + '/v1/models', headers={'Authorization': 'Bearer ' + key})
+    with urllib.request.build_opener(NoRedirect).open(req, timeout=20) as response:
+        catalog = json.loads(response.read(2 * 1024 * 1024))
+    return [m['id'] for m in catalog.get('data', []) if protocol in (m.get('protocols') or [m.get('protocol')])]
+
+
+def check(client):
+    raw = read(ROOT / (client + '.json'))
+    state = json.loads(raw, object_hook=state_hook) if raw else None
+    if not state or not state['active']:
+        raise ValueError('No active FiftyAPI configuration. Run configure first.')
+    path = config_path(client)
+    if str(path) != state['path']:
+        raise ValueError('The client configuration directory differs from the saved setup.')
+    try:
+        raw = read(path)
+        if raw is None:
+            raise ValueError()
+        doc = decode(client, raw)
+    except ValueError:
+        raise ValueError('Cannot read the active client configuration.') from None
+    if any(get(doc, field['keys']) != field['after'] for field in state['fields']):
+        raise ValueError('Managed settings have changed. Check the local configuration before retrying.')
+    if client == 'codex':
+        provider = doc['model_providers']['fiftyapi']
+        base = provider['base_url'].removesuffix('/v1')
+        key, model, protocol = provider['experimental_bearer_token'], doc['model'], 'responses'
+        print('Configured transport:', 'WebSocket enabled' if provider['supports_websockets'] else 'HTTP')
+    else:
+        if claude_conflicts():
+            raise ValueError('Inherited Claude environment variables conflict with the saved settings.')
+        env = doc['env']
+        base, key, model, protocol = env['ANTHROPIC_BASE_URL'], env['ANTHROPIC_AUTH_TOKEN'], env['ANTHROPIC_MODEL'], 'messages'
+    print('Local settings: match saved FiftyAPI configuration')
+    try:
+        models = catalog_models(base, key, protocol)
+    except urllib.error.HTTPError as exc:
+        if exc.code == 401:
+            raise ValueError('Gateway reachable; API key rejected or member disabled.') from None
+        raise ValueError(f'Gateway returned HTTP {exc.code} for the model catalog.') from None
+    except (OSError, ValueError):
+        raise ValueError('Could not read the gateway model catalog. Check the URL, network and TLS.') from None
+    print('Gateway reachable; API key accepted')
+    if model not in models:
+        raise ValueError(f'The configured model is unavailable or does not advertise {protocol}.')
+    print(f'Configured model advertises {protocol}. See your request logs for the observed transport.')
+
+
+def claude_conflicts():
+    keys = ('ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_MODEL',
+            'CLAUDE_CODE_OAUTH_TOKEN', 'CLAUDE_CODE_USE_BEDROCK', 'CLAUDE_CODE_USE_VERTEX', 'CLAUDE_CODE_USE_FOUNDRY')
+    return [key for key in keys if os.environ.get(key)]
+
+
 def configure(args, state):
     client = args.client
     executable = shutil.which('codex' if client == 'codex' else 'claude')
@@ -164,8 +229,7 @@ def configure(args, state):
         print('Client:', result.stdout.strip()[:120])
     else:
         print('CLI not found. IDE extensions can bundle their own client; verify its version separately.')
-    path = Path(os.environ.get('CODEX_HOME', str(Path.home() / '.codex'))) / 'config.toml' if client == 'codex' else Path(os.environ.get('CLAUDE_CONFIG_DIR', str(Path.home() / '.claude'))) / 'settings.json'
-    path = path.expanduser().absolute()
+    path = config_path(client)
     if state and str(path) != state['path']:
         raise ValueError('Configuration directory changed; restore the previous directory first.')
     base = (args.url or input('FiftyAPI site URL: ')).rstrip('/')
@@ -181,14 +245,8 @@ def configure(args, state):
         key = getpass.getpass('FiftyAPI API key: ').strip()
     if not key or any(ord(c) < 32 for c in key):
         raise ValueError('Invalid key')
-    class NoRedirect(urllib.request.HTTPRedirectHandler):
-        def redirect_request(self, *unused, **kwargs):
-            return None
-    req = urllib.request.Request(base + '/v1/models', headers={'Authorization': 'Bearer ' + key})
-    with urllib.request.build_opener(NoRedirect).open(req, timeout=20) as response:
-        catalog = json.loads(response.read(2 * 1024 * 1024))
     protocol = 'responses' if client == 'codex' else 'messages'
-    models = [m['id'] for m in catalog.get('data', []) if protocol in (m.get('protocols') or [m.get('protocol')])]
+    models = catalog_models(base, key, protocol)
     if not models:
         raise ValueError('No models advertise ' + protocol + '; contact the administrator.')
     print('Available models:', ', '.join(models))
@@ -202,7 +260,7 @@ def configure(args, state):
     if client == 'codex':
         changes = [(['model'], model), (['model_provider'], 'fiftyapi'), (['model_providers', 'fiftyapi'], {'name': 'FiftyAPI', 'base_url': base + '/v1', 'experimental_bearer_token': key, 'wire_api': 'responses', 'requires_openai_auth': False, 'supports_websockets': args.websocket})]
     else:
-        conflicts = [k for k in ('ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_MODEL', 'CLAUDE_CODE_OAUTH_TOKEN', 'CLAUDE_CODE_USE_BEDROCK', 'CLAUDE_CODE_USE_VERTEX', 'CLAUDE_CODE_USE_FOUNDRY') if os.environ.get(k)]
+        conflicts = claude_conflicts()
         if conflicts:
             raise ValueError('Remove conflicting inherited environment variables first: ' + ', '.join(conflicts))
         changes = [(['env', k], v) for k, v in {'ANTHROPIC_BASE_URL': base, 'ANTHROPIC_AUTH_TOKEN': key, 'ANTHROPIC_API_KEY': '', 'ANTHROPIC_MODEL': model, 'ANTHROPIC_DEFAULT_OPUS_MODEL': model, 'ANTHROPIC_DEFAULT_SONNET_MODEL': model, 'ANTHROPIC_DEFAULT_HAIKU_MODEL': model, 'CLAUDE_CODE_USE_BEDROCK': '0', 'CLAUDE_CODE_USE_VERTEX': '0', 'CLAUDE_CODE_USE_FOUNDRY': '0', 'CLAUDE_CODE_OAUTH_TOKEN': ''}.items()]
@@ -237,7 +295,7 @@ def configure(args, state):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=['configure', 'status', 'use', 'restore', 'uninstall'])
+    parser.add_argument('action', choices=['configure', 'check', 'status', 'use', 'restore', 'uninstall'])
     parser.add_argument('client', choices=['codex', 'claude'])
     parser.add_argument('--url')
     parser.add_argument('--model')
@@ -247,6 +305,9 @@ def main():
         raise ValueError('Run as the same user as the client, without sudo')
     if ROOT.is_symlink():
         raise ValueError('Helper directory must not be a symbolic link')
+    if args.action == 'check':
+        check(args.client)
+        return
     ROOT.mkdir(mode=0o700, parents=True, exist_ok=True)
     if os.name != 'nt':
         ROOT.chmod(0o700)

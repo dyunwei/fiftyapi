@@ -82,6 +82,8 @@ type websocketTurn struct {
 	model, stream, previous string
 	mu                      sync.Mutex
 	protocolCode            string
+	connectedUpstream       bool
+	failedUpstreamHandshake bool
 }
 
 func (t *websocketTurn) setCode(code string) { t.mu.Lock(); t.protocolCode = code; t.mu.Unlock() }
@@ -154,6 +156,7 @@ func (t *websocketUpstreamTransport) RoundTrip(req *http.Request) (*http.Respons
 		conn, response, err = ws.Dial(ctx, u.String(), &ws.DialOptions{HTTPClient: t.base, HTTPHeader: headers})
 		cancel()
 		if err != nil {
+			t.turn.failedUpstreamHandshake = true
 			t.base.CloseIdleConnections()
 			if response != nil {
 				if response.Body == nil {
@@ -175,6 +178,7 @@ func (t *websocketUpstreamTransport) RoundTrip(req *http.Request) (*http.Respons
 	} else {
 		t.base.CloseIdleConnections()
 	}
+	t.turn.connectedUpstream = true
 	raw, err := io.ReadAll(io.LimitReader(req.Body, 4<<20))
 	if err != nil {
 		return nil, errors.New("websocket request read failed")

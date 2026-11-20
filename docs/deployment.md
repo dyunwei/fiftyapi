@@ -327,6 +327,18 @@ python3 scripts/backup-offline.py restore \
 - `GET /api/admin/backups/{id}/download`：下载未过期的已完成备份。
 - `DELETE /api/admin/backups/{id}`：删除对应远端文件并保留删除记录。
 
+## 维护待办与告警
+
+管理仪表盘汇总待重授权账号、因待核算被暂停的成员以及最近一次备份失败。点击待办可进入对应处理页面。在「系统设置 → 邮件配置」填写维护告警收件邮箱即可用现有 SMTP 收到告警，留空关闭。服务启动后及每 5 分钟检查一次，将新待办合并为一封邮件。已发送的事项在同一次持续异常期间会去重；SMTP 发送失败将在下次检查时重试。
+
+## 备份恢复预检
+
+在线备份下载后，可以在服务运行时执行以下命令。预检在私有临时目录验证文件校验和、SQLite 完整性、数据库版本和原主密钥。仅对临时副本尝试迁移，完成后清理，需预留解压和迁移空间。Compose 可以沿用上文的挂载命令，把 `--output /data/restored` 换成 `--check`，无需先停服。
+
+```sh
+fiftyapi restore --from backup.tar.gz --check --key-file data/master.key
+```
+
 ## 自动维护开关
 
 `FIFTYAPI_AUTO_MAINTENANCE` 默认 `true`，每日同步价格与检查 Codex 稳定版本；设为 `false` 可离线运行。`FIFTYAPI_MORNING_PROBES` 默认 `false`；只有显式开启后才运行消耗上游额度的晨间推理探测。账号目录同步和 OAuth 必要刷新仍会执行。详见 [低维护账号共享](low-maintenance.md)。

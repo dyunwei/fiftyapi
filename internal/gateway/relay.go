@@ -137,6 +137,7 @@ func (h *Handler) relay(w http.ResponseWriter, r *http.Request, request map[stri
 		return out
 	}
 	defer resp.Body.Close()
+	out.observeHTTPResponse(resp)
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		out.status = resp.StatusCode
 		if out.status < 400 {

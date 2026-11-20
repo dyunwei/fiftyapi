@@ -74,6 +74,14 @@ Members see only their own request logs; administrators see all requests and set
 
 Changing a password revokes existing sign-in sessions. Members can revoke or delete their own keys; deletion immediately prevents future access while preserving historical settlement relationships.
 
+## Request diagnostics
+
+The request log shows the observed client transport below the model. **Request diagnostics** shows the API protocol and, when observed, both the client-to-gateway and gateway-to-upstream transports. Older requests show **Not recorded**. A request rejected before authentication or blocked by a reverse proxy may have no log entry.
+
+Diagnostics distinguish personal budget and concurrency limits, upstream throttling, protocol mismatch and interrupted requests. Affected budget windows, reset times and suggested retries appear when available. Output and completion reflect gateway observations, and settlement appears separately. An authenticated WebSocket handshake failure observed by the gateway has its own request ID. A subsequent SSE entry alone cannot establish why a client switched transports. **Copy diagnostics** includes the request ID and fixed diagnostic fields without raw upstream errors, prompts or keys.
+
+Both paginated and legacy log APIs may return an optional `diagnostics` object. It includes `protocol`, `client_transport`, `upstream_transport`, a diagnostic `code`, `retry_at`, `quota` and dispatch, output and completion flags. Timestamps are Unix seconds.
+
 ## Automatic settlement
 
 | Condition | Local budget handling |

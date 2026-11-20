@@ -144,6 +144,7 @@ func (h *Handler) forward(w http.ResponseWriter, r *http.Request, body []byte, r
 		return out
 	}
 	defer resp.Body.Close()
+	out.observeHTTPResponse(resp)
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		out.status = resp.StatusCode
 		if out.status < 400 {
@@ -162,7 +163,7 @@ func (h *Handler) forward(w http.ResponseWriter, r *http.Request, body []byte, r
 }
 
 func consumeProtocolResponse(w http.ResponseWriter, r *http.Request, resp *http.Response, protocolProvider string, stream bool, out result) result {
-	if nativeEventStream(resp) {
+	if out.eventStream(resp) {
 		var final json.RawMessage
 		completed := errors.New("native stream completed")
 		err := consumeSSE(resp.Body, func(event string, payload []byte) error {
@@ -264,6 +265,7 @@ func consumeProtocolResponse(w http.ResponseWriter, r *http.Request, resp *http.
 		out.err = errors.New("上游响应格式错误")
 		return out
 	}
+	out.upstreamTransport = "http_json"
 	observeBilling(root, &out)
 	if raw, ok := root["usage"]; ok {
 		mergeNativeUsage(raw, protocolProvider, &out)

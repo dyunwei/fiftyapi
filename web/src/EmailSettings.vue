@@ -19,6 +19,9 @@ onMounted(()=>action(load))
   <div class="mail-layout">
    <form class="mail-config" @submit.prevent="save"><fieldset :disabled="busy||!editable" class="mail-fields">
     <label class="checkbox"><input v-model="config.enabled" type="checkbox">{{ t('启用邀请邮件') }}</label>
+    <label>{{ t('维护告警收件邮箱') }}
+     <input v-model="config.alert_recipient" type="email" maxlength="254" :placeholder="t('留空关闭告警')">
+    </label>
     <div class="mail-identity-grid">
      <label>{{ t('公共访问地址') }}<input :aria-label="t('公共访问地址')" v-model="config.public_url" type="url" :required="config.enabled" maxlength="2048" placeholder="https://api.example.com"><small class="subtle">{{ t('邀请链接使用的站点地址，不包含路径。') }}</small></label>
      <label>{{ t('发件地址') }}<input :aria-label="t('发件地址')" v-model="config.from" :required="config.enabled" maxlength="320" placeholder="FiftyAPI &lt;sender@example.com&gt;"></label>

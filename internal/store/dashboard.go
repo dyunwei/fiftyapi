@@ -10,25 +10,26 @@ type ErrorStat struct {
 	Requests int64 `json:"requests"`
 }
 type Dashboard struct {
-	Errors          []ErrorStat  `json:"errors"`
-	Keys            int64        `json:"keys"`
-	EnabledKeys     int64        `json:"enabled_keys"`
-	Accounts        int64        `json:"accounts"`
-	EnabledAccounts int64        `json:"enabled_accounts"`
-	Users           int64        `json:"users"`
-	EnabledUsers    int64        `json:"enabled_users"`
-	TodayRequests   int64        `json:"today_requests"`
-	TotalRequests   int64        `json:"total_requests"`
-	TodayTokens     int64        `json:"today_tokens"`
-	TotalTokens     int64        `json:"total_tokens"`
-	TodayAmount     int64        `json:"today_amount"`
-	TotalAmount     int64        `json:"total_amount"`
-	RPM             int64        `json:"rpm"`
-	TPM             int64        `json:"tpm"`
-	AverageMS       float64      `json:"average_ms"`
-	ActiveUsers     int64        `json:"active_users"`
-	Trend           []TrendPoint `json:"trend"`
-	Distribution    []ModelStat  `json:"distribution"`
+	MaintenanceTodo map[string]int `json:"maintenance_todo,omitempty"`
+	Errors          []ErrorStat    `json:"errors"`
+	Keys            int64          `json:"keys"`
+	EnabledKeys     int64          `json:"enabled_keys"`
+	Accounts        int64          `json:"accounts"`
+	EnabledAccounts int64          `json:"enabled_accounts"`
+	Users           int64          `json:"users"`
+	EnabledUsers    int64          `json:"enabled_users"`
+	TodayRequests   int64          `json:"today_requests"`
+	TotalRequests   int64          `json:"total_requests"`
+	TodayTokens     int64          `json:"today_tokens"`
+	TotalTokens     int64          `json:"total_tokens"`
+	TodayAmount     int64          `json:"today_amount"`
+	TotalAmount     int64          `json:"total_amount"`
+	RPM             int64          `json:"rpm"`
+	TPM             int64          `json:"tpm"`
+	AverageMS       float64        `json:"average_ms"`
+	ActiveUsers     int64          `json:"active_users"`
+	Trend           []TrendPoint   `json:"trend"`
+	Distribution    []ModelStat    `json:"distribution"`
 }
 type TrendPoint struct {
 	Time       int64 `json:"time"`
@@ -64,6 +65,11 @@ func (s *Store) Dashboard(ctx context.Context, user int64, admin bool, hours, bu
 		return out, err
 	}
 	if admin {
+		todo, err := s.MaintenanceTodo(ctx)
+		if err != nil {
+			return out, err
+		}
+		out.MaintenanceTodo = todo
 		if err := s.DB.QueryRowContext(ctx, "SELECT count(*),COALESCE(sum(enabled),0) FROM upstream_accounts").Scan(&out.Accounts, &out.EnabledAccounts); err != nil {
 			return out, err
 		}

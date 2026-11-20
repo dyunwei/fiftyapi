@@ -61,6 +61,7 @@ func (h *Handler) antigravity(w http.ResponseWriter, r *http.Request, body []byt
 		return out
 	}
 	defer resp.Body.Close()
+	out.observeHTTPResponse(resp)
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		out.status = resp.StatusCode
 		if out.status == 400 || out.status == 401 || out.status == 403 || out.status == 404 || out.status == 429 || out.status == 508 {
@@ -76,7 +77,7 @@ func (h *Handler) antigravity(w http.ResponseWriter, r *http.Request, body []byt
 	}
 	observeHeaders(&out, resp.Header)
 	if stream {
-		if !nativeEventStream(resp) {
+		if !out.eventStream(resp) {
 			out.err = errors.New("上游未返回 SSE 响应")
 			return out
 		}
@@ -117,6 +118,7 @@ func (h *Handler) antigravity(w http.ResponseWriter, r *http.Request, body []byt
 			out.err = e
 			return out
 		}
+		out.upstreamTransport = "http_json"
 		if !out.complete {
 			out.err = errors.New("上游响应尚未完成")
 			return out

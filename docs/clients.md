@@ -96,6 +96,12 @@ curl -N http://127.0.0.1:8080/v1/chat/completions \
 
 将默认 OpenAI 客户端身份统一为实测的 0.164.0，已完成 `gpt-6.1-sol` 真实核心调用；旧版本声明可能导致目录缺少模型甚至直接调用返回 `model_not_found`。账号中的“验证并同步”会显示具体结果，见 [账号模型说明](account-models.md)。
 
+## 客户端自检
+
+在「使用 API 密钥 → 客户端接入自检」复制适合当前系统和客户端的命令。也可以从站点下载当前的 `/setup.py`，执行 `python3.11 fiftyapi-setup.py check codex` 或 `python3.11 fiftyapi-setup.py check claude`。Windows 使用 `py -3.11`。
+
+在配置客户端的同一用户和终端运行。助手比对当前本机配置与保存的接入配置，再通过 `/v1/models` 检查连通性、密钥和模型协议。检查不会改写配置或发送推理，也不会输出密钥。Codex 显示配置是否启用 WebSocket；实际传输以[请求诊断](request-logs.md#请求诊断)为准。
+
 ## 一键配置客户端
 
 在「使用密钥」中选择客户端、系统和模型，复制「一键配置」命令。需要 Python 3.11+（macOS/Linux 使用 `python3.11`，Windows 使用 Python launcher `py -3.11`）。助手由当前站点 `/setup.py` 提供，可以先下载审阅。无需管理员权限，不安装客户端。

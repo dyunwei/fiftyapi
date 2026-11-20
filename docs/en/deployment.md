@@ -147,11 +147,23 @@ Restoration verifies SHA-256 checksums, SQLite integrity and the original key, t
 
 After success, set `FIFTYAPI_DB_PATH=/data/restored/fiftyapi.db` in `.env`, then run `docker compose up -d --force-recreate fiftyapi`. The new directory includes a private copy of the supplied original master key. Check login, API keys, budgets, models, backup schedules and upstream authorization; OAuth tokens may have rotated since the snapshot. Keep the original instance stopped. To roll back, stop the restored instance and switch the database path back; subsequent writes are not merged. For binary deployments, use `fiftyapi restore --from backup.tar.gz --output restored-data --key-file data/master.key`.
 
+### Restore preflight
+
+Run the following against a downloaded online backup while the service is running. It verifies file checksums, SQLite integrity, schema compatibility and the original master key in a private temporary directory. Supported migrations are tried on the temporary copy, which is deleted afterward. Allow space for unpacking and migration. To check through Compose, use the same mounts as above but replace `--output /data/restored` with `--check` and skip the stop command.
+
+```sh
+fiftyapi restore --from backup.tar.gz --check --key-file data/master.key
+```
+
 ## Diagnostics
 
 `fiftyapi version` works without a master key. `/api/version` returns the version and build commit. Request IDs identify individual calls; request logs do not store full prompts or responses. Runtime logs retain operational summaries for 7 days. Errors before database initialization and runtime-log write failures remain visible in terminal/container logs.
 
 Antigravity includes paired OAuth client parameters. Normal deployment and account import do not require `ANTIGRAVITY_OAUTH_CLIENT_SECRET`; the configuration example lists it as a commented optional setting, and Compose forwards an override from the environment or `.env`. Unset or blank values use the built-in value. This advanced override configures the OAuth client, rather than user credentials. Refreshing imported account tokens still uses the paired client parameters. If Antigravity reports `invalid_client` after an environment override, unset the variable for local startup, or clear it in both `.env` and the shell running Compose and recreate the container (remove the override from custom Compose or Docker run environments as applicable), then generate a new authorization link. Do not reuse a failed callback or disclose environment values, authorization results or tokens.
+
+## Maintenance tasks and alerts
+
+The admin dashboard links to accounts requiring reauthorization, members blocked by pending settlements, and the latest failed backup. Enter a maintenance alert recipient under **System settings → Email configuration** to send alerts through the existing SMTP configuration. Leave it blank to disable email alerts. The service checks on startup and every five minutes, batches new issues into one message, and suppresses repeats while each issue remains active. SMTP failures are retried at the next check.
 
 ## Automatic maintenance
 

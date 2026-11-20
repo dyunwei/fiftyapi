@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fiftyapi/internal/accounts"
 	"fiftyapi/internal/providers"
+	"fiftyapi/internal/store"
 	ws "github.com/coder/websocket"
 	"io"
 	"net/http"
@@ -23,11 +24,31 @@ import (
 // cross users, sockets, or upstream accounts. Multiple client connections run
 // concurrently through the same account concurrency/queue limits as HTTP.
 func (h *Handler) ServeWebSocket(w http.ResponseWriter, r *http.Request) {
-	user, _, err := h.auth(r)
+	user, key, err := h.auth(r)
 	if err != nil {
 		failure(w, 401, "API Key 无效或用户已停用")
 		return
 	}
+	id, err := newRequestID()
+	if err != nil {
+		failure(w, 500, "无法创建请求记录")
+		return
+	}
+	start := time.Now()
+	tracked := &statusWriter{ResponseWriter: w}
+	w = tracked
+	w.Header().Set("X-Request-ID", id)
+	accepted := false
+	defer func() {
+		if accepted {
+			return
+		}
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 3*time.Second)
+		defer cancel()
+		zero := int64(0)
+		d := &store.RequestDiagnostics{Protocol: "responses", ClientTransport: httpTransport(w.Header().Get("Content-Type")), Code: "client_websocket_handshake"}
+		_ = h.store.LogRequest(ctx, store.RequestLog{Diagnostics: d, ID: id, UserID: user.ID, KeyID: key, Status: tracked.status, Amount: &zero, Error: "客户端 WebSocket 握手失败", DurationMS: time.Since(start).Milliseconds(), CreatedAt: start.Unix()})
+	}()
 	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Minute)
 	defer cancel()
 	socketID, ok := h.registerWebSocket(cancel)
@@ -62,6 +83,7 @@ func (h *Handler) ServeWebSocket(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return
 	}
+	accepted = true
 	defer conn.CloseNow()
 	conn.SetReadLimit(4 << 20)
 	state := &websocketState{cache: map[string]wsCachedResponse{}}

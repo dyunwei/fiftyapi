@@ -3,6 +3,10 @@
 Antigravity catalog tests now show native previews and safe 429 diagnostics and restore the default inference origin. Simulated verification on 2026-11-18 uses identity 2.23.0 and native-probe-model; no live-provider acceptance was run.
 
 
+## Request diagnostics verification
+
+Simulated OpenAI upstreams, Codex identity `0.164.0` and fixture model `model` cover Responses HTTP JSON, HTTP SSE, WebSocket on both hops, an authenticated handshake failure, protocol mismatch, local budget blocking and upstream throttling. Client setup checks for Responses and Messages use a simulated catalog. No live provider or native client was used for this verification.
+
 ## Current refactor verification boundary
 
 Current behavior is defined in [low-maintenance sharing](low-maintenance.md): native Antigravity v1internal replaces Messages conversion; Claude metadata/system pass through by default; automatic tier prices consume user budgets; unknown usage releases reservations and remains pending. User model allowlists and concurrency apply without separate speed permissions.

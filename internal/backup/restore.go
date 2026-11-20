@@ -47,6 +47,73 @@ func Restore(ctx context.Context, source, output string, key []byte) error {
 		return err
 	}
 	defer os.RemoveAll(stage)
+	if err := validateArchive(ctx, source, stage, key); err != nil {
+		return err
+	}
+	if err = os.Remove(filepath.Join(stage, "manifest.json")); err != nil {
+		return err
+	}
+	if err = os.WriteFile(filepath.Join(stage, "master.key"), []byte(base64.StdEncoding.EncodeToString(key)+"\n"), 0600); err != nil {
+		return err
+	}
+	for _, name := range []string{"fiftyapi.db", "master.key"} {
+		f, e := os.Open(filepath.Join(stage, name))
+		if e != nil {
+			return e
+		}
+		e = f.Sync()
+		f.Close()
+		if e != nil {
+			return e
+		}
+	}
+	if err = syncDir(stage); err != nil {
+		return err
+	}
+	// Create exclusively after validation. Keep the new directory private and
+	// remove it if publication fails; never rename over an existing directory.
+	if err = os.Mkdir(output, 0700); err != nil {
+		return err
+	}
+	published := false
+	defer func() {
+		if !published {
+			os.RemoveAll(output)
+		}
+	}()
+	entries, err := os.ReadDir(stage)
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		if err = os.Rename(filepath.Join(stage, entry.Name()), filepath.Join(output, entry.Name())); err != nil {
+			return err
+		}
+	}
+	if err = syncDir(output); err != nil {
+		return err
+	}
+	if err = syncDir(filepath.Dir(output)); err != nil {
+		return err
+	}
+	published = true
+	return nil
+}
+
+// CheckRestore validates an archive in private temporary storage while the live service runs.
+func CheckRestore(ctx context.Context, source string, key []byte) error {
+	if len(key) != 32 {
+		return errors.New("恢复需要原主密钥（32 字节）")
+	}
+	stage, err := os.MkdirTemp("", ".fiftyapi-restore-check-")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(stage)
+	return validateArchive(ctx, source, stage, key)
+}
+
+func validateArchive(ctx context.Context, source, stage string, key []byte) error {
 	input, err := os.Open(source)
 	if err != nil {
 		return err
@@ -156,53 +223,6 @@ func Restore(ctx context.Context, source, output string, key []byte) error {
 	if err = s.Close(); err != nil {
 		return err
 	}
-	if err = os.Remove(filepath.Join(stage, "manifest.json")); err != nil {
-		return err
-	}
-	if err = os.WriteFile(filepath.Join(stage, "master.key"), []byte(base64.StdEncoding.EncodeToString(key)+"\n"), 0600); err != nil {
-		return err
-	}
-	for _, name := range []string{"fiftyapi.db", "master.key"} {
-		f, e := os.Open(filepath.Join(stage, name))
-		if e != nil {
-			return e
-		}
-		e = f.Sync()
-		f.Close()
-		if e != nil {
-			return e
-		}
-	}
-	if err = syncDir(stage); err != nil {
-		return err
-	}
-	// Create exclusively after validation. Keep the new directory private and
-	// remove it if publication fails; never rename over an existing directory.
-	if err = os.Mkdir(output, 0700); err != nil {
-		return err
-	}
-	published := false
-	defer func() {
-		if !published {
-			os.RemoveAll(output)
-		}
-	}()
-	entries, err := os.ReadDir(stage)
-	if err != nil {
-		return err
-	}
-	for _, entry := range entries {
-		if err = os.Rename(filepath.Join(stage, entry.Name()), filepath.Join(output, entry.Name())); err != nil {
-			return err
-		}
-	}
-	if err = syncDir(output); err != nil {
-		return err
-	}
-	if err = syncDir(filepath.Dir(output)); err != nil {
-		return err
-	}
-	published = true
 	return nil
 }
 

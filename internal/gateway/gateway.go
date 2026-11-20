@@ -3,8 +3,6 @@ package gateway
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fiftyapi/internal/accounts"
@@ -129,6 +127,7 @@ func (h *Handler) Models(w http.ResponseWriter, r *http.Request) {
 }
 
 type result struct {
+	upstreamTransport              string
 	upstreamStatus, upstreamReason string
 	usage                          store.TokenUsage
 	known                          bool
@@ -157,14 +156,23 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 		failure(w, 401, "API Key 无效或账号已停用")
 		return
 	}
-	nonce := make([]byte, 24)
-	if _, err = rand.Read(nonce); err != nil {
+	id, err := newRequestID()
+	if err != nil {
 		failure(w, 500, "无法创建请求记录")
 		return
 	}
-	id := base64.RawURLEncoding.EncodeToString(nonce)
 	w.Header().Set("X-Request-ID", id)
 	recorded := false
+	turn, websocket := r.Context().Value(websocketStateKey{}).(*websocketTurn)
+	requestedProtocol := gatewayProtocol(r.URL.Path)
+	diagnostics := store.RequestDiagnostics{Protocol: requestedProtocol}
+	setClientTransport := func() {
+		if websocket {
+			diagnostics.ClientTransport = "websocket"
+		} else {
+			diagnostics.ClientTransport = httpTransport(w.Header().Get("Content-Type"))
+		}
+	}
 	logModel, logProvider := "", ""
 	var logInference store.RequestInference
 	tracked := &statusWriter{ResponseWriter: w}
@@ -178,7 +186,8 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 			if status == 0 {
 				status = 500
 			}
-			h.store.LogRequest(ctx, store.RequestLog{RequestInference: logInference, ID: id, UserID: user.ID, KeyID: key, Model: logModel, Provider: logProvider, Status: status, Amount: &zero, DurationMS: time.Since(start).Milliseconds(), Error: "请求未发送到上游", CreatedAt: start.Unix()})
+			setClientTransport()
+			h.store.LogRequest(ctx, store.RequestLog{Diagnostics: &diagnostics, RequestInference: logInference, ID: id, UserID: user.ID, KeyID: key, Model: logModel, Provider: logProvider, Status: status, Amount: &zero, DurationMS: time.Since(start).Milliseconds(), Error: "请求未发送到上游", CreatedAt: start.Unix()})
 		}
 	}()
 	if _, err := providers.NextRelayChain(r.Header.Get(providers.RelayChainHeader), h.instanceID); err != nil {
@@ -194,15 +203,6 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 	if json.Unmarshal(body, &request) != nil {
 		failure(w, 400, "请求 JSON 无效")
 		return
-	}
-	requestedProtocol := "messages"
-	if strings.HasPrefix(r.URL.Path, "/v1internal:") {
-		requestedProtocol = "antigravity"
-	}
-	if strings.Contains(r.URL.Path, "responses") {
-		requestedProtocol = "responses"
-	} else if strings.HasSuffix(r.URL.Path, "/chat/completions") {
-		requestedProtocol = "chat"
 	}
 	logInference = requestInference(request, requestedProtocol)
 	if raw := request["stream_id"]; len(raw) > 0 && r.Context().Value(websocketStateKey{}) == nil {
@@ -220,6 +220,7 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !access.Allows(modelName) {
+		diagnostics.Code = "model_access"
 		failure(w, 403, store.ErrModelAccess.Error())
 		return
 	}
@@ -227,6 +228,7 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 	logModel = m.ID
 	logProvider = m.Provider
 	if err != nil {
+		diagnostics.Code = "model_unavailable"
 		failure(w, 400, "模型未启用、未定价或没有可用账号")
 		return
 	}
@@ -238,6 +240,7 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if !m.SupportsProtocol(requestedProtocol) {
+		diagnostics.Code = "protocol_mismatch"
 		failure(w, 400, "协议不匹配：所选模型不支持当前接口；请按模型支持的协议配置客户端，本服务不自动转换协议")
 		return
 	}
@@ -317,12 +320,24 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, store.ErrQuota) || errors.Is(err, store.ErrUserConcurrency) {
 			status = 429
 		}
+		var quota *store.QuotaError
+		switch {
+		case errors.As(err, &quota):
+			diagnostics.Code = "local_quota"
+			diagnostics.Quota = quota.Blocks
+		case errors.Is(err, store.ErrUserConcurrency):
+			diagnostics.Code = "user_concurrency"
+		case errors.Is(err, store.ErrPendingUsage):
+			diagnostics.Code = "pending_usage"
+		case errors.Is(err, store.ErrModelAccess):
+			diagnostics.Code = "model_access"
+		}
 		failure(w, status, err.Error())
 		return
 	}
 	recorded = true
 	w.Header().Set("X-Request-ID", id)
-	logEntry := store.RequestLog{RequestInference: logInference, ID: id, UserID: user.ID, KeyID: key, Model: m.ID, Provider: m.Provider, CreatedAt: start.Unix()}
+	logEntry := store.RequestLog{Diagnostics: &diagnostics, RequestInference: logInference, ID: id, UserID: user.ID, KeyID: key, Model: m.ID, Provider: m.Provider, CreatedAt: start.Unix()}
 	finish := func(out result) {
 		saveCtx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 5*time.Second)
 		defer cancel()
@@ -374,6 +389,7 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 	}
 	excluded := map[int64]bool{}
 	refreshTried := map[int64]bool{}
+	wsHandshakeFailed := false
 	out := result{status: 503, err: errors.New("没有可用上游账号")}
 	for attempt := 1; attempt <= 3; attempt++ {
 		if r.Context().Err() != nil {
@@ -415,7 +431,21 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 		attemptModel.Provider = chosen.Route.Provider
 		attemptModel.UpstreamID = chosen.Route.UpstreamID
 		attemptModel.Protocols = append([]string(nil), chosen.Route.Protocols...)
+		if websocket {
+			turn.connectedUpstream = false
+			turn.failedUpstreamHandshake = false
+		}
 		out = h.forward(writer, r, body, attemptRequest, attemptModel, chosen.Credential, output)
+		if websocket {
+			switch {
+			case turn.connectedUpstream:
+				out.upstreamTransport = "websocket"
+			case !turn.failedUpstreamHandshake:
+				out.upstreamTransport = ""
+			}
+		}
+		wsHandshakeFailed = websocket && turn.failedUpstreamHandshake
+		diagnostics.OutputStarted = writer.firstOutput != nil
 		// Successful responses may still be buffered (for example, an empty
 		// completion). Deliver them before classifying a downstream disconnect.
 		if out.complete && out.err == nil && !writer.committed {
@@ -501,6 +531,15 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 			failure(w, out.status, out.err.Error())
 		}
 	}
+	setClientTransport()
+	diagnostics.UpstreamTransport = out.upstreamTransport
+	diagnostics.Dispatched = out.dispatched
+	diagnostics.Completed = out.complete && out.err == nil
+	diagnostics.OutputStarted = diagnostics.OutputStarted || (diagnostics.Completed && diagnostics.ClientTransport == "http_json")
+	if retry := max(out.cooldownUntil, out.retryAfter); retry > time.Now().Unix() {
+		diagnostics.RetryAt = retry
+	}
+	diagnostics.Code = diagnosticCode(out, wsHandshakeFailed)
 	finish(out)
 }
 

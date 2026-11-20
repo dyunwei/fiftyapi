@@ -30,7 +30,7 @@ func mergeChatUsage(raw json.RawMessage, out *result) {
 	mergeNativeUsage(converted, "openai", out)
 }
 func consumeChatResponse(w http.ResponseWriter, r *http.Request, resp *http.Response, stream bool, out result) result {
-	if nativeEventStream(resp) {
+	if out.eventStream(resp) {
 		if !stream {
 			out.err = errors.New("上游返回 SSE，但请求要求 Chat JSON；未转换响应")
 			return out
@@ -108,6 +108,7 @@ func consumeChatResponse(w http.ResponseWriter, r *http.Request, resp *http.Resp
 		out.err = errors.New("上游 Chat 响应格式无效")
 		return out
 	}
+	out.upstreamTransport = "http_json"
 	if response.ServiceTier != "" {
 		out.usage.Tier = store.NormalizeTier(response.ServiceTier)
 		out.usage.Confirmed = true

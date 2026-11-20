@@ -74,6 +74,16 @@ func (c *SMTP) SendInvitation(ctx context.Context, m Message) error {
 func (c *SMTP) SendTest(ctx context.Context, email string) error {
 	return c.send(ctx, email, "FiftyAPI 邮件配置测试 / Email test", "这是一封 FiftyAPI 邮件配置测试邮件。SMTP 服务器已接受发送请求，请确认收件情况。\n\nThis is a FiftyAPI email configuration test. The SMTP server accepted the request. Please confirm delivery.\n")
 }
+
+type MaintenanceCounts struct {
+	Reauth, Settlement, Backup int
+}
+
+func (c *SMTP) SendMaintenanceAlert(ctx context.Context, email string, counts MaintenanceCounts) error {
+	body := fmt.Sprintf("FiftyAPI 有新的维护待办。请登录管理控制台查看详情。\n\n待重授权账号：%d\n被待核算阻塞的成员：%d\n备份失败：%d\n\nFiftyAPI has new maintenance tasks. Sign in to the admin dashboard for details.\n\nAccounts requiring reauthorization: %d\nMembers blocked by settlement: %d\nBackup failure: %d\n", counts.Reauth, counts.Settlement, counts.Backup, counts.Reauth, counts.Settlement, counts.Backup)
+	return c.send(ctx, email, "FiftyAPI 维护告警 / Maintenance alert", body)
+}
+
 func (c *SMTP) send(ctx context.Context, email, subject, body string) error {
 	if err := c.Validate(); err != nil {
 		return err

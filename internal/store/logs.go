@@ -18,7 +18,25 @@ type RequestInference struct {
 	ServiceTier          string `json:"service_tier,omitempty"`
 }
 
+type QuotaBlock struct {
+	Window  string `json:"window"`
+	ResetAt *int64 `json:"reset_at,omitempty"`
+}
+
+type RequestDiagnostics struct {
+	Protocol          string       `json:"protocol,omitempty"`
+	ClientTransport   string       `json:"client_transport,omitempty"`
+	UpstreamTransport string       `json:"upstream_transport,omitempty"`
+	Code              string       `json:"code,omitempty"`
+	RetryAt           int64        `json:"retry_at,omitempty"`
+	Quota             []QuotaBlock `json:"quota,omitempty"`
+	Dispatched        bool         `json:"dispatched"`
+	OutputStarted     bool         `json:"output_started"`
+	Completed         bool         `json:"completed"`
+}
+
 type RequestLog struct {
+	Diagnostics *RequestDiagnostics `json:"diagnostics,omitempty"`
 	RequestInference
 	BillingUsage     BillingUsage `json:"billing_usage"`
 	ID               string       `json:"id"`
@@ -40,11 +58,12 @@ type RequestLog struct {
 	Reservation      *int64       `json:"reservation,omitempty"`
 }
 
-const insertRequestLog = `INSERT OR IGNORE INTO request_logs(id,user_id,key_id,account_id,model,provider,status,input_tokens,output_tokens,cached_tokens,cache_write_tokens,amount,duration_ms,error,created_at,reasoning_effort,thinking_type,thinking_budget_tokens,speed,service_tier,billing_usage) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+const insertRequestLog = `INSERT OR IGNORE INTO request_logs(id,user_id,key_id,account_id,model,provider,status,input_tokens,output_tokens,cached_tokens,cache_write_tokens,amount,duration_ms,error,created_at,reasoning_effort,thinking_type,thinking_budget_tokens,speed,service_tier,billing_usage,diagnostics) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
 
 func logArguments(l RequestLog) []any {
 	billing, _ := json.Marshal(l.BillingUsage)
-	return []any{l.ID, l.UserID, l.KeyID, l.AccountID, l.Model, l.Provider, l.Status, l.Input, l.Output, l.Cached, l.CacheWrite, l.Amount, l.DurationMS, l.Error, l.CreatedAt, l.ReasoningEffort, l.ThinkingType, l.ThinkingBudgetTokens, l.Speed, l.ServiceTier, string(billing)}
+	diagnostics, _ := json.Marshal(l.Diagnostics)
+	return []any{l.ID, l.UserID, l.KeyID, l.AccountID, l.Model, l.Provider, l.Status, l.Input, l.Output, l.Cached, l.CacheWrite, l.Amount, l.DurationMS, l.Error, l.CreatedAt, l.ReasoningEffort, l.ThinkingType, l.ThinkingBudgetTokens, l.Speed, l.ServiceTier, string(billing), string(diagnostics)}
 }
 
 func (s *Store) LogRequest(ctx context.Context, l RequestLog) error {
@@ -55,7 +74,7 @@ func (s *Store) Logs(ctx context.Context, user int64, admin bool, before int64, 
 	return s.LogsPage(ctx, user, admin, before, model, status, "", 0)
 }
 func (s *Store) LogsPage(ctx context.Context, user int64, admin bool, before int64, model string, status int, beforeID string, since int64, requestIDs ...string) ([]RequestLog, error) {
-	query := `SELECT id,user_id,key_id,account_id,model,provider,status,input_tokens,output_tokens,cached_tokens,cache_write_tokens,amount,duration_ms,error,created_at,reasoning_effort,thinking_type,thinking_budget_tokens,speed,service_tier,billing_usage FROM request_logs WHERE 1=1`
+	query := `SELECT id,user_id,key_id,account_id,model,provider,status,input_tokens,output_tokens,cached_tokens,cache_write_tokens,amount,duration_ms,error,created_at,reasoning_effort,thinking_type,thinking_budget_tokens,speed,service_tier,billing_usage,diagnostics FROM request_logs WHERE 1=1`
 	args := []any{}
 	if len(requestIDs) > 0 && requestIDs[0] != "" {
 		query += " AND id=?"
@@ -95,15 +114,23 @@ func (s *Store) LogsPage(ctx context.Context, user int64, admin bool, before int
 	result := []RequestLog{}
 	for rows.Next() {
 		var l RequestLog
-		var billing string
-		if err = rows.Scan(&l.ID, &l.UserID, &l.KeyID, &l.AccountID, &l.Model, &l.Provider, &l.Status, &l.Input, &l.Output, &l.Cached, &l.CacheWrite, &l.Amount, &l.DurationMS, &l.Error, &l.CreatedAt, &l.ReasoningEffort, &l.ThinkingType, &l.ThinkingBudgetTokens, &l.Speed, &l.ServiceTier, &billing); err != nil {
+		var billing, diagnostics string
+		if err = rows.Scan(&l.ID, &l.UserID, &l.KeyID, &l.AccountID, &l.Model, &l.Provider, &l.Status, &l.Input, &l.Output, &l.Cached, &l.CacheWrite, &l.Amount, &l.DurationMS, &l.Error, &l.CreatedAt, &l.ReasoningEffort, &l.ThinkingType, &l.ThinkingBudgetTokens, &l.Speed, &l.ServiceTier, &billing, &diagnostics); err != nil {
 			return nil, err
 		}
 		_ = json.Unmarshal([]byte(billing), &l.BillingUsage)
+		readRequestDiagnostics(diagnostics, &l)
 		result = append(result, l)
 	}
 	return result, rows.Err()
 }
+func readRequestDiagnostics(raw string, l *RequestLog) {
+	var diagnostics RequestDiagnostics
+	if raw != "{}" && raw != "null" && json.Unmarshal([]byte(raw), &diagnostics) == nil {
+		l.Diagnostics = &diagnostics
+	}
+}
+
 func (s *Store) LogRetention(ctx context.Context) (int, error) {
 	var raw string
 	if err := s.DB.QueryRowContext(ctx, "SELECT value FROM settings WHERE key='log_retention_days'").Scan(&raw); err != nil {

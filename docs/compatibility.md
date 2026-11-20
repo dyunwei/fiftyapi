@@ -3,6 +3,10 @@
 Antigravity 目录测试的原生预览、默认推理地址与 429 安全诊断已修复；2026-11-18 使用 2.23.0 身份和 native-probe-model 模拟上游验证，无真实供应商验收。
 
 
+## 请求诊断验证
+
+使用模拟 OpenAI 上游、Codex 身份 `0.164.0` 和夹具模型 `model`，覆盖 Responses HTTP JSON、HTTP SSE、双向 WebSocket、已认证的握手失败、模型协议不匹配、本地额度阻塞和上游限流。客户端助手使用模拟目录验证 Responses 与 Messages 自检。此项没有运行真实供应商或原生客户端。
+
 ## 当前重构的验证边界
 
 当前行为以 [低维护账号共享](low-maintenance.md) 为准：Antigravity 使用原生 v1internal，不再提供 Messages 转换；Claude 默认透传 metadata/system；加速档位按自动价格计入预算；未知用量释放预占并保留待核算。模型允许列表与并发按用户控制，不单独授权加速档位。

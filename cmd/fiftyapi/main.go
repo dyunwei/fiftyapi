@@ -174,6 +174,14 @@ func run() error {
 	if err = api.StartBackups(ctx); err != nil {
 		return fmt.Errorf("启动备份任务失败：%w", err)
 	}
+	alertCtx, stopAlerts := context.WithCancel(ctx)
+	alertDone := make(chan struct{})
+	go func() {
+		defer close(alertDone)
+		api.RunMaintenanceAlerts(alertCtx)
+	}()
+	defer func() { stopAlerts(); <-alertDone }()
+
 	probeCtx, stopProbes := context.WithCancel(ctx)
 	probeDone := make(chan struct{})
 	go func() {
@@ -299,22 +307,25 @@ func restoreBackup(args []string) error {
 	flags := flag.NewFlagSet("restore", flag.ContinueOnError)
 	source := flags.String("from", "", "备份 tar.gz 文件")
 	output := flags.String("output", "", "恢复到不存在的新目录")
+	check := flags.Bool("check", false, "验证备份与原主密钥，不恢复数据")
 	keyFile := flags.String("key-file", "", "原 master.key 文件（可选，否则读取现有环境或数据目录）")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
-	if *source == "" || *output == "" || flags.NArg() != 0 {
-		return errors.New("用法：fiftyapi restore --from backup.tar.gz --output 新目录 [--key-file 原master.key]")
+	if *source == "" || (*check && *output != "") || (!*check && *output == "") || flags.NArg() != 0 {
+		return errors.New("用法：fiftyapi restore --from backup.tar.gz (--output 新目录 | --check) [--key-file 原master.key]")
 	}
 	path, err := databasePath()
 	if err != nil {
 		return err
 	}
-	unlock, err := store.LockServerPath(path)
-	if err != nil {
-		return err
+	if !*check {
+		unlock, lockErr := store.LockServerPath(path)
+		if lockErr != nil {
+			return lockErr
+		}
+		defer unlock()
 	}
-	defer unlock()
 	var key []byte
 	if *keyFile != "" {
 		var value string
@@ -331,6 +342,13 @@ func restoreBackup(args []string) error {
 	defer clear(key)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	if *check {
+		if err := backup.CheckRestore(ctx, *source, key); err != nil {
+			return err
+		}
+		fmt.Println("备份预检通过：完整性、数据库版本和主密钥均已验证。")
+		return nil
+	}
 	if err = backup.Restore(ctx, *source, *output, key); err != nil {
 		return err
 	}

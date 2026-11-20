@@ -113,6 +113,9 @@ func TestInferencePolicyWebSocket(t *testing.T) {
 		if len(logs) == 2 {
 			seen := map[string]bool{}
 			for _, entry := range logs {
+				if d := entry.Diagnostics; d == nil || d.Protocol != "responses" || d.ClientTransport != "websocket" || d.UpstreamTransport != "websocket" || !d.Completed {
+					t.Fatalf("incorrect WebSocket diagnostics: %+v", d)
+				}
 				if entry.ServiceTier != "fast" {
 					t.Fatalf("WS requested tier lost: %+v", entry.RequestInference)
 				}

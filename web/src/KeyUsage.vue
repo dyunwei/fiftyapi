@@ -1,13 +1,14 @@
 <script setup>
 import {computed,onMounted,ref,watch} from 'vue'
 import {t} from './i18n.js'
-import {clientSnippets,setupCommand,restoreCommand} from './client-usage.js'
+import {clientSnippets,setupCommand,restoreCommand,checkCommand} from './client-usage.js'
 const props=defineProps({api:{type:Function,required:true},token:{type:String,default:''},keyName:{type:String,default:''}})
 defineEmits(['copy'])
 const client=ref('codex'),system=ref(/win/i.test(navigator.platform)?'windows':'unix'),keyValue=ref(props.token),model=ref(''),websocket=ref(false),models=ref([]),loading=ref(true),loadError=ref('')
 const setup=computed(()=>setupCommand({origin,client:client.value,system:system.value,model:model.value,websocket:websocket.value}))
 const restore=computed(()=>restoreCommand({client:client.value,system:system.value}))
 const origin=window.location.origin
+const check=computed(()=>checkCommand({origin,client:client.value,system:system.value}))
 const protocol=computed(()=>client.value==='claude'?'messages':'responses')
 const available=computed(()=>models.value.filter(m=>(m.protocols?.length?m.protocols:[m.protocol]).includes(protocol.value)))
 watch(available,list=>{if(!list.some(m=>m.id===model.value))model.value=list[0]?.id||''},{immediate:true})
@@ -33,6 +34,11 @@ onMounted(async()=>{try{models.value=await props.api('/models')}catch(e){if(e.na
    <section class="usage-code setup-command"><header><strong>{{ t('一键配置') }}</strong><button type="button" class="secondary" @click="$emit('copy',setup)">{{ t('复制') }}</button></header><pre><code>{{ setup }}</code></pre></section>
    <p class="notice">{{ t('在使用客户端的终端执行，按提示粘贴密钥即可自动配置，无需手动编辑文件。VS Code 用户请使用对应窗口的终端；Remote SSH 会配置远端用户。完成后重新加载窗口并新建会话。') }}</p>
    <p class="subtle">{{ t('需要 Python 3.11+，不要使用 sudo。修改前自动备份；密钥明文保存在本机，TOML 注释与排版会规范化。') }}</p>
+   <details class="usage-details">
+    <summary>{{ t('客户端接入自检') }}</summary>
+    <p class="subtle">{{ t('在配置客户端的同一终端运行。检查配置、网络、密钥和模型协议，无需调用推理。') }}</p>
+    <section class="usage-code"><header><code>{{ t('自检命令') }}</code><button type="button" class="secondary" @click="$emit('copy',check)">{{ t('复制') }}</button></header><pre><code>{{ check }}</code></pre></section>
+   </details>
    <details class="usage-details restore-guide">
     <summary>{{ t('恢复接入前的配置') }}</summary>
     <p class="subtle">{{ t('恢复首次通过助手接入 FiftyAPI 前的模型、服务地址与鉴权设置，保留之后修改的其他设置。如果之前使用官方服务，恢复后即可沿用原来的接入方式。此操作不会重置客户端，也不会退出原有账号。') }}</p>

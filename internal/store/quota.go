@@ -11,6 +11,15 @@ import (
 
 var ErrQuota = errors.New("额度不足，请等待重置或联系管理员")
 
+var ErrPendingUsage = errors.New("存在待核算请求，请联系管理员处理后继续使用")
+
+type QuotaError struct {
+	Blocks []QuotaBlock
+}
+
+func (e *QuotaError) Error() string { return ErrQuota.Error() }
+func (e *QuotaError) Unwrap() error { return ErrQuota }
+
 type Window struct {
 	ID        int64  `json:"id"`
 	Kind      string `json:"kind"`
@@ -90,7 +99,7 @@ func (s *Store) Reserve(ctx context.Context, id string, user, key int64, model s
 		return err
 	}
 	if pending > 0 {
-		return errors.New("存在待核算请求，请联系管理员处理后继续使用")
+		return ErrPendingUsage
 	}
 	w5, err := activeWindow(ctx, tx, user, "5h", now.Unix())
 	if err != nil {
@@ -103,7 +112,14 @@ func (s *Store) Reserve(ctx context.Context, id string, user, key int64, model s
 	available5 := limit5 - w5.Used - w5.Reserved
 	available7 := limit7 - w7.Used - w7.Reserved
 	if available5 <= 0 || available7 <= 0 {
-		return ErrQuota
+		blocked := &QuotaError{}
+		if available5 <= 0 {
+			blocked.Blocks = append(blocked.Blocks, QuotaBlock{Window: w5.Kind, ResetAt: w5.ExpiresAt})
+		}
+		if available7 <= 0 {
+			blocked.Blocks = append(blocked.Blocks, QuotaBlock{Window: w7.Kind, ResetAt: w7.ExpiresAt})
+		}
+		return blocked
 	}
 	reserve := min(estimate, available5, available7)
 	for _, w := range []Window{w5, w7} {

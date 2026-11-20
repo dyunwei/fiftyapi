@@ -14,17 +14,25 @@ export function clientSnippets({origin,client='codex',system='unix',token='',mod
  return [{title:system==='windows'?'PowerShell':'Terminal',code:env('FIFTYAPI_API_KEY',key)+'\n'+(system==='windows'?`curl.exe ${quote(base+'/v1/models')} -H "Authorization: Bearer $env:FIFTYAPI_API_KEY"`:`curl ${quote(base+'/v1/models')} -H "Authorization: Bearer $FIFTYAPI_API_KEY"`)}]
 }
 
+function runHelper(base, system, args) {
+ if(system==='windows')return `Invoke-WebRequest -Uri ${psQuote(base+'/setup.py')} -OutFile "$env:TEMP\\fiftyapi-setup.py"\nif ($?) { py -3.11 "$env:TEMP\\fiftyapi-setup.py" ${args} }`
+ return `curl -fsSL ${shellQuote(base+'/setup.py')} -o fiftyapi-setup.py && python3.11 fiftyapi-setup.py ${args}`
+}
+
 // Deliberately excludes the secret: it is entered through a hidden terminal prompt.
 export function setupCommand({origin,client,system,model='',websocket=false}){
  const base=origin.replace(/\/+$/,'')
  const quote=system==='windows'?psQuote:shellQuote
  const args=`configure ${client} --url ${quote(base)}`+(model?` --model ${quote(model)}`:'')+(client==='codex'&&websocket?' --websocket':'')
- if(system==='windows')return `Invoke-WebRequest -Uri ${psQuote(base+'/setup.py')} -OutFile "$env:TEMP\\fiftyapi-setup.py"\nif ($?) { py -3.11 "$env:TEMP\\fiftyapi-setup.py" ${args} }`
- return `curl -fsSL ${shellQuote(base+'/setup.py')} -o fiftyapi-setup.py && python3.11 fiftyapi-setup.py ${args}`
+ return runHelper(base, system, args)
 }
 
 export function restoreCommand({client='codex',system='unix'}){
  return system==='windows'
   ? `py -3.11 "$HOME\\.fiftyapi-helper\\helper.py" restore ${client}`
   : `python3.11 ~/.fiftyapi-helper/helper.py restore ${client}`
+}
+
+export function checkCommand({origin,client,system}){
+ return runHelper(origin.replace(/\/+$/,''), system, `check ${client}`)
 }
