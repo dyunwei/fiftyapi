@@ -74,14 +74,16 @@ func (h *Handler) ServeWebSocket(w http.ResponseWriter, r *http.Request) {
 		failure(w, 508, rejection)
 		return
 	}
-	value, _ := h.wsUsers.LoadOrStore(user.ID, &atomic.Int32{})
-	count := value.(*atomic.Int32)
-	if count.Add(1) > 4 {
-		count.Add(-1)
+	lease := h.acquireWebsocketLease(user.ID, id, cancel, time.Now())
+	if lease == nil {
 		rejection = "同一用户最多保持 4 个 WebSocket 连接"
 		failure(w, 429, rejection)
 		return
 	}
+	defer lease.release()
+	value, _ := h.wsUsers.LoadOrStore(user.ID, &atomic.Int32{})
+	count := value.(*atomic.Int32)
+	count.Add(1)
 	defer count.Add(-1)
 	if h.wsTotal.Add(1) > 128 {
 		h.wsTotal.Add(-1)
@@ -105,6 +107,9 @@ func (h *Handler) ServeWebSocket(w http.ResponseWriter, r *http.Request) {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
+				if lease.expire(time.Now()) {
+					return
+				}
 				pingCtx, stop := context.WithTimeout(ctx, 10*time.Second)
 				err := conn.Ping(pingCtx)
 				stop()
@@ -140,14 +145,18 @@ func (h *Handler) ServeWebSocket(w http.ResponseWriter, r *http.Request) {
 	queue := make(chan []byte, 16)
 	var queuedBytes atomic.Int64
 	done := make(chan struct{})
+	producerDone := make(chan struct{})
 	var activeMu sync.Mutex
 	var activeCancel context.CancelFunc
 	go func() {
 		defer close(done)
 		defer func() {
+			<-producerDone
 			for {
 				select {
 				case raw := <-queue:
+					queuedBytes.Add(-int64(len(raw)))
+					lease.finish(time.Now())
 					h.wsQueueBytes.Add(-int64(len(raw)))
 				default:
 					return
@@ -164,87 +173,91 @@ func (h *Handler) ServeWebSocket(w http.ResponseWriter, r *http.Request) {
 			case raw := <-queue:
 				queuedBytes.Add(-int64(len(raw)))
 				h.wsQueueBytes.Add(-int64(len(raw)))
-				var payload map[string]json.RawMessage
-				if json.Unmarshal(raw, &payload) != nil {
-					continue
-				}
-				var model, stream, previous string
-				_ = json.Unmarshal(payload["model"], &model)
-				_ = json.Unmarshal(payload["stream_id"], &stream)
-				_ = json.Unmarshal(payload["previous_response_id"], &previous)
-				if previous != "" {
-					cached, ok := state.previous(previous)
-					if !ok {
-						sendError("previous_response_not_found", "当前连接没有该响应上下文，请设置 previous_response_id:null 并发送完整历史", stream)
-						continue
+				func() {
+					defer func() { lease.finish(time.Now()) }()
+					var payload map[string]json.RawMessage
+					if json.Unmarshal(raw, &payload) != nil {
+						return
 					}
-					if model == "" {
-						model = cached
-						payload["model"], _ = json.Marshal(model)
-					}
-				}
-				if model == "" {
-					sendError("model_required", "response.create 必须指定模型", stream)
-					continue
-				}
-				// Revalidate every queued turn; revocation is not deferred until reconnect.
-				if _, _, e := h.auth(r); e != nil {
-					sendError("authentication_error", "API Key 已失效或用户已停用", stream)
-					cancel()
-					return
-				}
-				m, _, e := h.store.RoutableModel(ctx, model)
-				if e != nil || !m.SupportsProtocol("responses") {
-					sendError("model_not_found", "模型未启用、未定价或不支持 Responses", stream)
-					continue
-				}
-				if seed == "" {
-					seed = explicitSessionID(r, payload)
-					if seed == "" {
-						nonce := make([]byte, 24)
-						if _, err := rand.Read(nonce); err != nil {
+					var model, stream, previous string
+					_ = json.Unmarshal(payload["model"], &model)
+					_ = json.Unmarshal(payload["stream_id"], &stream)
+					_ = json.Unmarshal(payload["previous_response_id"], &previous)
+					if previous != "" {
+						cached, ok := state.previous(previous)
+						if !ok {
+							sendError("previous_response_not_found", "当前连接没有该响应上下文，请设置 previous_response_id:null 并发送完整历史", stream)
 							return
 						}
-						seed = "ws-" + hex.EncodeToString(nonce)
+						if model == "" {
+							model = cached
+							payload["model"], _ = json.Marshal(model)
+						}
 					}
-				}
-				delete(payload, "type")
-				payload["stream"] = json.RawMessage("true")
-				body, _ := json.Marshal(payload)
-				turnCtx, stop := context.WithCancel(ctx)
-				activeMu.Lock()
-				if ctx.Err() != nil {
+					if model == "" {
+						sendError("model_required", "response.create 必须指定模型", stream)
+						return
+					}
+					// Revalidate every queued turn; revocation is not deferred until reconnect.
+					if _, _, e := h.auth(r); e != nil {
+						sendError("authentication_error", "API Key 已失效或用户已停用", stream)
+						cancel()
+						return
+					}
+					m, _, e := h.store.RoutableModel(ctx, model)
+					if e != nil || !m.SupportsProtocol("responses") {
+						sendError("model_not_found", "模型未启用、未定价或不支持 Responses", stream)
+						return
+					}
+					if seed == "" {
+						seed = explicitSessionID(r, payload)
+						if seed == "" {
+							nonce := make([]byte, 24)
+							if _, err := rand.Read(nonce); err != nil {
+								return
+							}
+							seed = "ws-" + hex.EncodeToString(nonce)
+						}
+					}
+					delete(payload, "type")
+					payload["stream"] = json.RawMessage("true")
+					body, _ := json.Marshal(payload)
+					turnCtx, stop := context.WithCancel(ctx)
+					activeMu.Lock()
+					if ctx.Err() != nil {
+						activeMu.Unlock()
+						stop()
+						return
+					}
+					activeCancel = stop
+					activeMu.Unlock()
+					turn := &websocketTurn{state: state, ctx: ctx, model: model, stream: stream, previous: previous}
+					turnCtx = context.WithValue(turnCtx, websocketStateKey{}, turn)
+					turnCtx = context.WithValue(turnCtx, upstreamClientContextKey{}, upstreamClientFactory(func(c accounts.Credential) *http.Client { return turn.client(h, c) }))
+					request := r.Clone(turnCtx)
+					request.Method = http.MethodPost
+					urlCopy := *r.URL
+					urlCopy.Path = "/v1/responses"
+					urlCopy.RawQuery = ""
+					request.URL = &urlCopy
+					request.Header = r.Header.Clone()
+					request.Header.Set("Content-Type", "application/json")
+					request.Header.Set("session_id", seed)
+					request.Body = io.NopCloser(bytes.NewReader(body))
+					request.ContentLength = int64(len(body))
+					writer := &websocketWriter{header: make(http.Header), write: write, turn: turn}
+					h.Serve(writer, request)
+					writer.finish()
+					activeMu.Lock()
+					activeCancel = nil
 					activeMu.Unlock()
 					stop()
-					return
-				}
-				activeCancel = stop
-				activeMu.Unlock()
-				turn := &websocketTurn{state: state, ctx: ctx, model: model, stream: stream, previous: previous}
-				turnCtx = context.WithValue(turnCtx, websocketStateKey{}, turn)
-				turnCtx = context.WithValue(turnCtx, upstreamClientContextKey{}, upstreamClientFactory(func(c accounts.Credential) *http.Client { return turn.client(h, c) }))
-				request := r.Clone(turnCtx)
-				request.Method = http.MethodPost
-				urlCopy := *r.URL
-				urlCopy.Path = "/v1/responses"
-				urlCopy.RawQuery = ""
-				request.URL = &urlCopy
-				request.Header = r.Header.Clone()
-				request.Header.Set("Content-Type", "application/json")
-				request.Header.Set("session_id", seed)
-				request.Body = io.NopCloser(bytes.NewReader(body))
-				request.ContentLength = int64(len(body))
-				writer := &websocketWriter{header: make(http.Header), write: write, turn: turn}
-				h.Serve(writer, request)
-				writer.finish()
-				activeMu.Lock()
-				activeCancel = nil
-				activeMu.Unlock()
-				stop()
+				}()
 			}
 		}
 	}()
 	defer func() {
+		close(producerDone)
 		cancel()
 		activeMu.Lock()
 		if activeCancel != nil {
@@ -301,12 +314,21 @@ func (h *Handler) ServeWebSocket(w http.ResponseWriter, r *http.Request) {
 			sendError("queue_full", "网关 WebSocket 等待数据达到总上限", event.Stream)
 			continue
 		}
+
+		if !lease.begin(time.Now()) {
+			h.wsQueueBytes.Add(-int64(len(raw)))
+			queuedBytes.Add(-int64(len(raw)))
+			return
+		}
 		select {
 		case queue <- raw:
 		case <-ctx.Done():
+			queuedBytes.Add(-int64(len(raw)))
+			lease.finish(time.Now())
 			h.wsQueueBytes.Add(-int64(len(raw)))
 			return
 		default:
+			lease.finish(time.Now())
 			h.wsQueueBytes.Add(-int64(len(raw)))
 			queuedBytes.Add(-int64(len(raw)))
 			sendError("queue_full", "当前连接等待请求过多，请等待已有响应完成", event.Stream)

@@ -32,6 +32,8 @@ type Handler struct {
 	wsCancels    map[uint64]context.CancelFunc
 	wsWG         sync.WaitGroup
 	wsID         atomic.Uint64
+	wsSlotsMu    sync.Mutex
+	wsSlots      map[int64]map[string]*websocketLease
 	wsUsers      sync.Map
 	wsTotal      atomic.Int32
 	wsQueueBytes atomic.Int64
