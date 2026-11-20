@@ -107,6 +107,34 @@ test('管理员初始化、密钥一次性显示、成员权限与退出',async(
  await expect(page.locator('.nav-item').filter({hasText:'上游账号'})).toHaveCount(0)
  await expect(page.locator('.quota-amount').first()).toContainText('$10')
  expect((await page.request.get(baseURL+'/api/admin/users')).status()).toBe(403)
+ const memberStats=await (await page.request.get(baseURL+'/api/dashboard')).json()
+ expect(memberStats.performance).toBeUndefined()
+ const pendingID='pending-member-fixture'
+ const resetAt=Math.floor(Date.now()/1000)+3600
+ await page.route('**/api/dashboard?*', async route=>{
+  const response=await route.fetch()
+  await route.fulfill({response,json:{...await response.json(),pending_request_id:pendingID}})
+ })
+ await page.route('**/api/quota', route=>route.fulfill({json:[
+  {kind:'5h',limit:10000000,used:10000000,reserved:0,expires_at:resetAt},
+  {kind:'7d',limit:10000000,used:1000,reserved:9999000,expires_at:resetAt+7200},
+ ]}))
+ await page.route('**/api/logs?*', route=>{
+  const requestID=new URL(route.request().url()).searchParams.get('request_id')
+  expect(requestID).toBe(pendingID)
+  return route.fulfill({json:{items:[{id:pendingID,status:502,settlement_status:'pending'}]}})
+ })
+ await page.route('**/api/logs/'+pendingID+'/attempts',route=>route.fulfill({json:[]}))
+ await page.getByRole('button',{name:'刷新',exact:true}).first().click()
+ const restriction=page.getByRole('region',{name:'调用受限'})
+ await expect(restriction).toContainText('5 小时额度窗口已用完')
+ await expect(restriction).toContainText('7 天额度窗口的剩余额度已被在途请求预占')
+ await expect(restriction).toContainText('重置')
+ await restriction.getByRole('button',{name:'查看请求诊断'}).click()
+ await expect(dialog).toContainText(pendingID)
+ await expect(dialog).toContainText('结算异常')
+ await dialog.getByRole('button',{name:'关闭',exact:true}).last().click()
+ for (const pattern of ['**/api/dashboard?*','**/api/quota','**/api/logs?*','**/api/logs/'+pendingID+'/attempts']) await page.unroute(pattern)
  const modelQueries=[]
  await page.route('**/api/models?*',async route=>{
   const q=new URL(route.request().url()).searchParams;modelQueries.push(Object.fromEntries(q))
@@ -702,7 +730,7 @@ test('同一 New API 模型共享 Chat 和 Responses 协议及价格',async({pag
  await page.getByLabel('按请求 ID 筛选').fill(requestID)
  await page.getByRole('button',{name:'筛选',exact:true}).click()
  const diagnosticRow=page.getByRole('row').filter({hasText:requestID.slice(0,12)})
- await expect(diagnosticRow).toContainText('HTTP JSON')
+ await expect(diagnosticRow).toContainText('Messages · HTTP JSON')
  await diagnosticRow.getByRole('button',{name:'请求诊断',exact:true}).click()
  await expect(dialog).toContainText('Messages')
  await expect(dialog).toContainText('按模型支持的 API 协议重新配置客户端。')
@@ -801,6 +829,17 @@ test('仪表盘统计单行、快捷操作与额度并排且桌面保持单屏',
   await page.evaluate(language=>localStorage.setItem('fiftyapi.locale',language),language)
   await page.reload()
   await expect(page.locator('.quota-card')).toHaveCount(2)
+  const timing=page.locator('.dashboard-performance')
+  await timing.locator('summary').click()
+  await expect(timing.getByText(/SQLite 连接等待|SQLite connection wait/)).toBeVisible()
+  await expect(timing.getByText(/上游账号排队|Upstream account queue/)).toBeVisible()
+  const firstOutput=timing.getByText(/流式首段输出|First streaming output/)
+  await expect(firstOutput).toBeVisible()
+  expect(await firstOutput.evaluate(el=>{
+   const rect=el.getBoundingClientRect()
+   return document.elementFromPoint(rect.x+rect.width/2,rect.y+rect.height/2)===el
+  })).toBe(true)
+  await timing.locator('summary').click()
   await expect(page.locator('.dashboard-footnote')).toHaveCount(0)
   await expect(page.getByRole('heading',{name:/最近使用记录|Recent usage/})).toHaveCount(0)
   for(const width of [1280,1440,1920]){

@@ -76,7 +76,7 @@ Changing a password revokes existing sign-in sessions. Members can revoke or del
 
 ## Request diagnostics
 
-The request log shows the observed client transport below the model. **Request diagnostics** shows the API protocol and, when observed, both the client-to-gateway and gateway-to-upstream transports. Older requests show **Not recorded**. A request rejected before authentication or blocked by a reverse proxy may have no log entry.
+The request log shows the API protocol and observed client transport below the model, such as `Responses · WebSocket`. **Request diagnostics** shows the API protocol and, when observed, both the client-to-gateway and gateway-to-upstream transports. Older requests show **Not recorded**. A request rejected before authentication or blocked by a reverse proxy may have no log entry.
 
 Diagnostics distinguish personal budget and concurrency limits, upstream throttling, protocol mismatch and interrupted requests. Affected budget windows, reset times and suggested retries appear when available. Output and completion reflect gateway observations, and settlement appears separately. An authenticated WebSocket handshake failure observed by the gateway has its own request ID. A subsequent SSE entry alone cannot establish why a client switched transports. **Copy diagnostics** includes the request ID and fixed diagnostic fields without raw upstream errors, prompts or keys.
 

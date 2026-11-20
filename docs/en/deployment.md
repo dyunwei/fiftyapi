@@ -161,6 +161,14 @@ fiftyapi restore --from backup.tar.gz --check --key-file data/master.key
 
 Antigravity includes paired OAuth client parameters. Normal deployment and account import do not require `ANTIGRAVITY_OAUTH_CLIENT_SECRET`; the configuration example lists it as a commented optional setting, and Compose forwards an override from the environment or `.env`. Unset or blank values use the built-in value. This advanced override configures the OAuth client, rather than user credentials. Refreshing imported account tokens still uses the paired client parameters. If Antigravity reports `invalid_client` after an environment override, unset the variable for local startup, or clear it in both `.env` and the shell running Compose and recreate the container (remove the override from custom Compose or Docker run environments as applicable), then generate a new authorization link. Do not reuse a failed callback or disclose environment values, authorization results or tokens.
 
+## Timing metrics
+
+Open **Timing metrics** next to the dashboard's time-range selector to see average durations and sample counts since the current process started. The selected date range does not affect these metrics.
+
+- **SQLite connection wait** measures waits for a pooled database connection across the process, including background work. It excludes SQL execution time.
+- **Upstream account queue** measures time spent in the account slot queue, including timeouts and cancellations. Requests granted immediate slots do not contribute.
+- **First streaming output** measures time from the start of a forwarding attempt until the gateway observes its first substantive streaming output. It includes upstream connection and processing time. HTTP JSON, streams without substantive output and transport probes do not contribute.
+
 ## Maintenance tasks and alerts
 
 The admin dashboard links to accounts requiring reauthorization, members blocked by pending settlements, and the latest failed backup. Enter a maintenance alert recipient under **System settings → Email configuration** to send alerts through the existing SMTP configuration. Leave it blank to disable email alerts. The service checks on startup and every five minutes, batches new issues into one message, and suppresses repeats while each issue remains active. SMTP failures are retried at the next check.

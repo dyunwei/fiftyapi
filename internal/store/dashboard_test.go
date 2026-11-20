@@ -20,6 +20,20 @@ func TestDashboardScopesAndRealLogAggregation(t *testing.T) {
 	key1, _, _ := s.CreateAPIKey(ctx, admin, "admin")
 	key2, _, _ := s.CreateAPIKey(ctx, alice, "alice")
 	input, output, amount := int64(10), int64(2), int64(12)
+	for _, charge := range []struct {
+		id        string
+		user, key int64
+	}{
+		{"pending-alice", alice, key2.ID},
+		{"pending-admin", admin, key1.ID},
+	} {
+		if err := s.Reserve(ctx, charge.id, charge.user, charge.key, "model", Price{}, 1, time.Now()); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.Pending(ctx, charge.id); err != nil {
+			t.Fatal(err)
+		}
+	}
 	for _, who := range []struct{ user, key int64 }{{admin, key1.ID}, {alice, key2.ID}} {
 		id := "admin"
 		if who.user == alice {
@@ -33,15 +47,22 @@ func TestDashboardScopesAndRealLogAggregation(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	if own.TotalRequests != 1 || own.TotalTokens != 12 || own.Keys != 1 || len(own.Distribution) != 1 {
+	if own.PendingRequestID != "pending-alice" || own.TotalRequests != 1 || own.TotalTokens != 12 || own.Keys != 1 || len(own.Distribution) != 1 {
 		t.Fatalf("user stats exposed other data: %+v", own)
 	}
 	all, e := s.Dashboard(ctx, admin, true, 24, 3600, 480)
 	if e != nil {
 		t.Fatal(e)
 	}
-	if all.TotalRequests != 2 || all.TotalTokens != 24 || all.TodayRequests != 2 || all.Users != 2 || all.ActiveUsers != 2 || len(all.Trend) != 1 {
+	if all.PendingRequestID != "" || all.TotalRequests != 2 || all.TotalTokens != 24 || all.TodayRequests != 2 || all.Users != 2 || all.ActiveUsers != 2 || len(all.Trend) != 1 {
 		t.Fatalf("wrong actual aggregation: %+v", all)
+	}
+	if err := s.ManualSettle(ctx, admin, "pending-alice", 0, "dashboard fixture"); err != nil {
+		t.Fatal(err)
+	}
+	own, e = s.Dashboard(ctx, alice, false, 24, 3600, 480)
+	if e != nil || own.PendingRequestID != "" {
+		t.Fatalf("resolved request still blocks dashboard: %q (%v)", own.PendingRequestID, e)
 	}
 }
 

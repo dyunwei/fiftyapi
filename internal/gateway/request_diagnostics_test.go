@@ -46,6 +46,10 @@ func TestRequestDiagnosticsHTTP(t *testing.T) {
 	if d := check(g.request("/v1/responses", `{"model":"model","input":"stream-fixture","stream":true}`)); d.ClientTransport != "http_sse" || d.UpstreamTransport != "http_sse" || !d.Completed || !d.OutputStarted {
 		t.Fatalf("SSE diagnostics: %+v", d)
 	}
+	timing := g.h.Performance().FirstOutput
+	if timing.Samples != 1 || timing.AverageMS <= 0 {
+		t.Fatalf("streaming timing missing or includes JSON: %+v", timing)
+	}
 	if d := check(g.request("/v1/messages", `{"model":"model"}`)); d.Code != "protocol_mismatch" || d.Dispatched {
 		t.Fatalf("protocol diagnostics: %+v", d)
 	}

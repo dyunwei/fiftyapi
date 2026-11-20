@@ -338,6 +338,36 @@ func TestWeightedSelectionAndCanceledQueue(t *testing.T) {
 	}
 }
 
+func TestPerformanceMeasuresOnlyEnqueuedAccountWaits(t *testing.T) {
+	up := httptest.NewTLSServer(http.NotFoundHandler())
+	defer up.Close()
+	g := setupGateway(t, "openai", up)
+	ctx := context.Background()
+	policy := store.DefaultAccountPolicy()
+	policy.Concurrency = 1
+	policy.MaxQueue = 1
+	policy.WaitMS = 25
+	if err := g.s.SetAccountPolicy(ctx, g.user, g.account, policy); err != nil {
+		t.Fatal(err)
+	}
+	selected, err := g.h.selectAccount(ctx, g.user, "model", "model", nil, true, nil, "occupy")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer selected.Release()
+	if sample := g.h.Performance().AccountQueue; sample.Samples != 0 {
+		t.Fatalf("an immediate slot was counted in the queue: %+v", sample)
+	}
+	queued, err := g.h.selectAccount(ctx, g.user, "model", "model", nil, true, nil, "wait")
+	if err == nil {
+		queued.Release()
+		t.Fatal("expected full account to time out")
+	}
+	if sample := g.h.Performance().AccountQueue; sample.Samples != 1 || sample.AverageMS <= 0 {
+		t.Fatalf("timed out queue sample was not recorded: %+v", sample)
+	}
+}
+
 func TestServerSideToolSignalsForbidReplay(t *testing.T) {
 	for _, kind := range []string{"function_call", "mcp_call", "web_search_call", "computer_call", "code_interpreter_call", "shell_call", "image_generation_call"} {
 		t.Run(kind, func(t *testing.T) {

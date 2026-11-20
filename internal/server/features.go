@@ -2,11 +2,14 @@ package server
 
 import (
 	"errors"
-	"fiftyapi/internal/store"
-	"golang.org/x/crypto/bcrypt"
 	"net/http"
 	"strconv"
 	"strings"
+
+	"fiftyapi/internal/gateway"
+	"fiftyapi/internal/store"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 func targetID(r *http.Request) (int64, error) {
@@ -71,6 +74,12 @@ func (a *API) quota(w http.ResponseWriter, r *http.Request, id identity) {
 	}
 	writeJSON(w, 200, v)
 }
+
+type dashboardPerformance struct {
+	gateway.Performance
+	SQLiteWait gateway.TimingSummary `json:"sqlite_wait"`
+}
+
 func (a *API) dashboard(w http.ResponseWriter, r *http.Request, id identity) {
 	hours, _ := strconv.Atoi(r.URL.Query().Get("hours"))
 	if hours != 24 && hours != 168 && hours != 720 {
@@ -84,12 +93,26 @@ func (a *API) dashboard(w http.ResponseWriter, r *http.Request, id identity) {
 	if offset < -720 || offset > 840 {
 		offset = 0
 	}
-	data, err := a.store.Dashboard(r.Context(), id.user.ID, id.user.Role == "admin", hours, bucket, offset)
+	admin := id.user.Role == "admin"
+	data, err := a.store.Dashboard(r.Context(), id.user.ID, admin, hours, bucket, offset)
 	if err != nil {
 		writeError(w, 500, "读取统计失败")
 		return
 	}
-	writeJSON(w, 200, data)
+	response := struct {
+		store.Dashboard
+		Performance *dashboardPerformance `json:"performance,omitempty"`
+	}{Dashboard: data}
+	if admin {
+		stats := a.store.DB.Stats()
+		response.Performance = &dashboardPerformance{
+			SQLiteWait: gateway.SummarizeTiming(stats.WaitCount, stats.WaitDuration),
+		}
+		if a.gateway != nil {
+			response.Performance.Performance = a.gateway.Performance()
+		}
+	}
+	writeJSON(w, 200, response)
 }
 func (a *API) setLimits(w http.ResponseWriter, r *http.Request, id identity) {
 	target, err := targetID(r)

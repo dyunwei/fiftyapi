@@ -50,22 +50,24 @@ func (s *accountSlot) notify() {
 	}
 	s.changed = make(chan struct{})
 }
-func (s *accountSlot) wait(ctx context.Context, p store.AccountPolicy) bool {
+func (s *accountSlot) wait(ctx context.Context, p store.AccountPolicy) (acquired bool, elapsed time.Duration) {
 	if p.WaitMS == 0 || p.MaxQueue == 0 {
-		return false
+		return false, 0
 	}
 	ticket := new(struct{ marker byte })
 	s.mu.Lock()
 	if len(s.queue) >= p.MaxQueue {
 		s.mu.Unlock()
-		return false
+		return false, 0
 	}
+	queuedAt := time.Now()
 	s.queue = append(s.queue, ticket)
 	s.waiting = len(s.queue)
 	s.mu.Unlock()
 	defer func() {
 		s.mu.Lock()
 		defer s.mu.Unlock()
+		elapsed = time.Since(queuedAt)
 		for i, v := range s.queue {
 			if v == ticket {
 				s.queue = append(s.queue[:i], s.queue[i+1:]...)
@@ -81,7 +83,7 @@ func (s *accountSlot) wait(ctx context.Context, p store.AccountPolicy) bool {
 		s.mu.Lock()
 		if ctx.Err() != nil {
 			s.mu.Unlock()
-			return false
+			return false, 0
 		}
 		if len(s.queue) > 0 && s.queue[0] == ticket && s.active < p.Concurrency {
 			s.queue = s.queue[1:]
@@ -89,7 +91,7 @@ func (s *accountSlot) wait(ctx context.Context, p store.AccountPolicy) bool {
 			s.active++
 			s.notify()
 			s.mu.Unlock()
-			return true
+			return true, 0
 		}
 		if s.changed == nil {
 			s.changed = make(chan struct{})
@@ -98,9 +100,9 @@ func (s *accountSlot) wait(ctx context.Context, p store.AccountPolicy) bool {
 		s.mu.Unlock()
 		select {
 		case <-ctx.Done():
-			return false
+			return false, 0
 		case <-timer.C:
-			return false
+			return false, 0
 		case <-changed:
 		}
 	}
@@ -274,7 +276,13 @@ func (h *Handler) selectAccount(ctx context.Context, user int64, model, scope st
 		slot := h.slot(c.ID)
 		acquired := slot.acquire(c.Policy.Concurrency)
 		if !acquired && wait {
-			acquired = slot.wait(ctx, c.Policy)
+			var elapsed time.Duration
+			acquired, elapsed = slot.wait(ctx, c.Policy)
+			if elapsed > 0 {
+				h.performance.mu.Lock()
+				h.performance.accountWait.observe(elapsed)
+				h.performance.mu.Unlock()
+			}
 		}
 		if !acquired {
 			return selection{}, false

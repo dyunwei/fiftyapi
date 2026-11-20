@@ -20,6 +20,7 @@ import (
 
 type Handler struct {
 	store        *store.Store
+	performance  performanceMetrics
 	accounts     *accounts.Service
 	counter      atomic.Uint64
 	sseChecks    atomic.Int32
@@ -481,7 +482,11 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 		reason := routingReason(out)
 		observation := store.AccountObservation{RequestAttempt: store.RequestAttempt{RequestID: id, Attempt: attempt, AccountID: chosen.ID, Model: m.ID, Status: out.status, DurationMS: time.Since(started).Milliseconds(), Dispatched: out.dispatched, Retryable: eligible && (portable || refreshed) && attempt < 3, Reason: reason, CreatedAt: started.Unix()}, Success: out.complete && out.err == nil, Failure: writer.writeErr == nil && out.err != nil && out.signal != "refreshed" && out.signal != "rate_limit" && out.signal != "quota_exhausted" && out.signal != "model_unavailable" && out.status != 400 && out.status != 403 && r.Context().Err() == nil, CooldownUntil: out.cooldownUntil, HoldBinding: holdBinding, QuotaExhausted: out.signal == "quota_exhausted", PrimaryUsed: out.primaryUsed, PrimaryReset: out.primaryReset, SecondaryUsed: out.secondaryUsed, SecondaryReset: out.secondaryReset}
 		if writer.firstOutput != nil {
-			ms := writer.firstOutput.Sub(started).Milliseconds()
+			elapsed := writer.firstOutput.Sub(started)
+			h.performance.mu.Lock()
+			h.performance.firstOutput.observe(elapsed)
+			h.performance.mu.Unlock()
+			ms := elapsed.Milliseconds()
 			observation.FirstOutputMS = &ms
 		}
 		if out.modelCooldown {

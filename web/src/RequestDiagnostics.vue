@@ -1,12 +1,11 @@
 <script setup>
 import { computed } from 'vue'
 import { t } from './i18n.js'
-import { requestTransport } from './request-diagnostics.js'
+import { requestProtocol, requestTransport } from './request-diagnostics.js'
 
 const props = defineProps({ log: { type: Object, required: true }, date: { type: Function, required: true } })
 const emit = defineEmits(['copy'])
 const diagnostics = computed(() => props.log.diagnostics)
-const protocols = { responses: 'Responses', messages: 'Messages', chat: 'Chat Completions', antigravity: 'Antigravity v1internal' }
 const advice = {
   protocol_mismatch: '按模型支持的 API 协议重新配置客户端。',
   model_access: '选择有权限的模型，或联系管理员调整访问权限。',
@@ -26,7 +25,7 @@ const fields = computed(() => {
   const d = diagnostics.value
   const rows = [
     [t('请求 ID'), props.log.id],
-    [t('API 协议'), protocols[d?.protocol] || t('未记录')],
+    [t('API 协议'), requestProtocol(d?.protocol)],
     [t('客户端 → 网关'), requestTransport(d?.client_transport)],
     [t('网关 → 上游'), requestTransport(d?.upstream_transport, d && !d.dispatched ? '未发送' : '未记录')],
     [t('状态'), props.log.status || t('未记录')],

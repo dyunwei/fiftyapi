@@ -96,6 +96,10 @@ curl -N http://127.0.0.1:8080/v1/chat/completions \
 
 将默认 OpenAI 客户端身份统一为实测的 0.164.0，已完成 `gpt-6.1-sol` 真实核心调用；旧版本声明可能导致目录缺少模型甚至直接调用返回 `model_not_found`。账号中的“验证并同步”会显示具体结果，见 [账号模型说明](account-models.md)。
 
+## 调用受限状态
+
+成员首页的「调用受限」区列出未分配、已耗尽或被在途请求预占的额度窗口。已耗尽且正在计时的窗口显示预计重置时间。因待核算暂停时，可从首页直接打开该请求的诊断。管理员完成核算或在途请求完成后，刷新首页查看最新状态。
+
 ## 客户端自检
 
 在「使用 API 密钥 → 客户端接入自检」复制适合当前系统和客户端的命令。也可以从站点下载当前的 `/setup.py`，执行 `python3.11 fiftyapi-setup.py check codex` 或 `python3.11 fiftyapi-setup.py check claude`。Windows 使用 `py -3.11`。

@@ -92,6 +92,10 @@ Models need administrator-confirmed prices, an available upstream and a positive
 
 Reliable received usage is settled after cancellation or interruption. Missing/invalid usage releases reservations and requires administrator settlement; further calls by that user pause until resolution. Provide request IDs, status and sanitized errors when asking for help; never share keys or OAuth callbacks. See [compatibility](compatibility.md).
 
+## Inference access status
+
+The member overview shows which budget windows have no allocation, are exhausted, or have their remaining budget held by in-flight requests. An exhausted active window shows its expected reset time. If a pending settlement blocks inference, open the affected request's diagnostics directly from the overview. Refresh the page after an administrator resolves the settlement or after in-flight requests finish.
+
 ## Client connection check
 
 Copy the command for your platform and client from **Use API key → Client connection check**. You can also download the current `/setup.py` from your site and run `python3.11 fiftyapi-setup.py check codex` or `python3.11 fiftyapi-setup.py check claude`. On Windows use `py -3.11`.
