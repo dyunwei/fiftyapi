@@ -5,6 +5,49 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 English | 中文说明见各版本下方折叠区域
 
+## 0.3.0 (2026-11-20)
+
+### Added
+
+- Request logs show the API protocol and observed client transport, with per-hop diagnostics, actionable error details, and a redacted copy action.
+- The client setup helper checks connectivity, key acceptance, model compatibility and SSE delivery. Codex also checks the WebSocket handshake. The transport checks use no upstream inference quota.
+- The member overview explains budget and settlement blocks and opens diagnostics for the affected request.
+- The admin dashboard shows maintenance tasks, supports opt-in SMTP alerts, and reports average SQLite connection wait, upstream account queue time and first streaming output time since startup.
+- `fiftyapi restore --check` verifies backup integrity, schema compatibility and the original master key while the service is running.
+
+### Fixed
+
+- The container smoke test verifies that a rejected WebSocket Origin produces one zero-cost diagnostic and that successful handshakes without inference produce no request entries.
+
+### Upgrade notes
+
+- Back up the database and the original master key before upgrading from v0.2.1. Startup applies append-only migrations `022_request_diagnostics.sql` and `023_maintenance_alerts.sql`. To roll back, restore the pre-upgrade database with the older binary.
+- Existing requests without diagnostics show **Not recorded** for protocol and transport. To enable maintenance alerts, enter a recipient under **System settings → Email configuration**.
+- Download the updated client helper from the upgraded gateway. Transport probes cover the client-to-gateway path. Release verification uses simulated upstreams. See [compatibility](docs/en/compatibility.md).
+
+<details>
+<summary>中文说明</summary>
+
+**新增**
+
+- 请求日志同时显示 API 协议与实际客户端传输，提供分段诊断、失败处理提示和脱敏复制。
+- 客户端助手检查连通性、API Key、模型兼容性和 SSE 事件到达情况。Codex 还会检查 WebSocket 握手。传输探测不消耗上游推理额度。
+- 成员首页显示额度与待核算阻塞原因，并可直接打开对应请求的诊断。
+- 管理仪表盘新增维护待办、可选 SMTP 告警，以及从服务启动开始统计的 SQLite 连接等待、上游账号排队和流式首段输出平均耗时。
+- `fiftyapi restore --check` 可在服务运行时验证备份完整性、数据库版本和原主密钥。
+
+**修复**
+
+- 容器冒烟测试核对被拒绝的 WebSocket Origin 会产生一条零费用诊断，成功握手且未发起推理时不会产生请求记录。
+
+**升级说明**
+
+- 从 v0.2.1 升级前备份数据库和原主密钥。启动时自动执行追加迁移 `022_request_diagnostics.sql` 和 `023_maintenance_alerts.sql`。回退时用旧版程序配合升级前的数据库备份。
+- 没有诊断信息的历史请求，协议及传输显示「未记录」。需要邮件告警时，在「系统设置 → 邮件配置」填写收件邮箱。
+- 从升级后的网关下载新版客户端助手。传输探测覆盖客户端到网关的链路。本版使用模拟上游验证，详见 [兼容性](docs/compatibility.md)。
+
+</details>
+
 ## 0.2.1 (2026-11-19)
 
 ### Changed
