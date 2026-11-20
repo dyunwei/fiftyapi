@@ -26,6 +26,7 @@ type Credential struct {
 	ExpiresAt            time.Time        `json:"expires_at"`
 }
 type Service struct {
+	identityMu     sync.Mutex
 	store          *store.Store
 	key            []byte
 	client         *http.Client

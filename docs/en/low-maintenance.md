@@ -60,3 +60,7 @@ HTTP 429 on this test means the selected upstream restricted the request. It doe
 The 2026-11-18 fix corrects stale copy, the preview, and the default inference-origin regression. Simulated tests use Antigravity identity 2.23.0 and fixture model `native-probe-model`, covering native envelopes, 429/RetryInfo, private-data protection, and single dispatch. No live provider was contacted, so this does not establish that a real account's 429 has cleared.
 
 Validation passed: `make test`, `make build`, and `make test-ui`, including 28 browser tests.
+
+Use “Use candidate version” to save the detected version as the default. The previous Codex default is retained for “Revert to previous version”; reverting again switches back. Manual version changes also update the rollback value; saving the same version preserves it. Pinned account versions are unaffected. These actions neither install clients nor update protocol implementations or run paid probes.
+
+Client WebSockets receive protocol Pings every 30 seconds. A missing Pong within 10 seconds ends the connection, cancels active work and releases connection slots. Terminal/container logs record connection opening, read termination, release, upstream reuse and idle duration. Correlate them with failure logs using `connection_id`. This heartbeat checks client-to-gateway connectivity, not upstream inference availability.

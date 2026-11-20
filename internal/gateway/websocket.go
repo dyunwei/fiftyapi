@@ -95,9 +95,34 @@ func (h *Handler) ServeWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	accepted = true
+	// The ingress read loop handles pong frames even when no model turn is active.
+	// Canceling the connection context also cancels active work and releases slots.
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				pingCtx, stop := context.WithTimeout(ctx, 10*time.Second)
+				err := conn.Ping(pingCtx)
+				stop()
+				if err != nil {
+					log.Printf("WebSocket heartbeat failed connection_id=%s cause=%s", id, failureCategory(err))
+					cancel()
+					return
+				}
+			}
+		}
+	}()
+	log.Printf("WebSocket opened connection_id=%s user_id=%d user_connections=%d total_connections=%d", id, user.ID, count.Load(), h.wsTotal.Load())
+	defer func() {
+		log.Printf("WebSocket released connection_id=%s user_id=%d user_connections_after=%d total_connections_after=%d duration_ms=%d", id, user.ID, count.Load()-1, h.wsTotal.Load()-1, time.Since(start).Milliseconds())
+	}()
 	defer conn.CloseNow()
 	conn.SetReadLimit(4 << 20)
-	state := &websocketState{cache: map[string]wsCachedResponse{}}
+	state := &websocketState{connectionID: id, cache: map[string]wsCachedResponse{}}
 	defer state.close()
 	seed := explicitSessionID(r, nil)
 	var writeMu sync.Mutex
@@ -233,6 +258,7 @@ func (h *Handler) ServeWebSocket(w http.ResponseWriter, r *http.Request) {
 	for {
 		kind, raw, e := conn.Read(ctx)
 		if e != nil {
+			log.Printf("WebSocket read ended connection_id=%s cause=%s", id, failureCategory(e))
 			return
 		}
 		if kind != ws.MessageText {

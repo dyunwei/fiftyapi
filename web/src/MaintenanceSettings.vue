@@ -7,6 +7,7 @@ async function load(){state.value=await props.api('/admin/settings/maintenance')
 async function action(fn){if(busy.value)return;busy.value=true;error.value='';try{await fn()}catch(e){if(e.name!=='AbortError')error.value=e.message}finally{busy.value=false}}
 async function sync(){await action(async()=>{await props.api('/admin/settings/prices/sync',{method:'POST'});await load();props.notify(t('价格目录已同步'))})}
 async function check(){await action(async()=>{await props.api('/admin/settings/codex/check',{method:'POST'});await load()})}
+async function useVersion(version){state.value.identity.codex_version=version;await save()}
 async function save(){await action(async()=>{await props.api('/admin/settings/maintenance',{method:'PUT',body:state.value.identity});await load();props.notify(t('客户端默认版本已保存'))})}
 function date(value){return value?new Date(value*1000).toLocaleString():t('未记录')}
 defineExpose({reload:()=>action(load)})
@@ -28,6 +29,8 @@ onMounted(()=>action(load))
 <button class="primary" :disabled="busy">{{t('保存默认版本')}}</button>
 </fieldset></form>
 <p v-if="state.candidate.version">{{t('发现的 Codex 稳定版本')}}: {{state.candidate.version}}</p>
+<button v-if="state.candidate.version" class="secondary" :disabled="busy||state.candidate.version===state.identity.codex_version" @click="useVersion(state.candidate.version)">{{t('采用候选版本')}}</button>
+<p v-if="state.identity.previous_codex_version">{{t('上一版本')}}: {{state.identity.previous_codex_version}} <button class="secondary" :disabled="busy" @click="useVersion(state.identity.previous_codex_version)">{{t('回退上一版本')}}</button></p>
 <p v-if="state.versions.error" class="alert">{{t(state.versions.error)}}</p>
 <button class="secondary" :disabled="busy" @click="check">{{t('检查 Codex 版本')}}</button>
 </template>

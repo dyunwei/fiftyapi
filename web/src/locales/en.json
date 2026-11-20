@@ -1129,5 +1129,8 @@
   "账号名称、ID 或平台": "Account name, ID or platform",
   "暂无符合条件的账号": "No accounts match your filters",
   "授权详情": "Authorization details",
-  "暂无授权与健康详情": "No authorization or health details are available."
+  "暂无授权与健康详情": "No authorization or health details are available.",
+  "采用候选版本": "Use candidate version",
+  "上一版本": "Previous version",
+  "回退上一版本": "Revert to previous version"
 }

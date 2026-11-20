@@ -67,3 +67,43 @@ func TestGlobalIdentityInheritancePersistsAcrossRefreshSave(t *testing.T) {
 		t.Fatal("explicit version overwritten")
 	}
 }
+
+func TestIdentityVersionRollback(t *testing.T) {
+	ctx := context.Background()
+	s, err := store.Open(ctx, filepath.Join(t.TempDir(), "db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	actor, _ := s.CreateAdmin(ctx, "admin", "hash")
+	service, err := New(s, make([]byte, 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	original, _ := service.ClientIdentity(ctx)
+	next := original
+	next.CodexVersion = "0.200.0"
+	next.PreviousCodexVersion = "untrusted"
+	if err = service.SaveClientIdentity(ctx, actor, next); err != nil {
+		t.Fatal(err)
+	}
+	saved, _ := service.ClientIdentity(ctx)
+	if saved.PreviousCodexVersion != original.CodexVersion {
+		t.Fatal(saved)
+	}
+	if err = service.SaveClientIdentity(ctx, actor, saved); err != nil {
+		t.Fatal(err)
+	}
+	saved, _ = service.ClientIdentity(ctx)
+	if saved.PreviousCodexVersion != original.CodexVersion {
+		t.Fatal("same version lost rollback", saved)
+	}
+	saved.CodexVersion = saved.PreviousCodexVersion
+	if err = service.SaveClientIdentity(ctx, actor, saved); err != nil {
+		t.Fatal(err)
+	}
+	saved, _ = service.ClientIdentity(ctx)
+	if saved.CodexVersion != original.CodexVersion || saved.PreviousCodexVersion != "0.200.0" {
+		t.Fatal(saved)
+	}
+}

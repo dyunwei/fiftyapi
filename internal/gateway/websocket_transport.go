@@ -7,6 +7,7 @@ import (
 	"fiftyapi/internal/accounts"
 	ws "github.com/coder/websocket"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"sync"
@@ -21,13 +22,16 @@ type wsCachedResponse struct{ model string }
 // use the regular HTTP/SSE scheduling/ledger machinery via a transport adapter;
 // no prompt history is reconstructed or persisted to emulate previous IDs.
 type websocketState struct {
-	mu        sync.Mutex
-	conn      *ws.Conn
-	owner     int64
-	cache     map[string]wsCachedResponse
-	order     []string
-	lastModel string
-	base      *http.Client
+	connectionID  string
+	openedAt      time.Time
+	lastCompleted time.Time
+	mu            sync.Mutex
+	conn          *ws.Conn
+	owner         int64
+	cache         map[string]wsCachedResponse
+	order         []string
+	lastModel     string
+	base          *http.Client
 }
 
 func (s *websocketState) Owner() int64 { s.mu.Lock(); defer s.mu.Unlock(); return s.owner }
@@ -35,6 +39,7 @@ func (s *websocketState) close() {
 	s.mu.Lock()
 	conn := s.conn
 	base := s.base
+	owner, openedAt := s.owner, s.openedAt
 	s.conn = nil
 	s.base = nil
 	s.owner = 0
@@ -43,6 +48,7 @@ func (s *websocketState) close() {
 	s.lastModel = ""
 	s.mu.Unlock()
 	if conn != nil {
+		log.Printf("Upstream WebSocket released connection_id=%s account_id=%d duration_ms=%d", s.connectionID, owner, time.Since(openedAt).Milliseconds())
 		conn.CloseNow()
 	}
 	if base != nil {
@@ -70,6 +76,7 @@ func (s *websocketState) remember(id, model string) {
 	}
 	s.cache[id] = wsCachedResponse{model: model}
 	s.lastModel = model
+	s.lastCompleted = time.Now()
 	for len(s.order) > 64 {
 		delete(s.cache, s.order[0])
 		s.order = s.order[1:]
@@ -113,6 +120,7 @@ func (t *websocketUpstreamTransport) RoundTrip(req *http.Request) (*http.Respons
 	state := t.turn.state
 	state.mu.Lock()
 	conn, owner := state.conn, state.owner
+	lastCompleted := state.lastCompleted
 	state.mu.Unlock()
 	if conn != nil && owner != t.credential.AccountID {
 		t.base.CloseIdleConnections()
@@ -173,12 +181,19 @@ func (t *websocketUpstreamTransport) RoundTrip(req *http.Request) (*http.Respons
 		}
 		state.mu.Lock()
 		state.conn = conn
+		state.openedAt = time.Now()
+		state.lastCompleted = time.Time{}
 		state.owner = t.credential.AccountID
 		state.base = t.base
 		state.mu.Unlock()
 	} else {
 		t.base.CloseIdleConnections()
 	}
+	idleMS := int64(0)
+	if reused && !lastCompleted.IsZero() {
+		idleMS = time.Since(lastCompleted).Milliseconds()
+	}
+	log.Printf("Upstream WebSocket turn connection_id=%s account_id=%d reused=%t idle_ms=%d", state.connectionID, t.credential.AccountID, reused, idleMS)
 	t.turn.connectedUpstream = true
 	raw, err := io.ReadAll(io.LimitReader(req.Body, 4<<20))
 	if err != nil {

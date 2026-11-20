@@ -211,7 +211,7 @@ func consumeProtocolResponse(w http.ResponseWriter, r *http.Request, resp *http.
 			}
 			if kind == "error" || kind == "response.failed" || kind == "response.incomplete" {
 				applyStreamSignal(&out, payload)
-				return &transportFailure{detail: "terminal_event=" + safeEventType(kind)}
+				return &transportFailure{detail: "terminal_event=" + safeEventType(kind) + " " + safeUpstreamError(payload)}
 			}
 			if stream {
 				if !out.sent {

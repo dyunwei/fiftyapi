@@ -8,9 +8,10 @@ import (
 )
 
 type ClientIdentity struct {
-	CodexVersion       string `json:"codex_version"`
-	ClaudeVersion      string `json:"claude_version"`
-	AntigravityVersion string `json:"antigravity_version"`
+	PreviousCodexVersion string `json:"previous_codex_version,omitempty"`
+	CodexVersion         string `json:"codex_version"`
+	ClaudeVersion        string `json:"claude_version"`
+	AntigravityVersion   string `json:"antigravity_version"`
 }
 
 func (s *Service) ClientIdentity(ctx context.Context) (ClientIdentity, error) {
@@ -29,6 +30,17 @@ func (s *Service) SaveClientIdentity(ctx context.Context, actor int64, in Client
 		if !providers.ValidClientVersion(v) {
 			return errors.New("客户端版本需为 x.y.z 或 x.y.z-alpha.N")
 		}
+	}
+	// Serialize changes so the previous version and the new default stay paired.
+	s.identityMu.Lock()
+	defer s.identityMu.Unlock()
+	current, err := s.ClientIdentity(ctx)
+	if err != nil {
+		return err
+	}
+	in.PreviousCodexVersion = current.PreviousCodexVersion
+	if in.CodexVersion != current.CodexVersion {
+		in.PreviousCodexVersion = current.CodexVersion
 	}
 	raw, err := json.Marshal(in)
 	if err != nil {

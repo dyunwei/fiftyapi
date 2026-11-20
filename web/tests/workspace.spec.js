@@ -743,6 +743,11 @@ test('同一 New API 模型共享 Chat 和 Responses 协议及价格',async({pag
 })
 
 test('自动维护设置集中保存版本，候选版本不自动启用',async({page})=>{
+ await page.route('**/api/admin/settings/maintenance', async route=>{
+ if(route.request().method()!=='GET')return route.continue()
+ const response=await route.fetch();const data=await response.json()
+ await route.fulfill({response,json:{...data,candidate:{version:'0.201.0'}}})
+ })
  await page.context().addCookies(adminCookies);await page.goto(baseURL)
  await page.locator('.nav-item').filter({hasText:'系统设置'}).click()
  await page.getByRole('tab',{name:'自动维护',exact:true}).click()
@@ -755,6 +760,15 @@ test('自动维护设置集中保存版本，候选版本不自动启用',async(
  await expect(page.locator('.toast')).toContainText('客户端默认版本已保存')
  await page.getByRole('button',{name:'刷新当前页面'}).click()
  await expect(section.getByLabel('Codex',{exact:true})).toHaveValue('0.200.0')
+ await expect(section).toContainText('上一版本: '+original)
+ await section.getByRole('button',{name:'回退上一版本',exact:true}).click()
+ await expect(section.getByLabel('Codex',{exact:true})).toHaveValue(original)
+ await expect(section).toContainText('上一版本: 0.200.0')
+ await section.getByRole('button',{name:'采用候选版本',exact:true}).click()
+ await expect(section.getByLabel('Codex',{exact:true})).toHaveValue('0.201.0')
+ await expect(section.getByRole('button',{name:'采用候选版本',exact:true})).toBeDisabled()
+ await section.getByRole('button',{name:'回退上一版本',exact:true}).click()
+ await expect(section.getByLabel('Codex',{exact:true})).toHaveValue(original)
  await section.getByLabel('Codex',{exact:true}).fill(original);await section.getByRole('button',{name:'保存默认版本',exact:true}).click()
  await page.setViewportSize({width:390,height:844})
  await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)

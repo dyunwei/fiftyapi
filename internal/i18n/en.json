@@ -685,5 +685,6 @@
   "价格规则超出范围": "Pricing rules are out of range",
   "价格规则无效或重复": "Invalid or duplicate pricing rules",
   "账号请求头与已定价的请求档位不一致": "Account headers conflict with the priced request tier",
-  "上游返回 HTTP 429：请求受限，可能是限流、额度或模型容量限制": "Upstream returned HTTP 429: the request is restricted, possibly by rate, quota, or model capacity limits"
+  "上游返回 HTTP 429：请求受限，可能是限流、额度或模型容量限制": "Upstream returned HTTP 429: the request is restricted, possibly by rate, quota, or model capacity limits",
+  "上游繁忙，已发送响应，未自动重放": "Upstream busy; response already sent, not automatically replayed"
 }

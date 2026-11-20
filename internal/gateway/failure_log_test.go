@@ -44,3 +44,13 @@ func TestStreamPreservesSafeTransportFailure(t *testing.T) {
 		t.Fatalf("got %q want %q", got, want)
 	}
 }
+
+func TestSafeUpstreamError(t *testing.T) {
+	got := safeUpstreamError([]byte(`{"error":{"code":"server_overloaded","type":"private","message":"secret"}}`))
+	if got != "error0_code=server_overloaded" {
+		t.Fatal(got)
+	}
+	if got = safeUpstreamError([]byte(`{"error":{"code":"secret"}}`)); got != "error_code=unclassified" {
+		t.Fatal(got)
+	}
+}
