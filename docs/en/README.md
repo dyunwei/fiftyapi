@@ -21,7 +21,7 @@
 
 - **Other tasks** · [Release quickstart](release-quickstart.md)
 - **Development and releases** · [Contributing](../../CONTRIBUTING.md) · [Maintenance](maintaining.md) · [Changelog](../../CHANGELOG.md) · [Security reports](../../SECURITY.md)
-- **Design and verification** · [Architecture, probes, and acceptance records in Chinese](../README.md)
+- **Design and verification** · [Compatibility archive](compatibility-history.md) · [Architecture, probes, and acceptance records in Chinese](../README.md)
 - **Third-party sources** · [Third-party notices](../../THIRD_PARTY_NOTICES.md) · [sub2api source fingerprints](../sub2api-source.json)
 
 </details>

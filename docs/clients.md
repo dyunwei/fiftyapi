@@ -17,7 +17,7 @@ claude
 
 base URL 不加 `/v1`，客户端调用 `/v1/messages`。如果终端原先配置了供应商的 `ANTHROPIC_API_KEY`，请清除冲突配置。Messages 路由到 Claude 或支持 Messages 的 API 上游。Antigravity 需要原生 v1internal 客户端，见 [低维护账号共享](low-maintenance.md)。`/v1/messages/count_tokens` 为本地估算，不代表供应商精确分词。
 
-Antigravity `gemini-3.5-flash-lite` 的网关工具闭环已实测；真实 Claude OAuth 与 Claude Code 原生程序尚未验收。完整兼容性见 [验证记录](compatibility.md)。
+历史 Antigravity Messages 转换器的工具闭环验收不适用于当前原生链路。仓库尚无真实 Claude OAuth 与原生 Claude Code 验收记录；已记录的范围见[兼容性](compatibility.md)。
 
 ## Codex / Responses
 
@@ -43,7 +43,7 @@ codex
 
 `env_key` 和 Responses provider 的配置方式参考 [OpenAI 自定义 Responses provider 示例](https://developers.openai.com/siwc/token-sharing-open-source/codex-app-server)。这里环境变量保存的是本服务 Key，服务端才负责供应商授权。已使用本机 Codex 0.164.0-alpha.11.1、gpt-6.1-sol 完成固定短提示的 WebSocket 接入验收；长时间工具工作流仍需按实际场景验证。
 
-OAuth Responses 路由 OpenAI 账号；API Key 上游按配置的 Responses 协议直通。支持 HTTP/SSE 和 `/v1/responses/compact` 接口，上游 compact 能力需单独确认。携带 `client_version` 的目录请求保留上游模型元数据并筛选已启用、已定价模型。HTTP/SSE 使用 `store:false` 完整历史；原生 WebSocket 支持同连接内的 `previous_response_id`，连接丢失后必须发送完整历史。同连接内顺序处理，多连接可并行；不支持 steer、显式 cancel、优先/快速服务等级或把 Gemini 转成 Responses。API Key 上游要显式开启 WebSocket 且确认上游支持，否则将上述 supports_websockets 改为 false。详见 [账号与网关](reliability-redesign.md)。
+OAuth Responses 路由 OpenAI 账号；API Key 上游按配置的 Responses 协议直通。支持 HTTP/SSE 和 `/v1/responses/compact` 接口，上游 compact 能力需单独确认。携带 `client_version` 的目录请求保留上游模型元数据并筛选已启用、已定价模型。HTTP/SSE 使用 `store:false` 完整历史；原生 WebSocket 支持同连接内的 `previous_response_id`，连接丢失后必须发送完整历史。同连接内顺序处理，多连接可并行；不支持 steer、显式 cancel 或把 Gemini 转成 Responses。加速档位需要上游支持且自动价格目录包含对应费率，见[价格规则](low-maintenance.md#自动价格与模型)。API Key 上游要显式开启 WebSocket 且确认上游支持，否则将上述 supports_websockets 改为 false。详见 [账号与网关](reliability-redesign.md)。
 
 ## 最小 API 调用
 
@@ -57,10 +57,10 @@ curl -sS http://127.0.0.1:8080/v1/models \
 curl -N http://127.0.0.1:8080/v1/messages \
   -H "Authorization: Bearer $FIFTYAPI_API_KEY" \
   -H 'Content-Type: application/json' \
-  -d '{"model":"gemini-3.5-flash-lite","max_tokens":64,"stream":true,"messages":[{"role":"user","content":"Reply OK"}]}'
+  -d '{"model":"YOUR_MESSAGES_MODEL_ID","max_tokens":64,"stream":true,"messages":[{"role":"user","content":"Reply OK"}]}'
 ```
 
-先由管理员为模型设置内部价格并给当前用户额度。401 检查本服务 Key/用户状态；400 检查模型启用、价格和协议；429 检查额度或上游限流；503 检查账号就绪、并发及会话绑定。断流有可靠用量时自动扣除，缺失或无效用量释放预占并等待管理员核算，处理前暂停该用户继续调用；日志说明结算结果，只有结算异常需要管理员核实。诊断时仅提供状态、请求 ID 和脱敏错误，不公开 Key 或授权回调地址。
+先由管理员为模型设置内部价格并给当前用户额度。401 检查本服务 Key/用户状态；400 检查模型启用、价格和协议；429 检查额度或上游限流；503 检查账号就绪、并发及会话绑定。断流有可靠用量时自动扣除，缺失或无效用量按零结算并释放预占；账本写入异常保留核算证据，但历史异常本身不会限制后续调用。日志说明结算结果，只有结算异常需要管理员核实。诊断时仅提供状态、请求 ID 和脱敏错误，不公开 Key 或授权回调地址。
 
 ## Cherry Studio / Chat Completions
 

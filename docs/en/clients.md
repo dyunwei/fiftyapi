@@ -28,7 +28,7 @@ claude
 
 The base URL has no `/v1`; the client appends `/v1/messages`. Clear conflicting vendor `ANTHROPIC_API_KEY` settings. Messages routes to Claude or Messages-capable API upstreams. Antigravity uses its native v1internal protocol. `/v1/messages/count_tokens` is a local estimate, not exact vendor tokenization.
 
-Historical Antigravity converter tool tests do not establish compatibility for the new native path. Real Claude OAuth and the native Claude Code client remain unverified.
+Historical Antigravity converter tool tests do not establish compatibility for the new native path. The repository has no recorded live Claude OAuth or native Claude Code acceptance; see [compatibility](compatibility.md) for recorded scope.
 
 ## Codex / Responses
 
@@ -56,7 +56,7 @@ The client key belongs to FiftyAPI; the server handles upstream authorization. I
 
 HTTP/SSE uses `store:false` and full history. Native WebSocket supports `previous_response_id` within the same connection; reconnecting requires complete history. Requests on one connection are sequential; separate connections may run concurrently. API key upstreams require explicit WebSocket enablement and actual upstream support; otherwise set `supports_websockets=false`.
 
-The compact endpoint is implemented but availability must be confirmed separately. With the older client identity, the tested account returned HTTP 404; compact with the newer identity remains unverified. Do not assume automatic context compaction will work.
+The compact endpoint is implemented but availability must be confirmed separately. The tested account returned HTTP 404 with both client identities `0.146.0` and `0.164.0`. Do not assume automatic context compaction will work.
 
 ## API examples
 

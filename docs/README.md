@@ -22,7 +22,7 @@
 - **其他操作** · [发布包快速启动](release-quickstart.md)
 - **开发与发布** · [参与贡献](../CONTRIBUTING.md) · [维护与发布](maintaining.md) · [更新日志](../CHANGELOG.md) · [安全问题报告](../SECURITY.md)
 - **设计** · [架构](design.md) · [调度与重试](reliability-redesign.md) · [sub2api 功能取舍](upstream-migration.md)
-- **验证记录** · [开发探针](probe.md) · [OpenAI 验收](openai-acceptance.md) · [SQLite 压测](sqlite-load-test.md)
+- **验证记录** · [兼容性历史归档](compatibility-history.md) · [开发探针](probe.md) · [OpenAI 验收](openai-acceptance.md) · [SQLite 压测](sqlite-load-test.md)
 - **第三方来源** · [第三方声明](../THIRD_PARTY_NOTICES.md) · [sub2api 源码指纹](sub2api-source.json)
 
 </details>
