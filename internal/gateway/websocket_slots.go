@@ -12,49 +12,111 @@ const websocketExpireIdle = 5 * time.Minute
 // pending covers both queued and executing turns. All lease state is protected
 // by wsSlotsMu so admission cannot evict a socket while a new turn enters it.
 type websocketLease struct {
-	handler *Handler
-	user    int64
-	id      string
-	cancel  context.CancelFunc
-	last    time.Time
-	pending int
-	retired bool
+	handler   *Handler
+	user      int64
+	id        string
+	cancel    context.CancelFunc
+	last      time.Time
+	pending   int
+	retired   bool
+	ready     bool
+	counted   bool
+	replacing *websocketLease
+	claimedBy *websocketLease
 }
 
-func (h *Handler) acquireWebsocketLease(user int64, id string, cancel context.CancelFunc, now time.Time) *websocketLease {
+// Reserve capacity before the library handshake, but do not cancel an existing
+// socket until the handshake succeeds. A replacement shares its victim's slot.
+func (h *Handler) reserveWebsocketLease(user int64, id string, cancel context.CancelFunc, now time.Time) (*websocketLease, int) {
 	h.wsSlotsMu.Lock()
 	defer h.wsSlotsMu.Unlock()
 	if h.wsSlots == nil {
 		h.wsSlots = make(map[int64]map[string]*websocketLease)
 	}
 	slots := h.wsSlots[user]
+	used := 0
+	for _, slot := range slots {
+		if slot.counted {
+			used++
+		}
+	}
+	var victim *websocketLease
+	if used >= 4 {
+		for _, slot := range slots {
+			if slot.ready && slot.claimedBy == nil && slot.pending == 0 && now.Sub(slot.last) >= websocketReplaceIdle && (victim == nil || slot.last.Before(victim.last)) {
+				victim = slot
+			}
+		}
+		if victim == nil {
+			return nil, 429
+		}
+	}
+	if victim == nil && h.wsSlotCount >= 128 {
+		return nil, 503
+	}
 	if slots == nil {
 		slots = make(map[string]*websocketLease)
 		h.wsSlots[user] = slots
 	}
-	if len(slots) >= 4 {
-		var oldest *websocketLease
-		for _, slot := range slots {
-			if slot.pending == 0 && now.Sub(slot.last) >= websocketReplaceIdle && (oldest == nil || slot.last.Before(oldest.last)) {
-				oldest = slot
-			}
-		}
-		if oldest == nil {
-			return nil
-		}
-		oldest.retireLocked("replaced_idle", now)
-		// retire may remove the user's last map entry; preserve this admission map.
-		h.wsSlots[user] = slots
+	lease := &websocketLease{handler: h, user: user, id: id, cancel: cancel, last: now, replacing: victim, counted: victim == nil}
+	if victim != nil {
+		victim.claimedBy = lease
+	} else {
+		h.wsSlotCount++
 	}
-	lease := &websocketLease{handler: h, user: user, id: id, cancel: cancel, last: now}
 	slots[id] = lease
-	return lease
+	return lease, 0
+}
+func (l *websocketLease) activate(now time.Time) bool {
+	l.handler.wsSlotsMu.Lock()
+	defer l.handler.wsSlotsMu.Unlock()
+	if l.retired {
+		return false
+	}
+	if l.replacing != nil {
+		victim := l.replacing
+		// Activity may resume while the handshake is in progress. Protect old work.
+		if victim.pending != 0 || now.Sub(victim.last) < websocketReplaceIdle {
+			return false
+		}
+		victim.retireLocked("replaced_idle", now)
+	}
+	l.ready = true
+	l.last = now
+	return true
+}
+func (h *Handler) websocketCounts(user int64) (int, int) {
+	h.wsSlotsMu.Lock()
+	defer h.wsSlotsMu.Unlock()
+	used := 0
+	for _, slot := range h.wsSlots[user] {
+		if slot.counted {
+			used++
+		}
+	}
+	return used, h.wsSlotCount
 }
 func (l *websocketLease) retireLocked(reason string, now time.Time) {
 	if l.retired {
 		return
 	}
 	l.retired = true
+	if l.replacing != nil {
+		l.replacing.claimedBy = nil
+		l.replacing = nil
+	}
+	if l.counted {
+		l.handler.wsSlotCount--
+		l.counted = false
+	}
+	// If a victim closes naturally during a handshake, transfer its reservation.
+	if l.claimedBy != nil {
+		next := l.claimedBy
+		next.replacing = nil
+		next.counted = true
+		l.handler.wsSlotCount++
+		l.claimedBy = nil
+	}
 	slots := l.handler.wsSlots[l.user]
 	delete(slots, l.id)
 	if len(slots) == 0 {
@@ -71,7 +133,7 @@ func (l *websocketLease) release() {
 func (l *websocketLease) begin(now time.Time) bool {
 	l.handler.wsSlotsMu.Lock()
 	defer l.handler.wsSlotsMu.Unlock()
-	if l.retired {
+	if l.retired || !l.ready {
 		return false
 	}
 	l.pending++
@@ -90,7 +152,7 @@ func (l *websocketLease) expire(now time.Time) bool {
 	if l.retired {
 		return true
 	}
-	if l.pending == 0 && now.Sub(l.last) >= websocketExpireIdle {
+	if l.ready && l.claimedBy == nil && l.pending == 0 && now.Sub(l.last) >= websocketExpireIdle {
 		l.retireLocked("idle_timeout", now)
 		return true
 	}

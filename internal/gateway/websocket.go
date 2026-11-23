@@ -74,56 +74,38 @@ func (h *Handler) ServeWebSocket(w http.ResponseWriter, r *http.Request) {
 		failure(w, 508, rejection)
 		return
 	}
-	lease := h.acquireWebsocketLease(user.ID, id, cancel, time.Now())
+	lease, status := h.reserveWebsocketLease(user.ID, id, cancel, time.Now())
 	if lease == nil {
 		rejection = "同一用户最多保持 4 个 WebSocket 连接"
-		failure(w, 429, rejection)
+		if status == 503 {
+			rejection = "WebSocket 连接已满"
+		}
+		failure(w, status, rejection)
 		return
 	}
 	defer lease.release()
-	value, _ := h.wsUsers.LoadOrStore(user.ID, &atomic.Int32{})
-	count := value.(*atomic.Int32)
-	count.Add(1)
-	defer count.Add(-1)
-	if h.wsTotal.Add(1) > 128 {
-		h.wsTotal.Add(-1)
-		rejection = "WebSocket 连接已满"
-		failure(w, 503, rejection)
-		return
-	}
-	defer h.wsTotal.Add(-1)
+	controller := http.NewResponseController(w)
+	_ = controller.SetWriteDeadline(time.Now().Add(5 * time.Second))
 	conn, err := ws.Accept(w, r, &ws.AcceptOptions{CompressionMode: ws.CompressionDisabled})
+	_ = controller.SetWriteDeadline(time.Time{})
 	if err != nil {
 		return
 	}
 	accepted = true
+	if !lease.activate(time.Now()) {
+		log.Printf("WebSocket replacement aborted connection_id=%s reason=old_connection_active", id)
+		_ = conn.Close(ws.StatusTryAgainLater, "Connection became active; retry later")
+		return
+	}
 	// The ingress read loop handles pong frames even when no model turn is active.
 	// Canceling the connection context also cancels active work and releases slots.
-	go func() {
-		ticker := time.NewTicker(30 * time.Second)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				if lease.expire(time.Now()) {
-					return
-				}
-				pingCtx, stop := context.WithTimeout(ctx, 10*time.Second)
-				err := conn.Ping(pingCtx)
-				stop()
-				if err != nil {
-					log.Printf("WebSocket heartbeat failed connection_id=%s cause=%s", id, failureCategory(err))
-					cancel()
-					return
-				}
-			}
-		}
-	}()
-	log.Printf("WebSocket opened connection_id=%s user_id=%d user_connections=%d total_connections=%d", id, user.ID, count.Load(), h.wsTotal.Load())
+	go maintainClientWebsocket(ctx, conn, id, cancel, lease, 30*time.Second, 10*time.Second)
+	userConnections, totalConnections := h.websocketCounts(user.ID)
+	log.Printf("WebSocket opened connection_id=%s user_id=%d user_connections=%d total_connections=%d", id, user.ID, userConnections, totalConnections)
 	defer func() {
-		log.Printf("WebSocket released connection_id=%s user_id=%d user_connections_after=%d total_connections_after=%d duration_ms=%d", id, user.ID, count.Load()-1, h.wsTotal.Load()-1, time.Since(start).Milliseconds())
+		lease.release()
+		users, total := h.websocketCounts(user.ID)
+		log.Printf("WebSocket released connection_id=%s user_id=%d user_connections_after=%d total_connections_after=%d duration_ms=%d", id, user.ID, users, total, time.Since(start).Milliseconds())
 	}()
 	defer conn.CloseNow()
 	conn.SetReadLimit(4 << 20)
@@ -464,5 +446,28 @@ func (h *Handler) ShutdownWebSockets(ctx context.Context) error {
 		return nil
 	case <-ctx.Done():
 		return ctx.Err()
+	}
+}
+
+func maintainClientWebsocket(ctx context.Context, conn *ws.Conn, id string, cancel context.CancelFunc, lease *websocketLease, interval, timeout time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if lease.expire(time.Now()) {
+				return
+			}
+			pingCtx, stop := context.WithTimeout(ctx, timeout)
+			err := conn.Ping(pingCtx)
+			stop()
+			if err != nil {
+				log.Printf("WebSocket heartbeat failed connection_id=%s cause=%s", id, failureCategory(err))
+				cancel()
+				return
+			}
+		}
 	}
 }

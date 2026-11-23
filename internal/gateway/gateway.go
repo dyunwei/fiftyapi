@@ -34,8 +34,7 @@ type Handler struct {
 	wsID         atomic.Uint64
 	wsSlotsMu    sync.Mutex
 	wsSlots      map[int64]map[string]*websocketLease
-	wsUsers      sync.Map
-	wsTotal      atomic.Int32
+	wsSlotCount  int
 	wsQueueBytes atomic.Int64
 	cooldowns    sync.Map
 	client       func(providers.Config) *http.Client

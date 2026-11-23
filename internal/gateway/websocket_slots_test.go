@@ -18,10 +18,10 @@ func TestWebsocketSlotsProtectWorkAndRetireIdle(t *testing.T) {
 	for i := range slots {
 		ctx, cancel := context.WithCancel(context.Background())
 		contexts[i] = ctx
-		slots[i] = h.acquireWebsocketLease(1, string(rune('a'+i)), cancel, now)
+		slots[i] = h.acquireTestWebsocketLease(1, string(rune('a'+i)), cancel, now)
 		defer slots[i].release()
 	}
-	if h.acquireWebsocketLease(1, "new", func() {}, now) != nil {
+	if h.acquireTestWebsocketLease(1, "new", func() {}, now) != nil {
 		t.Fatal("fresh sockets evicted")
 	}
 	for _, slot := range slots {
@@ -29,14 +29,14 @@ func TestWebsocketSlotsProtectWorkAndRetireIdle(t *testing.T) {
 			t.Fatal("begin failed")
 		}
 	}
-	if h.acquireWebsocketLease(1, "new", func() {}, now.Add(10*time.Minute)) != nil {
+	if h.acquireTestWebsocketLease(1, "new", func() {}, now.Add(10*time.Minute)) != nil {
 		t.Fatal("queued/active work evicted")
 	}
 	if slots[0].expire(now.Add(10 * time.Minute)) {
 		t.Fatal("busy socket expired")
 	}
 	slots[0].finish(now)
-	replacement := h.acquireWebsocketLease(1, "replacement", func() {}, now.Add(time.Minute))
+	replacement := h.acquireTestWebsocketLease(1, "replacement", func() {}, now.Add(time.Minute))
 	if replacement == nil || contexts[0].Err() == nil {
 		t.Fatal("idle socket not replaced")
 	}
@@ -145,7 +145,8 @@ func TestQuotaRecoveryCanReplaceIdleSocketsWithoutRestart(t *testing.T) {
 		g.h.wsSlotsMu.Lock()
 		left := len(g.h.wsSlots)
 		g.h.wsSlotsMu.Unlock()
-		if left == 0 && g.h.wsTotal.Load() == 0 && g.h.wsQueueBytes.Load() == 0 {
+		_, total := g.h.websocketCounts(g.user)
+		if left == 0 && total == 0 && g.h.wsQueueBytes.Load() == 0 {
 			break
 		}
 		select {
@@ -154,4 +155,13 @@ func TestQuotaRecoveryCanReplaceIdleSocketsWithoutRestart(t *testing.T) {
 		case <-time.After(time.Millisecond):
 		}
 	}
+}
+
+func (h *Handler) acquireTestWebsocketLease(user int64, id string, cancel context.CancelFunc, now time.Time) *websocketLease {
+	lease, _ := h.reserveWebsocketLease(user, id, cancel, now)
+	if lease != nil && !lease.activate(now) {
+		lease.release()
+		return nil
+	}
+	return lease
 }
