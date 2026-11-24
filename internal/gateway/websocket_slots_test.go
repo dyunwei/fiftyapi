@@ -106,6 +106,27 @@ func TestQuotaRecoveryCanReplaceIdleSocketsWithoutRestart(t *testing.T) {
 	if response == nil || response.StatusCode != 429 {
 		t.Fatal("wrong cap rejection")
 	}
+	for {
+		logs, err := g.s.LogsPage(ctx, g.user, false, 0, "", 429, "", 0, response.Header.Get("X-Request-ID"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(logs) == 1 {
+			entry := logs[0]
+			d := entry.Diagnostics
+			if entry.Amount == nil || *entry.Amount != 0 || d == nil || d.Dispatched ||
+				d.Code != "websocket_connection_limit_reached" || d.ConnectionLimit == nil ||
+				d.ConnectionLimit.Used != 4 || d.ConnectionLimit.Limit != 4 {
+				t.Fatalf("incorrect connection limit diagnostic: %+v", d)
+			}
+			break
+		}
+		select {
+		case <-ctx.Done():
+			t.Fatal("missing connection limit diagnostic")
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
 	// Advance lease idle ages without a wall-clock wait, once quota refusals finish.
 	for {
 		g.h.wsSlotsMu.Lock()
@@ -160,7 +181,7 @@ func TestQuotaRecoveryCanReplaceIdleSocketsWithoutRestart(t *testing.T) {
 }
 
 func (h *Handler) acquireTestWebsocketLease(user int64, id string, cancel context.CancelFunc, now time.Time) *websocketLease {
-	lease, _ := h.reserveWebsocketLease(user, id, cancel, now)
+	lease, _, _ := h.reserveWebsocketLease(user, id, cancel, now)
 	if lease != nil && !lease.activate(now) {
 		lease.release()
 		return nil
@@ -176,18 +197,18 @@ func TestConfiguredWebsocketUserLimit(t *testing.T) {
 		h := &Handler{websocketUserLimit: limit}
 		now := time.Now()
 		for i := 0; i < limit; i++ {
-			lease, status := h.reserveWebsocketLease(1, fmt.Sprint(i), func() {}, now)
+			lease, status, _ := h.reserveWebsocketLease(1, fmt.Sprint(i), func() {}, now)
 			if lease == nil || status != 0 || !lease.activate(now) {
 				t.Fatalf("limit %d: connection %d rejected, status %d", limit, i, status)
 			}
 		}
-		if lease, status := h.reserveWebsocketLease(1, "overflow", func() {}, now); lease != nil || status != 429 {
+		if lease, status, _ := h.reserveWebsocketLease(1, "overflow", func() {}, now); lease != nil || status != 429 {
 			t.Fatalf("limit %d: overflow accepted or wrong status %d", limit, status)
 		}
-		if lease, status := h.reserveWebsocketLease(2, "other-user", func() {}, now); lease == nil || status != 0 {
+		if lease, status, _ := h.reserveWebsocketLease(2, "other-user", func() {}, now); lease == nil || status != 0 {
 			t.Fatalf("limit %d: other user rejected, status %d", limit, status)
 		}
-		replacement, status := h.reserveWebsocketLease(1, "replacement", func() {}, now.Add(time.Minute))
+		replacement, status, _ := h.reserveWebsocketLease(1, "replacement", func() {}, now.Add(time.Minute))
 		if replacement == nil || status != 0 || !replacement.activate(now.Add(time.Minute)) {
 			t.Fatalf("limit %d: idle replacement rejected, status %d", limit, status)
 		}

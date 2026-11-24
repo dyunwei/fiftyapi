@@ -50,6 +50,7 @@ Tests use simulated upstreams and temporary databases by default without consumi
 | Antigravity catalog tests | 2026-11-18, identity `2.23.0`, fixture model `native-probe-model`; native previews, default inference origin, 429/RetryInfo, safe redaction and no duplicate invocation |
 | Client transport checks | Python 3.11 helper, local gateway and simulated HTTP; Responses/Messages SSE timing, event coalescing detection and WebSocket handshakes. Covers client-to-gateway transport without native clients or model inference |
 | Administration and operations | Setup, roles/CSRF, migrations, credential encryption, log isolation, mail and backup restoration; Chinese/English browser flows and mobile layouts |
+| In-place Compose upgrade | v0.3.0 and v0.3.1 containers to the current build using a Python 3 test client, simulated upstream, and fixture model `upgrade-model`. Covers an in-flight Responses WebSocket request, reconnect, existing key, reservation release, and HTTP JSON settlement. No native client or live provider was exercised. |
 
 These simulations establish no additional live-provider compatibility. Catalog synchronization, candidate client identities and client-to-gateway transport checks do not establish model inference acceptance.
 

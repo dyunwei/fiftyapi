@@ -70,3 +70,11 @@ jobs:
         run: python3 scripts/docker-smoke.py
       - name: Bind mount permissions, automatic secrets and container recreation
         run: FIFTYAPI_TEST_AUTO_SECRETS=1 FIFTYAPI_TEST_BIND_MOUNT=1 python3 scripts/docker-smoke.py
+      - name: Build previous release for upgrade verification
+        run: |
+          baseline="$(mktemp -d)"
+          git fetch --depth=1 origin e19d116ac9205f17feb6d186a8c27fff69e8caed
+          git archive e19d116ac9205f17feb6d186a8c27fff69e8caed | tar -x -C "$baseline"
+          docker build -t fiftyapi:upgrade-baseline "$baseline"
+      - name: Upgrade the running Compose service with existing data
+        run: python3 scripts/docker-upgrade.py

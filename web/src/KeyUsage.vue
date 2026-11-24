@@ -2,14 +2,35 @@
 import {computed,onMounted,ref,watch} from 'vue'
 import {t} from './i18n.js'
 import {clientSnippets,setupCommand,restoreCommand,checkCommand} from './client-usage.js'
-const props=defineProps({api:{type:Function,required:true},token:{type:String,default:''},keyName:{type:String,default:''}})
-defineEmits(['copy'])
+const props=defineProps({api:{type:Function,required:true},token:{type:String,default:''},keyName:{type:String,default:''},admin:Boolean})
+defineEmits(['copy','navigate'])
 const client=ref('codex'),system=ref(/win/i.test(navigator.platform)?'windows':'unix'),keyValue=ref(props.token),model=ref(''),websocket=ref(false),models=ref([]),loading=ref(true),loadError=ref('')
 const setup=computed(()=>setupCommand({origin,client:client.value,system:system.value,model:model.value,websocket:websocket.value}))
 const restore=computed(()=>restoreCommand({client:client.value,system:system.value}))
 const origin=window.location.origin
 const check=computed(()=>checkCommand({origin,client:client.value,system:system.value}))
-const protocol=computed(()=>client.value==='claude'?'messages':'responses')
+const protocol=computed(()=>({claude:'messages',api:'chat',codex:'responses'})[client.value])
+const readiness=ref(''),readinessFailed=ref(false)
+watch(protocol,async(value,_,onCleanup)=>{
+ let current=true
+ onCleanup(()=>{current=false})
+ readiness.value=''
+ readinessFailed.value=false
+ try{
+  const result=await props.api('/client-readiness?protocol='+value)
+  if(current)readiness.value=result.code
+ }catch(e){if(current&&e.name!=='AbortError')readinessFailed.value=true}
+},{immediate:true})
+const blockers={
+ upstream:['暂无已同步模型的可用上游账号。','accounts','上游账号'],
+ model_disabled:['当前有上游模型，但没有启用任何模型。','models','模型与价格'],
+ price:['可用的上游模型尚未定价。','models','模型与价格'],
+ access:['当前账号没有可用模型的访问权限。','users','团队成员'],
+ budget_unassigned:['当前账号尚未分配额度。','users','团队成员'],
+ budget_exhausted:['当前账号可用额度不足，等额度重置或在途请求结束后再试。','overview','仪表盘'],
+ protocol:['当前客户端的协议没有匹配的可用模型。','models','可用模型'],
+}
+const blocker=computed(()=>blockers[readiness.value])
 const available=computed(()=>models.value.filter(m=>(m.protocols?.length?m.protocols:[m.protocol]).includes(protocol.value)))
 watch(available,list=>{if(!list.some(m=>m.id===model.value))model.value=list[0]?.id||''},{immediate:true})
 const snippets=computed(()=>clientSnippets({origin:window.location.origin,client:client.value,system:system.value,token:keyValue.value,model:model.value,websocket:websocket.value}))
@@ -29,7 +50,14 @@ onMounted(async()=>{try{models.value=await props.api('/models')}catch(e){if(e.na
   </div>
   <p class="subtle">{{ t('从密钥列表进入时自动填入可复制的密钥；也可粘贴其他密钥。留空时示例使用占位符。') }}</p>
   <p v-if="loadError" class="subtle" role="status">{{ loadError }}</p>
-  <p v-if="!loading&&!available.length&&client!=='api'" class="notice">{{ t('暂无匹配协议的可用模型，请联系管理员配置模型、价格与额度。') }}</p>
+  <div v-if="blocker" class="notice" role="status">
+   {{ t(blocker[0]) }}
+   <button v-if="admin||blocker[1]==='overview'" type="button" class="text-button" @click="$emit('navigate',blocker[1])">{{ t(blocker[2]) }}</button>
+   <span v-else-if="readiness==='protocol'">{{ t('请选择与可用模型协议匹配的客户端，或联系管理员。') }}</span>
+   <span v-else>{{ t('请联系管理员处理。') }}</span>
+  </div>
+  <p v-else-if="readinessFailed" class="subtle" role="status">{{ t('无法检查接入条件，请稍后重试。') }}</p>
+  <p v-else-if="readiness==='ready'&&client!=='api'&&model&&!loading&&!available.some(m=>m.id===model)" class="notice" role="status">{{ t('所填模型不在当前客户端的可用列表中，请选择列表中的模型。') }}</p>
   <template v-if="client!=='api'">
    <section class="usage-code setup-command"><header><strong>{{ t('一键配置') }}</strong><button type="button" class="secondary" @click="$emit('copy',setup)">{{ t('复制') }}</button></header><pre><code>{{ setup }}</code></pre></section>
    <p class="notice">{{ t('在使用客户端的终端执行，按提示粘贴密钥即可自动配置，无需手动编辑文件。VS Code 用户请使用对应窗口的终端；Remote SSH 会配置远端用户。完成后重新加载窗口并新建会话。') }}</p>

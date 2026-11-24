@@ -98,6 +98,8 @@ The member overview shows which budget windows have no allocation, are exhausted
 
 ## Client connection check
 
+In **API Keys → Use**, select a client to see the first blocker across upstream availability, enabled and priced models, model access, budget, and protocol. Administrators can go directly to the relevant page. This check reads the signed-in user's configuration and budget. After setting up the client, run the command below to verify its connection.
+
 Copy the command for your platform and client from **Use API key → Client connection check**. You can also download the current `/setup.py` from your site and run `python3.11 fiftyapi-setup.py check codex` or `python3.11 fiftyapi-setup.py check claude`. On Windows use `py -3.11`.
 
 Run it as the same user and in the same terminal environment used to configure the client. The helper compares the local configuration with the saved setup and checks connectivity, API key acceptance and model protocol through `/v1/models`. It does not edit configuration, send inference requests or print secrets. For Codex it reports whether WebSocket is configured. Open **Request diagnostics** in the request log to see the observed transport. [Request diagnostics](administration.md#request-diagnostics)

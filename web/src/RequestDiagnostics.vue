@@ -15,6 +15,7 @@ const advice = {
   pending_usage: '该历史请求因待核算被拒绝，可以重新发起调用。',
   upstream_rate_limit: '上游暂时限制调用。请在建议时间后重试；若持续发生，请联系管理员。',
   client_websocket_handshake: '客户端与网关的 WebSocket 握手失败。请确认客户端已启用 WebSocket，并检查反向代理的升级设置。',
+  websocket_connection_limit_reached: 'WebSocket 握手时连接数已满。关闭不用的客户端会话，或等待名额释放后重试。',
   upstream_websocket_handshake: '网关未能与上游建立 WebSocket。请把诊断发给管理员检查上游配置。',
   stream_interrupted: '流式响应未完成。请先检查已有输出和结算状态，再决定是否重试。',
   client_cancelled: '连接在处理完成前已取消。若未主动取消，请检查客户端超时与连接。',
@@ -30,6 +31,7 @@ const fields = computed(() => {
     [t('网关 → 上游'), requestTransport(d?.upstream_transport, d && !d.dispatched ? '未发送' : '未记录')],
     [t('状态'), props.log.status || t('未记录')],
   ]
+  if (d?.connection_limit) rows.push([t('握手时的连接数 / 上限'), `${d.connection_limit.used} / ${d.connection_limit.limit}`])
   if (d?.dispatched) {
     rows.push([t('输出状态'), t(d.output_started ? '已观察到输出' : '未观察到输出')])
     rows.push([t('请求完成状态'), t(d.completed ? '已完成' : '未完成')])

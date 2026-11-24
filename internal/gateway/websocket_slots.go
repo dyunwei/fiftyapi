@@ -27,7 +27,7 @@ type websocketLease struct {
 
 // Reserve capacity before the library handshake, but do not cancel an existing
 // socket until the handshake succeeds. A replacement shares its victim's slot.
-func (h *Handler) reserveWebsocketLease(user int64, id string, cancel context.CancelFunc, now time.Time) (*websocketLease, int) {
+func (h *Handler) reserveWebsocketLease(user int64, id string, cancel context.CancelFunc, now time.Time) (*websocketLease, int, int) {
 	h.wsSlotsMu.Lock()
 	defer h.wsSlotsMu.Unlock()
 	if h.wsSlots == nil {
@@ -48,11 +48,11 @@ func (h *Handler) reserveWebsocketLease(user int64, id string, cancel context.Ca
 			}
 		}
 		if victim == nil {
-			return nil, 429
+			return nil, 429, used
 		}
 	}
 	if victim == nil && h.wsSlotCount >= 128 {
-		return nil, 503
+		return nil, 503, used
 	}
 	if slots == nil {
 		slots = make(map[string]*websocketLease)
@@ -65,7 +65,7 @@ func (h *Handler) reserveWebsocketLease(user int64, id string, cancel context.Ca
 		h.wsSlotCount++
 	}
 	slots[id] = lease
-	return lease, 0
+	return lease, 0, used
 }
 func (l *websocketLease) activate(now time.Time) bool {
 	l.handler.wsSlotsMu.Lock()

@@ -148,6 +148,7 @@ func (a *API) Handler() http.Handler {
 	mux.HandleFunc("POST /api/keys/{id}/reveal", a.protect(false, true, a.revealKey))
 	mux.HandleFunc("POST /api/keys/{id}/revoke", a.protect(false, true, a.revokeKey))
 	mux.HandleFunc("DELETE /api/keys/{id}", a.protect(false, true, a.deleteKey))
+	mux.HandleFunc("GET /api/client-readiness", a.protect(false, false, a.clientReadiness))
 	mux.HandleFunc("GET /api/models", a.protect(false, false, a.models))
 	mux.HandleFunc("GET /api/admin/models", a.protect(true, false, a.models))
 	mux.HandleFunc("PUT /api/admin/models", a.protect(true, true, a.setModel))

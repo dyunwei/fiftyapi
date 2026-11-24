@@ -50,6 +50,7 @@ OpenAI 的日期、身份、模型与复现条件见 [OpenAI 验收](openai-acce
 | Antigravity 目录测试 | 2026-11-18，身份 `2.23.0`、fixture 模型 `native-probe-model`；原生请求预览、默认推理地址、429/RetryInfo、安全脱敏与不重复调用 |
 | 客户端传输自检 | Python 3.11 助手、本机网关及模拟 HTTP；Responses/Messages SSE 间隔、事件合并检测、WebSocket 握手。只验证客户端到网关，不运行原生客户端或模型推理 |
 | 管理与运维 | 初始化、权限/CSRF、迁移、凭据加密、日志隔离、邮件、备份恢复；浏览器覆盖中英文和移动端布局 |
+| Compose 原地升级 | v0.3.0、v0.3.1 容器到当前版本，使用 Python 3 测试客户端、模拟上游和夹具模型 `upgrade-model`。覆盖 Responses WebSocket 在途请求、重连、原 Key、额度预占释放及 HTTP JSON 结算。未运行原生客户端或真实供应商。 |
 
 上述模拟验证不新增真实供应商兼容保证。目录同步、客户端身份候选版本及客户端到网关的传输自检，都不等于模型推理验收。
 

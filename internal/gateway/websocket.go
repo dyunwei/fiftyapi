@@ -41,6 +41,8 @@ func (h *Handler) ServeWebSocket(w http.ResponseWriter, r *http.Request) {
 	w = tracked
 	w.Header().Set("X-Request-ID", id)
 	accepted := false
+	var connectionLimit *store.ConnectionLimit
+	code := "client_websocket_handshake"
 	rejection := "客户端 WebSocket 握手失败"
 	defer func() {
 		if accepted {
@@ -49,7 +51,7 @@ func (h *Handler) ServeWebSocket(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 3*time.Second)
 		defer cancel()
 		zero := int64(0)
-		d := &store.RequestDiagnostics{Protocol: "responses", ClientTransport: httpTransport(w.Header().Get("Content-Type")), Code: "client_websocket_handshake"}
+		d := &store.RequestDiagnostics{Protocol: "responses", ClientTransport: httpTransport(w.Header().Get("Content-Type")), Code: code, ConnectionLimit: connectionLimit}
 		summary := fmt.Sprintf("WebSocket handshake rejected request_id=%s status=%d reason=%s", id, tracked.status, rejection)
 		log.Print(summary)
 		h.store.RecordRuntime(ctx, store.RuntimeLog{Level: "warn", Module: "gateway", Event: "websocket_handshake_rejected", Message: summary, Status: tracked.status})
@@ -74,8 +76,12 @@ func (h *Handler) ServeWebSocket(w http.ResponseWriter, r *http.Request) {
 		failure(w, 508, rejection)
 		return
 	}
-	lease, status := h.reserveWebsocketLease(user.ID, id, cancel, time.Now())
+	lease, status, used := h.reserveWebsocketLease(user.ID, id, cancel, time.Now())
 	if lease == nil {
+		if status == http.StatusTooManyRequests {
+			code = "websocket_connection_limit_reached"
+			connectionLimit = &store.ConnectionLimit{Used: used, Limit: h.websocketConnectionLimit()}
+		}
 		rejection = fmt.Sprintf("同一用户最多保持 %d 个 WebSocket 连接", h.websocketConnectionLimit())
 		if status == 503 {
 			rejection = "WebSocket 连接已满"

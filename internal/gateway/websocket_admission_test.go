@@ -19,7 +19,7 @@ func TestWebsocketAdmissionRollbackAndBusyVictim(t *testing.T) {
 	for i := 0; i < 4; i++ {
 		original = append(original, h.acquireTestWebsocketLease(1, fmt.Sprint(i), func() {}, now))
 	}
-	next, status := h.reserveWebsocketLease(1, "failed", func() {}, now.Add(time.Minute))
+	next, status, _ := h.reserveWebsocketLease(1, "failed", func() {}, now.Add(time.Minute))
 	if status != 0 || next == nil {
 		t.Fatal(status)
 	}
@@ -35,7 +35,7 @@ func TestWebsocketAdmissionRollbackAndBusyVictim(t *testing.T) {
 	if user, total := h.websocketCounts(1); user != 4 || total != 4 {
 		t.Fatal(user, total)
 	}
-	next, _ = h.reserveWebsocketLease(1, "busy", func() {}, now.Add(time.Minute))
+	next, _, _ = h.reserveWebsocketLease(1, "busy", func() {}, now.Add(time.Minute))
 	victim := next.replacing
 	if !victim.begin(now) {
 		t.Fatal("old connection could not accept work during handshake")
@@ -65,10 +65,10 @@ func TestWebsocketReplacementAtGlobalCapacity(t *testing.T) {
 			all = append(all, h.acquireTestWebsocketLease(user, fmt.Sprint(i), func() {}, now))
 		}
 	}
-	if lease, status := h.reserveWebsocketLease(99, "overflow", func() {}, now); lease != nil || status != 503 {
+	if lease, status, _ := h.reserveWebsocketLease(99, "overflow", func() {}, now); lease != nil || status != 503 {
 		t.Fatal("global cap not enforced", status)
 	}
-	replacement, status := h.reserveWebsocketLease(1, "replacement", func() {}, now.Add(time.Minute))
+	replacement, status, _ := h.reserveWebsocketLease(1, "replacement", func() {}, now.Add(time.Minute))
 	if replacement == nil || status != 0 {
 		t.Fatal("replacement needs an extra global slot", status)
 	}
@@ -80,7 +80,7 @@ func TestWebsocketReplacementAtGlobalCapacity(t *testing.T) {
 	if _, total := h.websocketCounts(1); total != 128 {
 		t.Fatal(total)
 	}
-	replacement, status = h.reserveWebsocketLease(1, "accepted", func() {}, now.Add(time.Minute))
+	replacement, status, _ = h.reserveWebsocketLease(1, "accepted", func() {}, now.Add(time.Minute))
 	if status != 0 || replacement == nil {
 		t.Fatal(status)
 	}
@@ -111,7 +111,7 @@ func TestWebsocketVictimClosesDuringHandshake(t *testing.T) {
 	for i := 0; i < 4; i++ {
 		leases = append(leases, h.acquireTestWebsocketLease(1, fmt.Sprint(i), func() {}, now))
 	}
-	next, _ := h.reserveWebsocketLease(1, "new", func() {}, now.Add(time.Minute))
+	next, _, _ := h.reserveWebsocketLease(1, "new", func() {}, now.Add(time.Minute))
 	next.replacing.release()
 	if next.replacing != nil || !next.counted {
 		t.Fatal("reservation not transferred")
@@ -177,7 +177,7 @@ func TestClientHeartbeatTimeoutReleasesAdmission(t *testing.T) {
 		defer close(done)
 		ctx, cancel := context.WithCancel(r.Context())
 		defer cancel()
-		lease, _ := h.reserveWebsocketLease(1, "heartbeat", cancel, time.Now())
+		lease, _, _ := h.reserveWebsocketLease(1, "heartbeat", cancel, time.Now())
 		defer lease.release()
 		conn, err := ws.Accept(w, r, nil)
 		if err != nil {
@@ -216,7 +216,7 @@ func TestWebsocketConcurrentAdmissionBounded(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			lease, _ := h.reserveWebsocketLease(int64(i%40), fmt.Sprint(i), func() {}, time.Now())
+			lease, _, _ := h.reserveWebsocketLease(int64(i%40), fmt.Sprint(i), func() {}, time.Now())
 			if lease == nil {
 				return
 			}

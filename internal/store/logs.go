@@ -23,16 +23,22 @@ type QuotaBlock struct {
 	ResetAt *int64 `json:"reset_at,omitempty"`
 }
 
+type ConnectionLimit struct {
+	Used  int `json:"used"`
+	Limit int `json:"limit"`
+}
+
 type RequestDiagnostics struct {
-	Protocol          string       `json:"protocol,omitempty"`
-	ClientTransport   string       `json:"client_transport,omitempty"`
-	UpstreamTransport string       `json:"upstream_transport,omitempty"`
-	Code              string       `json:"code,omitempty"`
-	RetryAt           int64        `json:"retry_at,omitempty"`
-	Quota             []QuotaBlock `json:"quota,omitempty"`
-	Dispatched        bool         `json:"dispatched"`
-	OutputStarted     bool         `json:"output_started"`
-	Completed         bool         `json:"completed"`
+	ConnectionLimit   *ConnectionLimit `json:"connection_limit,omitempty"`
+	Protocol          string           `json:"protocol,omitempty"`
+	ClientTransport   string           `json:"client_transport,omitempty"`
+	UpstreamTransport string           `json:"upstream_transport,omitempty"`
+	Code              string           `json:"code,omitempty"`
+	RetryAt           int64            `json:"retry_at,omitempty"`
+	Quota             []QuotaBlock     `json:"quota,omitempty"`
+	Dispatched        bool             `json:"dispatched"`
+	OutputStarted     bool             `json:"output_started"`
+	Completed         bool             `json:"completed"`
 }
 
 type RequestLog struct {

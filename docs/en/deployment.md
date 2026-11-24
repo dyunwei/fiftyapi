@@ -108,6 +108,8 @@ This path also serves HTTP POST. Configure the remaining paths and your domain/H
 
 ## Upgrade and rollback
 
+For a Docker Compose upgrade, run `docker compose up -d --build`. Check health with `docker compose ps fiftyapi` and look for startup or migration errors with `docker compose logs --tail 100 fiftyapi`. Once healthy, run the client connection check with an existing key to verify model discovery and WebSocket handshakes. CI exercises container replacement, key and budget persistence, interrupted reservations, and reconnection with an isolated volume and a simulated upstream.
+
 1. Stop the service and back up the database, any existing WAL/SHM files, and the original master key.
 2. Replace the binary or rebuild the container using the same data path and key.
 3. Start one instance; migrations apply automatically. FiftyAPI v0.3.1 uses schema 23.

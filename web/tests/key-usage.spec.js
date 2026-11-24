@@ -11,6 +11,7 @@ test.beforeEach(async({page})=>{
     '/api/version':{version:'0.1.0'},'/api/setup/status':{initialized:true},
     '/api/me':{user:{id:1,username:'member',role:'member',enabled:true},csrf_token:'fixture'},
     '/api/quota':[],
+    '/api/client-readiness':{code:'ready'},
     '/api/keys':route.request().method()==='POST'?{token}:[{id:1,name:'My client',prefix:'sk-aaaaaaaaa',suffix:'aaaa',copyable:true,enabled:true,created_at:1}],
     '/api/keys/1/reveal':{token},
     '/api/models':[{id:'team/codex',protocols:['responses']},{id:'team/claude',protocols:['messages']}]
@@ -105,4 +106,17 @@ test('desktop key and WebSocket share a row and restore adapts to the selected s
  await dialog.locator('.restore-guide summary').click()
  await expect(dialog.locator('.restore-guide pre')).toHaveText('python3.11 ~/.fiftyapi-helper/helper.py restore codex')
  await expect(dialog.locator('.restore-guide')).toContainText('首次通过助手接入 FiftyAPI 前')
+})
+
+
+test('client readiness shows the first blocker and updates when switching clients',async({page})=>{
+ await page.route('http://fiftyapi.test/api/client-readiness?*',route=>{
+  const protocol=new URL(route.request().url()).searchParams.get('protocol')
+  return route.fulfill({json:{code:protocol==='responses'?'price':'protocol'}})
+ })
+ await page.getByRole('button',{name:'使用说明',exact:true}).click()
+ const dialog=page.getByRole('dialog')
+ await expect(dialog.getByRole('status')).toContainText('可用的上游模型尚未定价。')
+ await dialog.getByRole('button',{name:'Claude Code',exact:true}).click()
+ await expect(dialog.getByRole('status')).toContainText('当前客户端的协议没有匹配的可用模型。')
 })
