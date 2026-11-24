@@ -76,7 +76,7 @@ func (h *Handler) ServeWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 	lease, status := h.reserveWebsocketLease(user.ID, id, cancel, time.Now())
 	if lease == nil {
-		rejection = "同一用户最多保持 4 个 WebSocket 连接"
+		rejection = fmt.Sprintf("同一用户最多保持 %d 个 WebSocket 连接", h.websocketConnectionLimit())
 		if status == 503 {
 			rejection = "WebSocket 连接已满"
 		}

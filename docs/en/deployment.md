@@ -28,6 +28,7 @@ The local helper saves its master key and setup token under `.local/` and reuses
 | `FIFTYAPI_DB_PATH` | Database path, e.g. `data/fiftyapi.db` |
 | `FIFTYAPI_LISTEN` | Listen address, e.g. `127.0.0.1:8080` |
 | `FIFTYAPI_COOKIE_SECURE` | Set `true` when serving through HTTPS |
+| `FIFTYAPI_WEBSOCKET_USER_LIMIT` | Client WebSocket connections per user, shared by all keys. Default `32`, range `1–128`. Recreate the container or restart the process after changes; global limit remains 128 |
 | `FIFTYAPI_PUBLIC_URL` | Public site origin used for invitation links |
 | `TZ` | Service timezone, including scheduled tasks |
 

@@ -29,6 +29,7 @@ Rocky Linux 启用 SELinux 时，默认 Docker 命名卷可直接使用；若选
 | `FIFTYAPI_DATA_DIR` | 默认 `data`；容器默认 `/data`，用于自动选择数据库文件 |
 | `FIFTYAPI_LISTEN` | 默认 `127.0.0.1:8080` |
 | `FIFTYAPI_COOKIE_SECURE` | HTTPS 部署设 `true`；HTTP（包括内网）设 `false` |
+| `FIFTYAPI_WEBSOCKET_USER_LIMIT` | 每用户客户端 WebSocket 连接上限，默认 `32`，范围 `1–128`；该用户所有 Key 共用，修改后需重建容器或重启进程；全局上限仍为 128 |
 
 主密钥错误会拒绝启动，不会覆盖已有凭据。管理员和普通用户密码均为 8–72 字节，使用 bcrypt；会话有效期 12 小时，Cookie HttpOnly/SameSiteStrict，写操作需 CSRF，管理接口校验角色。
 

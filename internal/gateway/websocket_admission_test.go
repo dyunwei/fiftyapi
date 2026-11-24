@@ -13,7 +13,7 @@ import (
 )
 
 func TestWebsocketAdmissionRollbackAndBusyVictim(t *testing.T) {
-	h := &Handler{}
+	h := &Handler{websocketUserLimit: 4}
 	now := time.Now()
 	var original []*websocketLease
 	for i := 0; i < 4; i++ {
@@ -57,7 +57,7 @@ func TestWebsocketAdmissionRollbackAndBusyVictim(t *testing.T) {
 }
 
 func TestWebsocketReplacementAtGlobalCapacity(t *testing.T) {
-	h := &Handler{}
+	h := &Handler{websocketUserLimit: 4}
 	now := time.Now()
 	var all []*websocketLease
 	for user := int64(1); user <= 32; user++ {
@@ -105,7 +105,7 @@ func TestWebsocketReplacementAtGlobalCapacity(t *testing.T) {
 }
 
 func TestWebsocketVictimClosesDuringHandshake(t *testing.T) {
-	h := &Handler{}
+	h := &Handler{websocketUserLimit: 4}
 	now := time.Now()
 	var leases []*websocketLease
 	for i := 0; i < 4; i++ {
@@ -127,6 +127,7 @@ func TestWebsocketVictimClosesDuringHandshake(t *testing.T) {
 
 func TestInvalidWebsocketHandshakePreservesIdleConnections(t *testing.T) {
 	g, server := websocketGateway(t, func(http.ResponseWriter, *http.Request) { t.Error("unexpected inference") })
+	g.h.websocketUserLimit = 4
 	var conns []*ws.Conn
 	for i := 0; i < 4; i++ {
 		conns = append(conns, dialGatewayWS(t, g, server))
@@ -170,7 +171,7 @@ func TestInvalidWebsocketHandshakePreservesIdleConnections(t *testing.T) {
 }
 
 func TestClientHeartbeatTimeoutReleasesAdmission(t *testing.T) {
-	h := &Handler{}
+	h := &Handler{websocketUserLimit: 4}
 	done := make(chan struct{})
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer close(done)
@@ -209,7 +210,7 @@ func TestClientHeartbeatTimeoutReleasesAdmission(t *testing.T) {
 }
 
 func TestWebsocketConcurrentAdmissionBounded(t *testing.T) {
-	h := &Handler{}
+	h := &Handler{websocketUserLimit: 4}
 	var wg sync.WaitGroup
 	for i := 0; i < 256; i++ {
 		wg.Add(1)

@@ -474,6 +474,8 @@
   "网关暂不可用": "Gateway temporarily unavailable",
   "检测到网关转发循环": "Gateway forwarding loop detected",
   "同一用户最多保持 4 个 WebSocket 连接": "At most 4 WebSocket connections per user",
+  "同一用户最多保持 %d 个 WebSocket 连接": "At most %d WebSocket connections per user",
+  "FIFTYAPI_WEBSOCKET_USER_LIMIT 必须为 1 到 128 的整数": "FIFTYAPI_WEBSOCKET_USER_LIMIT must be an integer from 1 to 128",
   "WebSocket 连接已满": "WebSocket connection limit reached",
   "当前连接没有该响应上下文，请设置 previous_response_id:null 并发送完整历史": "This connection has no context for that response. Set previous_response_id:null and send full history.",
   "response.create 必须指定模型": "response.create requires a model",

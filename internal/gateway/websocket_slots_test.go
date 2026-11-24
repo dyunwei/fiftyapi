@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"fmt"
 	ws "github.com/coder/websocket"
 	"net/http"
 	"strings"
@@ -11,7 +12,7 @@ import (
 )
 
 func TestWebsocketSlotsProtectWorkAndRetireIdle(t *testing.T) {
-	h := &Handler{}
+	h := &Handler{websocketUserLimit: 4}
 	now := time.Now()
 	slots := make([]*websocketLease, 4)
 	contexts := make([]context.Context, 4)
@@ -85,6 +86,7 @@ func TestQuotaRecoveryCanReplaceIdleSocketsWithoutRestart(t *testing.T) {
 	if err := g.s.SetLimits(ctx, g.user, g.user, 0, 0); err != nil {
 		t.Fatal(err)
 	}
+	g.h.websocketUserLimit = 4
 	var conns []*ws.Conn
 	for i := 0; i < 4; i++ {
 		conn := dialGatewayWS(t, g, server)
@@ -164,4 +166,33 @@ func (h *Handler) acquireTestWebsocketLease(user int64, id string, cancel contex
 		return nil
 	}
 	return lease
+}
+
+func TestConfiguredWebsocketUserLimit(t *testing.T) {
+	if got := (&Handler{}).websocketConnectionLimit(); got != 32 {
+		t.Fatalf("default connection limit = %d, want 32", got)
+	}
+	for _, limit := range []int{1, 6, 32} {
+		h := &Handler{websocketUserLimit: limit}
+		now := time.Now()
+		for i := 0; i < limit; i++ {
+			lease, status := h.reserveWebsocketLease(1, fmt.Sprint(i), func() {}, now)
+			if lease == nil || status != 0 || !lease.activate(now) {
+				t.Fatalf("limit %d: connection %d rejected, status %d", limit, i, status)
+			}
+		}
+		if lease, status := h.reserveWebsocketLease(1, "overflow", func() {}, now); lease != nil || status != 429 {
+			t.Fatalf("limit %d: overflow accepted or wrong status %d", limit, status)
+		}
+		if lease, status := h.reserveWebsocketLease(2, "other-user", func() {}, now); lease == nil || status != 0 {
+			t.Fatalf("limit %d: other user rejected, status %d", limit, status)
+		}
+		replacement, status := h.reserveWebsocketLease(1, "replacement", func() {}, now.Add(time.Minute))
+		if replacement == nil || status != 0 || !replacement.activate(now.Add(time.Minute)) {
+			t.Fatalf("limit %d: idle replacement rejected, status %d", limit, status)
+		}
+		if users, _ := h.websocketCounts(1); users != limit {
+			t.Fatalf("limit %d: replacement changed count to %d", limit, users)
+		}
+	}
 }

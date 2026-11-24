@@ -41,7 +41,7 @@ func (h *Handler) reserveWebsocketLease(user int64, id string, cancel context.Ca
 		}
 	}
 	var victim *websocketLease
-	if used >= 4 {
+	if used >= h.websocketConnectionLimit() {
 		for _, slot := range slots {
 			if slot.ready && slot.claimedBy == nil && slot.pending == 0 && now.Sub(slot.last) >= websocketReplaceIdle && (victim == nil || slot.last.Before(victim.last)) {
 				victim = slot
@@ -157,4 +157,12 @@ func (l *websocketLease) expire(now time.Time) bool {
 		return true
 	}
 	return false
+}
+
+// Preserve the default for handlers constructed directly by tests.
+func (h *Handler) websocketConnectionLimit() int {
+	if h.websocketUserLimit > 0 {
+		return h.websocketUserLimit
+	}
+	return 32
 }

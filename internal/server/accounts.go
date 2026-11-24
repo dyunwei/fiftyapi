@@ -15,7 +15,7 @@ import (
 
 func (a *API) AttachAccounts(service *accounts.Service) {
 	a.accounts = service
-	a.gateway = gateway.New(a.store, service)
+	a.gateway = gateway.New(a.store, service, gateway.Config{WebSocketUserLimit: a.cfg.WebSocketUserLimit})
 }
 func (a *API) listAccounts(w http.ResponseWriter, r *http.Request, id identity) {
 	records, err := a.store.Accounts(r.Context())

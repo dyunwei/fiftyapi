@@ -20,29 +20,39 @@ import (
 )
 
 type Handler struct {
-	store        *store.Store
-	performance  performanceMetrics
-	accounts     *accounts.Service
-	counter      atomic.Uint64
-	sseChecks    atomic.Int32
-	instanceID   string
-	slots        sync.Map
-	wsMu         sync.Mutex
-	wsClosing    bool
-	wsCancels    map[uint64]context.CancelFunc
-	wsWG         sync.WaitGroup
-	wsID         atomic.Uint64
-	wsSlotsMu    sync.Mutex
-	wsSlots      map[int64]map[string]*websocketLease
-	wsSlotCount  int
-	wsQueueBytes atomic.Int64
-	cooldowns    sync.Map
-	client       func(providers.Config) *http.Client
+	store              *store.Store
+	performance        performanceMetrics
+	accounts           *accounts.Service
+	counter            atomic.Uint64
+	sseChecks          atomic.Int32
+	instanceID         string
+	slots              sync.Map
+	wsMu               sync.Mutex
+	wsClosing          bool
+	wsCancels          map[uint64]context.CancelFunc
+	wsWG               sync.WaitGroup
+	wsID               atomic.Uint64
+	wsSlotsMu          sync.Mutex
+	wsSlots            map[int64]map[string]*websocketLease
+	wsSlotCount        int
+	websocketUserLimit int
+	wsQueueBytes       atomic.Int64
+	cooldowns          sync.Map
+	client             func(providers.Config) *http.Client
 }
 
-func New(s *store.Store, a *accounts.Service) *Handler {
+type Config struct {
+	// WebSocketUserLimit defaults to 32 when unset.
+	WebSocketUserLimit int
+}
+
+func New(s *store.Store, a *accounts.Service, configs ...Config) *Handler {
+	limit := 32
+	if len(configs) > 0 && configs[0].WebSocketUserLimit > 0 {
+		limit = configs[0].WebSocketUserLimit
+	}
 	id, _ := s.RelayInstanceID(context.Background())
-	return &Handler{instanceID: id, store: s, accounts: a, client: providers.HTTPClient}
+	return &Handler{websocketUserLimit: limit, instanceID: id, store: s, accounts: a, client: providers.HTTPClient}
 }
 func failure(w http.ResponseWriter, status int, message string) {
 	w.Header().Set("Content-Type", "application/json")

@@ -31,11 +31,12 @@ import (
 )
 
 type Config struct {
-	SettingsKey   []byte
-	Mailer        mailer.Sender
-	PublicURL     string
-	SetupToken    string
-	SecureCookies bool
+	SettingsKey        []byte
+	Mailer             mailer.Sender
+	PublicURL          string
+	SetupToken         string
+	SecureCookies      bool
+	WebSocketUserLimit int
 }
 type API struct {
 	backups   *backup.Service

@@ -158,6 +158,10 @@ func run() error {
 	if err != nil {
 		return errors.New("FIFTYAPI_COOKIE_SECURE 必须为 true 或 false")
 	}
+	websocketUserLimit, err := strconv.Atoi(env("FIFTYAPI_WEBSOCKET_USER_LIMIT", "32"))
+	if err != nil || websocketUserLimit < 1 || websocketUserLimit > 128 {
+		return errors.New("FIFTYAPI_WEBSOCKET_USER_LIMIT 必须为 1 到 128 的整数")
+	}
 	smtpSender, err := mailer.FromEnv()
 	if err != nil {
 		return err
@@ -166,7 +170,7 @@ func run() error {
 	if smtpSender != nil {
 		sender = smtpSender
 	}
-	api, err := server.New(s, server.Config{SettingsKey: key, SetupToken: setupToken, SecureCookies: secure, Mailer: sender, PublicURL: configenv.Value("FIFTYAPI_PUBLIC_URL")})
+	api, err := server.New(s, server.Config{WebSocketUserLimit: websocketUserLimit, SettingsKey: key, SetupToken: setupToken, SecureCookies: secure, Mailer: sender, PublicURL: configenv.Value("FIFTYAPI_PUBLIC_URL")})
 	if err != nil {
 		return err
 	}
