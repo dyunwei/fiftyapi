@@ -5,6 +5,38 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 English | 中文说明见各版本下方折叠区域
 
+## 0.3.2 (2026-11-24)
+
+### Added
+
+- WebSocket connection limit diagnostics show the count at rejection, the configured limit, and how to retry. The per-user limit defaults to 32 and can be set with `FIFTYAPI_WEBSOCKET_USER_LIMIT`.
+- Client setup shows the first blocker across upstream availability, model pricing and access, budget, and protocol. Administrators can open the relevant settings from the guide.
+- Added Compose upgrade regression coverage for existing API keys, budgets, WebSocket reconnection, and interrupted reservations.
+- Administrators can roll back the default Codex client identity version and inspect gateway failures in runtime logs.
+
+### Fixed
+
+- Client WebSockets reclaim idle slots without interrupting queued or active work. Failed replacement handshakes preserve the old connection.
+- Upstream WebSockets detect disconnects between turns and clear expired connection context.
+- Fixed account card action styles and moved the member balance into the sidebar.
+
+### Upgrade notes
+
+- No database migration is required from v0.3.1. Compose deployments can update with `docker compose up -d --build`. Existing WebSockets reconnect after the container is replaced.
+- Compatibility coverage uses simulated upstreams. See [Compatibility](docs/compatibility.md) for the scope of native-client and live-provider verification.
+
+<details>
+<summary>中文说明</summary>
+
+- WebSocket 超限诊断显示拒绝时的连接数、配置上限与重试建议。每用户默认 32 个连接，可用 `FIFTYAPI_WEBSOCKET_USER_LIMIT` 调整。
+- 客户端配置页提示上游、模型定价、访问权限、额度和协议中的首个卡点，管理员可直达对应页面。
+- 增加 Compose 原地升级回归，覆盖原密钥、预算、WebSocket 重连和中断预占释放。
+- 支持回退默认 Codex 客户端身份版本，管理员可在运行日志查看网关故障。
+- 修复空闲 WebSocket 回收、失败握手保留旧连接、上游连接闲时断开检测及账号卡片按钮样式。成员余额移至侧栏。
+- 从 v0.3.1 升级无需迁移数据库。Compose 可执行 `docker compose up -d --build`，替换容器后客户端需要重连。模拟测试和真实验收范围见[兼容性说明](docs/compatibility.md)。
+
+</details>
+
 ## 0.3.1 (2026-11-20)
 
 ### Fixed
