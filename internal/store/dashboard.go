@@ -11,7 +11,15 @@ type ErrorStat struct {
 	Status   int   `json:"status"`
 	Requests int64 `json:"requests"`
 }
+type FailureStat struct {
+	Code      string `json:"code"`
+	Protocol  string `json:"protocol"`
+	AccountID int64  `json:"account_id"`
+	Requests  int64  `json:"requests"`
+}
 type Dashboard struct {
+	Failures         []FailureStat  `json:"failures,omitempty"`
+	FailureSince     int64          `json:"failure_since,omitempty"`
 	PendingRequestID string         `json:"pending_request_id,omitempty"`
 	MaintenanceTodo  map[string]int `json:"maintenance_todo,omitempty"`
 	Errors           []ErrorStat    `json:"errors"`
@@ -96,6 +104,28 @@ func (s *Store) Dashboard(ctx context.Context, user int64, admin bool, hours, bu
 		return out, err
 	}
 	from := now - int64(hours)*3600
+	if admin {
+		out.FailureSince = from
+		rows, err := s.DB.QueryContext(ctx, `SELECT COALESCE(json_extract(diagnostics,'$.code'),''),COALESCE(json_extract(diagnostics,'$.protocol'),''),COALESCE(account_id,0),count(*)
+			FROM request_logs WHERE created_at>=? AND status>=400 GROUP BY 1,2,3
+			ORDER BY 4 DESC,1,2,3 LIMIT 12`, from)
+		if err != nil {
+			return out, err
+		}
+		for rows.Next() {
+			var f FailureStat
+			if err := rows.Scan(&f.Code, &f.Protocol, &f.AccountID, &f.Requests); err != nil {
+				rows.Close()
+				return out, err
+			}
+			out.Failures = append(out.Failures, f)
+		}
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			return out, err
+		}
+	}
 	rangeArgs := append(append([]any{}, args...), from)
 	rows, err := s.DB.QueryContext(ctx, "SELECT (created_at/"+bucketSQL(bucket)+")*"+bucketSQL(bucket)+",COALESCE(sum(input_tokens),0),COALESCE(sum(output_tokens),0),COALESCE(sum(cached_tokens),0),COALESCE(sum(cache_write_tokens),0),count(*) FROM request_logs"+where+" AND created_at>=? GROUP BY 1 ORDER BY 1", rangeArgs...)
 	if err != nil {

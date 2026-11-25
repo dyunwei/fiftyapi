@@ -1,4 +1,8 @@
 {
+  "创建恢复预检文件失败": "Could not create a restore check file",
+  "故障摘要筛选仅供管理员使用": "Only administrators can filter by failure summary",
+  "已有备份操作正在执行": "Another backup operation is in progress",
+  "备份文件下载不完整或校验和不匹配": "Backup download is incomplete or its checksum does not match",
   "传输探测正在进行，请稍后再试": "Transport checks are busy. Try again shortly.",
   "客户端 WebSocket 握手失败": "Client WebSocket handshake failed",
   "告警收件邮箱无效": "Invalid maintenance alert recipient",

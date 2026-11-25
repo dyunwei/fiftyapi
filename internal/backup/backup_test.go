@@ -69,6 +69,9 @@ func waitRecord(t *testing.T, s *Service, id string) Record {
 func TestBackupUploadRestoreDownloadAndOriginalTargetCleanup(t *testing.T) {
 	s, actor := setup(t)
 	ctx := context.Background()
+	if err := s.store.CheckMasterKey(ctx, s.key); err != nil {
+		t.Fatal(err)
+	}
 	var mu sync.Mutex
 	objects := map[string][]byte{}
 	deletes := 0
@@ -124,8 +127,12 @@ func TestBackupUploadRestoreDownloadAndOriginalTargetCleanup(t *testing.T) {
 	c := config(upstream.URL)
 	c.Prefix = "备份 folder/+%/"
 	c.RetentionDays = 30
+	c.AutoEnabled = true
 	if err := s.SaveConfig(ctx, actor, c); err != nil {
 		t.Fatal(err)
+	}
+	if h, err := s.Health(ctx, time.Now()); err != nil || !h.Stale || h.LastSuccess != 0 {
+		t.Fatalf("expected overdue schedule without a successful backup: %+v %v", h, err)
 	}
 	raw, _, _ := s.store.Setting(ctx, settingName)
 	if strings.Contains(raw, c.SecretKey) || strings.Contains(raw, c.AccessKey) {
@@ -141,6 +148,15 @@ func TestBackupUploadRestoreDownloadAndOriginalTargetCleanup(t *testing.T) {
 	r = waitRecord(t, s, r.ID)
 	if r.Status != "completed" {
 		t.Fatalf("backup failed: %+v", r)
+	}
+	if err := s.CheckRecord(ctx, r.ID); err != nil {
+		t.Fatal(err)
+	}
+	if h, err := s.Health(ctx, time.Now()); err != nil || h.Stale || h.LastSuccess == 0 || h.CheckedAt == 0 || h.CheckedID != r.ID {
+		t.Fatalf("expected separate backup and restore check states: %+v %v", h, err)
+	}
+	if h, err := s.Health(ctx, time.Now().Add(49*time.Hour)); err != nil || !h.Stale {
+		t.Fatalf("expected overdue backup: %+v %v", h, err)
 	}
 	if r.ExpiresAt-r.StartedAt != 3*86400 {
 		t.Fatal("manual retention ignored")

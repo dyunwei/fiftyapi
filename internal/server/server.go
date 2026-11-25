@@ -176,6 +176,7 @@ func (a *API) Handler() http.Handler {
 	mux.HandleFunc("POST /api/admin/settings/backup/test", a.protect(true, true, a.testBackupConfig))
 	mux.HandleFunc("GET /api/admin/backups", a.protect(true, false, a.listBackups))
 	mux.HandleFunc("POST /api/admin/backups", a.protect(true, true, a.createBackup))
+	mux.HandleFunc("POST /api/admin/backups/{id}/check", a.protect(true, true, a.checkBackup))
 	mux.HandleFunc("GET /api/admin/backups/{id}/download", a.protect(true, false, a.downloadBackup))
 	mux.HandleFunc("DELETE /api/admin/backups/{id}", a.protect(true, true, a.deleteBackup))
 	mux.HandleFunc("GET /api/admin/settings/email", a.protect(true, false, a.emailSettings))

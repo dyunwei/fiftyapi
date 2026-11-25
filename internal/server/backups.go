@@ -142,3 +142,11 @@ func (a *API) deleteBackup(w http.ResponseWriter, r *http.Request, _ identity) {
 	}
 	writeJSON(w, 200, map[string]bool{"ok": true})
 }
+
+func (a *API) checkBackup(w http.ResponseWriter, r *http.Request, _ identity) {
+	if err := a.backups.CheckRecord(r.Context(), r.PathValue("id")); err != nil {
+		writeError(w, 400, err.Error())
+		return
+	}
+	writeJSON(w, 200, map[string]bool{"ok": true})
+}

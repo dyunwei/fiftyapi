@@ -11,6 +11,8 @@ type LogFilter struct {
 	Admin                        bool
 	Model, RequestID, Settlement string
 	Status                       int
+	FailureCode, Protocol        *string
+	AccountID                    *int64
 	Since, Until                 int64
 }
 type LogPage struct {
@@ -59,6 +61,24 @@ func logPageSources(f LogFilter) (string, string, []any) {
 			args = append(args, f.Until)
 		}
 
+		if f.FailureCode != nil || f.Protocol != nil || f.AccountID != nil {
+			if synthetic {
+				where += " AND 0"
+			} else {
+				if f.FailureCode != nil {
+					where += " AND l.status>=400 AND COALESCE(json_extract(l.diagnostics,'$.code'),'')=?"
+					args = append(args, *f.FailureCode)
+				}
+				if f.Protocol != nil {
+					where += " AND COALESCE(json_extract(l.diagnostics,'$.protocol'),'')=?"
+					args = append(args, *f.Protocol)
+				}
+				if f.AccountID != nil {
+					where += " AND COALESCE(l.account_id,0)=?"
+					args = append(args, *f.AccountID)
+				}
+			}
+		}
 		if f.Settlement != "" {
 			where += " AND c.status=?"
 			args = append(args, f.Settlement)

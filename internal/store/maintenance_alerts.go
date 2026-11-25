@@ -39,16 +39,20 @@ func (s *Store) MaintenanceTodo(ctx context.Context) (map[string]int, error) {
 	return counts, rows.Err()
 }
 
-func (s *Store) UnsentMaintenanceIssues(ctx context.Context) ([]MaintenanceIssue, error) {
+func (s *Store) UnsentMaintenanceIssues(ctx context.Context, backupStale ...bool) ([]MaintenanceIssue, error) {
+	active := activeMaintenanceIssues
+	if len(backupStale) > 0 && backupStale[0] {
+		active += " UNION ALL SELECT 'backup_stale', 'backup_stale'"
+	}
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, "DELETE FROM maintenance_alerts_sent WHERE issue NOT IN (SELECT issue FROM ("+activeMaintenanceIssues+"))"); err != nil {
+	if _, err := tx.ExecContext(ctx, "DELETE FROM maintenance_alerts_sent WHERE issue NOT IN (SELECT issue FROM ("+active+"))"); err != nil {
 		return nil, err
 	}
-	rows, err := tx.QueryContext(ctx, "SELECT kind,issue FROM ("+activeMaintenanceIssues+") WHERE issue NOT IN (SELECT issue FROM maintenance_alerts_sent)")
+	rows, err := tx.QueryContext(ctx, "SELECT kind,issue FROM ("+active+") WHERE issue NOT IN (SELECT issue FROM maintenance_alerts_sent)")
 	if err != nil {
 		return nil, err
 	}

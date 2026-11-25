@@ -98,6 +98,8 @@ The member overview shows which budget windows have no allocation, are exhausted
 
 ## Client connection check
 
+Entering a model ID checks that specific model. Budget blockers include the affected windows and any known reset time.
+
 In **API Keys → Use**, select a client to see the first blocker across upstream availability, enabled and priced models, model access, budget, and protocol. Administrators can go directly to the relevant page. This check reads the signed-in user's configuration and budget. After setting up the client, run the command below to verify its connection.
 
 Copy the command for your platform and client from **Use API key → Client connection check**. You can also download the current `/setup.py` from your site and run `python3.11 fiftyapi-setup.py check codex` or `python3.11 fiftyapi-setup.py check claude`. On Windows use `py -3.11`.

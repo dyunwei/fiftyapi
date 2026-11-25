@@ -31,7 +31,8 @@ func (a *API) sendMaintenanceAlerts(ctx context.Context) error {
 	if settings.AlertRecipient == "" {
 		return nil
 	}
-	issues, err := a.store.UnsentMaintenanceIssues(ctx)
+	health, healthErr := a.backups.Health(ctx, time.Now())
+	issues, err := a.store.UnsentMaintenanceIssues(ctx, healthErr == nil && health.Stale)
 	if err != nil || len(issues) == 0 {
 		return err
 	}
@@ -42,6 +43,8 @@ func (a *API) sendMaintenanceAlerts(ctx context.Context) error {
 			counts.Reauth++
 		case "settlement":
 			counts.Settlement++
+		case "backup_stale":
+			counts.BackupStale++
 		case "backup":
 			counts.Backup++
 		}

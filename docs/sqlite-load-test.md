@@ -30,3 +30,18 @@ FIFTYAPI_LOAD_CLIENTS=10 FIFTYAPI_LOAD_TURNS=100 FIFTYAPI_LOAD_CAPACITY=100 \
 ## 适用范围
 
 这是新建数据库、短模拟输出、单次运行的结果，不是生产容量承诺或 SQLite 理论上限。尚未覆盖大量历史日志、管理页统计并行访问、长时间运行、真实长流式输出、多账号路由、生产磁盘以及突发固定速率流量。生产容量评估应在目标服务器使用相同配置复测，并预留余量。
+
+## 混合负载回归（2026-11-25）
+
+以临时 SQLite 和模拟 OpenAI Responses 上游运行，预置 100,000 条历史日志，通过实际本机 HTTP 连接并行发出 4 条 SSE 和 4 条 WebSocket 请求。每条流约 2 秒。所有流开始后启动在线备份到模拟 S3，并执行 4 轮仪表盘和日志查询。客户端为 Go 测试程序，上游使用 FiftyAPI 测试夹具身份和模型 `model`。
+
+| 传输 | 首段输出 P95 | 总耗时 P95 |
+| --- | ---: | ---: |
+| SSE | 31 ms | 2.059 s |
+| WebSocket | 32 ms | 2.044 s |
+
+SQLite 连接等待 187 次，累计 545 ms。两种传输共完成 8 条请求，两个预算窗口各结算 96 microUSD、预占归零。每种传输只有 4 个样本，P95 等于该组最大值。本次测试未接触真实供应商、生产磁盘或反向代理，没有验证长时间运行的吞吐量。
+
+```sh
+FIFTYAPI_MIXED_LOAD=1 go test -count=1 -v -run '^TestMixedProductionLoad$' ./internal/gateway
+```

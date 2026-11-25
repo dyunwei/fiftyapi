@@ -1,6 +1,6 @@
 <script setup>
 import {computed,onMounted,ref,watch} from 'vue'
-import {t} from './i18n.js'
+import {t,locale} from './i18n.js'
 import {clientSnippets,setupCommand,restoreCommand,checkCommand} from './client-usage.js'
 const props=defineProps({api:{type:Function,required:true},token:{type:String,default:''},keyName:{type:String,default:''},admin:Boolean})
 defineEmits(['copy','navigate'])
@@ -10,18 +10,24 @@ const restore=computed(()=>restoreCommand({client:client.value,system:system.val
 const origin=window.location.origin
 const check=computed(()=>checkCommand({origin,client:client.value,system:system.value}))
 const protocol=computed(()=>({claude:'messages',api:'chat',codex:'responses'})[client.value])
-const readiness=ref(''),readinessFailed=ref(false)
-watch(protocol,async(value,_,onCleanup)=>{
+const readiness=ref(''),readinessFailed=ref(false),quotaBlocks=ref([])
+const checkedModel=computed(()=>client.value==='api'?'':model.value.trim())
+watch([protocol,checkedModel],([value,id],_,onCleanup)=>{
  let current=true
- onCleanup(()=>{current=false})
+ const timer=setTimeout(checkReadiness,200)
+ onCleanup(()=>{current=false;clearTimeout(timer)})
  readiness.value=''
  readinessFailed.value=false
+ quotaBlocks.value=[]
+ async function checkReadiness(){
  try{
-  const result=await props.api('/client-readiness?protocol='+value)
-  if(current)readiness.value=result.code
+  const result=await props.api('/client-readiness?'+new URLSearchParams({protocol:value,...(id?{model:id}:{})}))
+  if(current){readiness.value=result.code;quotaBlocks.value=result.quota||[]}
  }catch(e){if(current&&e.name!=='AbortError')readinessFailed.value=true}
+ }
 },{immediate:true})
 const blockers={
+ model_unknown:['当前模型不存在或未向你开放。','models','可用模型'],
  upstream:['暂无已同步模型的可用上游账号。','accounts','上游账号'],
  model_disabled:['当前有上游模型，但没有启用任何模型。','models','模型与价格'],
  price:['可用的上游模型尚未定价。','models','模型与价格'],
@@ -51,10 +57,11 @@ onMounted(async()=>{try{models.value=await props.api('/models')}catch(e){if(e.na
   <p class="subtle">{{ t('从密钥列表进入时自动填入可复制的密钥；也可粘贴其他密钥。留空时示例使用占位符。') }}</p>
   <p v-if="loadError" class="subtle" role="status">{{ loadError }}</p>
   <div v-if="blocker" class="notice" role="status">
-   {{ t(blocker[0]) }}
+   {{ t(readiness==='price'&&checkedModel?'模型 {0} 缺少价格。':blocker[0],[checkedModel]) }}
    <button v-if="admin||blocker[1]==='overview'" type="button" class="text-button" @click="$emit('navigate',blocker[1])">{{ t(blocker[2]) }}</button>
    <span v-else-if="readiness==='protocol'">{{ t('请选择与可用模型协议匹配的客户端，或联系管理员。') }}</span>
    <span v-else>{{ t('请联系管理员处理。') }}</span>
+   <ul v-if="quotaBlocks.length"><li v-for="block in quotaBlocks" :key="block.window">{{ t(block.window==='5h'?'5 小时额度窗口':'7 天额度窗口') }}<template v-if="block.reset_at"> · {{ t('重置：') }}{{ new Date(block.reset_at*1000).toLocaleString(locale) }}</template></li></ul>
   </div>
   <p v-else-if="readinessFailed" class="subtle" role="status">{{ t('无法检查接入条件，请稍后重试。') }}</p>
   <p v-else-if="readiness==='ready'&&client!=='api'&&model&&!loading&&!available.some(m=>m.id===model)" class="notice" role="status">{{ t('所填模型不在当前客户端的可用列表中，请选择列表中的模型。') }}</p>

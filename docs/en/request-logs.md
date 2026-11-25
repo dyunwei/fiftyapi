@@ -1,6 +1,8 @@
 
 ### Administrator failure diagnostics
 
+Administrators can open matching request logs for the selected dashboard time range by selecting a failure group. Groups use diagnostic cause, protocol, and upstream account.
+
 A WebSocket handshake rejected with HTTP 429 at the per-user connection limit records the connection count and configured limit at the time of rejection. `HTTP JSON` in the list describes the handshake error response.
 
 New upstream request failures and rejected client WebSocket handshakes are written to container/terminal output and administrator Runtime logs (module `gateway`, retained for seven days). Correlate `request_id` in the summary with request logs. Handshake rejections retain specific reasons such as connection limits. Failure summaries include account (the runtime log account column), attempt, transport, status, dispatch/completion/output observations and fixed failure categories.

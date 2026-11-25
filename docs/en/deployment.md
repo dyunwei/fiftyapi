@@ -121,6 +121,8 @@ Allow at least 60 seconds for graceful shutdown. OAuth token rotation can contin
 
 ## Backups and restoration
 
+With daily backups enabled, the dashboard flags overdue backups and sends the configured maintenance email if no successful backup exists or the last success is at least 48 hours old. Run **Check restore** for a downloadable archive in Backup records. It verifies the archive, database version, and current master key in a temporary directory on the data volume. The dashboard shows the most recent successful check and its backup ID separately. CLI check results appear in the terminal.
+
 For a simple offline backup: stop the service, copy the entire database directory including existing WAL/SHM files, and back up the master key separately. Copying only a live `.db` file is not a complete backup.
 
 The offline tool requires Linux/Unix and Python 3.9+. Stop the service and any import command first:

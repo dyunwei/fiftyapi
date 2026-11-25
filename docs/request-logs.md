@@ -6,6 +6,8 @@ Codex Responses 的 `response.completed`、Claude Messages 的 `message_stop` �
 
 ## 请求诊断
 
+管理员可在仪表盘的错误统计中点击故障原因、协议和上游账号组合，直接打开所选时段的对应请求日志。清除故障筛选可返回常规查询。
+
 WebSocket 握手因用户连接名额耗尽而返回 429 时，诊断显示握手时的连接数和配置上限。列表的 `HTTP JSON` 是握手拒绝使用的响应格式。
 
 「我的请求日志」在模型下方并列显示 API 协议和客户端实际使用的传输，例如 `Responses · WebSocket`。点击「请求诊断」可查看客户端到网关、网关到上游各段观测到的传输。HTTP SSE、HTTP JSON 和 WebSocket 按实际传输记录。无法确定响应格式时显示 HTTP，历史记录显示「未记录」。鉴权失败或被反向代理挡在网关外的请求可能没有日志。

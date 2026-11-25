@@ -116,7 +116,7 @@ test('client readiness shows the first blocker and updates when switching client
  })
  await page.getByRole('button',{name:'使用说明',exact:true}).click()
  const dialog=page.getByRole('dialog')
- await expect(dialog.getByRole('status')).toContainText('可用的上游模型尚未定价。')
+ await expect(dialog.getByRole('status')).toContainText('模型 team/codex 缺少价格。')
  await dialog.getByRole('button',{name:'Claude Code',exact:true}).click()
  await expect(dialog.getByRole('status')).toContainText('当前客户端的协议没有匹配的可用模型。')
 })

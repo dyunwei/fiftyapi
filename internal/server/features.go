@@ -2,9 +2,11 @@ package server
 
 import (
 	"errors"
+	"fiftyapi/internal/backup"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"fiftyapi/internal/gateway"
 	"fiftyapi/internal/store"
@@ -101,9 +103,13 @@ func (a *API) dashboard(w http.ResponseWriter, r *http.Request, id identity) {
 	}
 	response := struct {
 		store.Dashboard
-		Performance *dashboardPerformance `json:"performance,omitempty"`
+		BackupHealth *backup.Health        `json:"backup_health,omitempty"`
+		Performance  *dashboardPerformance `json:"performance,omitempty"`
 	}{Dashboard: data}
 	if admin {
+		if health, err := a.backups.Health(r.Context(), time.Now()); err == nil {
+			response.BackupHealth = &health
+		}
 		stats := a.store.DB.Stats()
 		response.Performance = &dashboardPerformance{
 			SQLiteWait: gateway.SummarizeTiming(stats.WaitCount, stats.WaitDuration),
@@ -297,7 +303,7 @@ func (a *API) setModel(w http.ResponseWriter, r *http.Request, id identity) {
 }
 func (a *API) logs(w http.ResponseWriter, r *http.Request, id identity) {
 	q := r.URL.Query()
-	if q.Has("page") || q.Has("page_size") || q.Has("settlement") || q.Has("until") {
+	if q.Has("page") || q.Has("page_size") || q.Has("settlement") || q.Has("until") || q.Has("failure_code") || q.Has("protocol") || q.Has("account_id") {
 		pageText, sizeText := q.Get("page"), q.Get("page_size")
 		if !q.Has("page") {
 			pageText = "1"
@@ -329,7 +335,29 @@ func (a *API) logs(w http.ResponseWriter, r *http.Request, id identity) {
 			writeError(w, 400, "日志分页或筛选参数无效")
 			return
 		}
-		result, err := a.store.LogListPage(r.Context(), store.LogFilter{User: id.user.ID, Admin: admin, Model: q.Get("model"), RequestID: q.Get("request_id"), Status: status, Since: since, Until: until, Settlement: settlement}, page, size)
+		code, protocol := q.Get("failure_code"), q.Get("protocol")
+		account, accountErr := strconv.ParseInt(q.Get("account_id"), 10, 64)
+		f := store.LogFilter{User: id.user.ID, Admin: admin, Model: q.Get("model"), RequestID: q.Get("request_id"), Status: status, Since: since, Until: until, Settlement: settlement}
+		if q.Has("failure_code") || q.Has("protocol") || q.Has("account_id") {
+			if !admin {
+				writeError(w, 403, "故障摘要筛选仅供管理员使用")
+				return
+			}
+			if len(code) > 80 || len(protocol) > 32 || (q.Has("account_id") && (accountErr != nil || account < 0)) {
+				writeError(w, 400, "日志分页或筛选参数无效")
+				return
+			}
+			if q.Has("failure_code") {
+				f.FailureCode = &code
+			}
+			if q.Has("protocol") {
+				f.Protocol = &protocol
+			}
+			if q.Has("account_id") {
+				f.AccountID = &account
+			}
+		}
+		result, err := a.store.LogListPage(r.Context(), f, page, size)
 		if err != nil {
 			writeError(w, 500, "读取日志失败")
 			return
