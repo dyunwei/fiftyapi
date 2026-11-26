@@ -19,6 +19,7 @@ const advice = {
   upstream_websocket_handshake: '网关未能与上游建立 WebSocket。请把诊断发给管理员检查上游配置。',
   stream_interrupted: '流式响应未完成。请先检查已有输出和结算状态，再决定是否重试。',
   client_cancelled: '连接在处理完成前已取消。若未主动取消，请检查客户端超时与连接。',
+  route_unavailable: '当前模型没有可用路由。请稍后重试或联系管理员检查模型路由状态。',
   upstream_unavailable: '请求未成功发往上游。请稍后重试；若持续发生，请联系管理员。',
   upstream_error: '请求在上游阶段失败。若持续发生，请将诊断发给管理员。',
 }

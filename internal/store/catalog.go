@@ -248,6 +248,9 @@ func (s *Store) SetModel(ctx context.Context, actor int64, id string, enabled bo
 	}
 	return tx.Commit()
 }
+
+var ErrNoModelRoute = errors.New("没有可用上游账号")
+
 func (s *Store) RoutableModel(ctx context.Context, id string) (Model, []int64, error) {
 	var m Model
 	var protocols string
@@ -275,7 +278,7 @@ func (s *Store) RoutableModel(ctx context.Context, id string) (Model, []int64, e
 		ids = append(ids, id)
 	}
 	if len(ids) == 0 {
-		return m, nil, errors.New("没有可用上游账号")
+		return m, nil, ErrNoModelRoute
 	}
 	m.Available = true
 	return m, ids, rows.Err()

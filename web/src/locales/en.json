@@ -1,4 +1,6 @@
 {
+  "路由不可用": "Route unavailable",
+  "当前模型没有可用路由。请稍后重试或联系管理员检查模型路由状态。": "No route is available for this model. Retry later or ask an administrator to check model route status.",
   "模型路由状态": "Model route status",
   "查看路由状态": "View route status",
   "可参与调度": "Eligible for routing",

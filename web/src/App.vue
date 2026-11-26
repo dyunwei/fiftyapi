@@ -211,7 +211,7 @@ async function editUserAccess(u){await action(async()=>{const p=await api('/admi
 async function viewSettlement(l){await action(async()=>{const r=await api(`/admin/logs/${encodeURIComponent(l.id)}/settlement`);open('settlement',{...r.charge,price:r.price,price_valid:r.price_valid})})}
 async function retrySettlement(l){if(!confirm(t('按已保存用量重试结算？缺失可靠用量时将按 0 释放预占。不会重新调用模型。')))return;await action(async()=>{await api(`/admin/logs/${encodeURIComponent(l.id)}/retry-settlement`,{method:'POST',body:{}});modal.value=null;form.value={};await refresh();notify(t('结算已完成'))})}
 
-const failureLabels = {"websocket_connection_limit_reached": "WebSocket 名额已满", "upstream_rate_limit": "上游限流", "stream_interrupted": "流式响应中断", "client_websocket_handshake": "客户端握手失败", "upstream_websocket_handshake": "上游握手失败", "upstream_error": "上游请求失败", "upstream_unavailable": "上游不可用", "local_quota": "本地额度不足", "user_concurrency": "个人并发已满"}
+const failureLabels = {"route_unavailable":"路由不可用","websocket_connection_limit_reached": "WebSocket 名额已满", "upstream_rate_limit": "上游限流", "stream_interrupted": "流式响应中断", "client_websocket_handshake": "客户端握手失败", "upstream_websocket_handshake": "上游握手失败", "upstream_error": "上游请求失败", "upstream_unavailable": "上游不可用", "local_quota": "本地额度不足", "user_concurrency": "个人并发已满"}
 function failureLabel(code){return t(failureLabels[code]||code||'未分类故障')}
 function showFailures(f){
  filter.value={model:'',request_id:'',status:'',hours:'0',since:'',until:'',settlement:'',failure:f,failureSince:dashboard.value.failure_since}

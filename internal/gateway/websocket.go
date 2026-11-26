@@ -193,7 +193,7 @@ func (h *Handler) ServeWebSocket(w http.ResponseWriter, r *http.Request) {
 						return
 					}
 					m, _, e := h.store.RoutableModel(ctx, model)
-					if e != nil || !m.SupportsProtocol("responses") {
+					if (e != nil && !errors.Is(e, store.ErrNoModelRoute)) || !m.SupportsProtocol("responses") {
 						sendError("model_not_found", "模型未启用、未定价或不支持 Responses", stream)
 						return
 					}

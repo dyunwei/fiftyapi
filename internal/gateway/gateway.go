@@ -244,6 +244,9 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 	logProvider = m.Provider
 	if err != nil {
 		diagnostics.Code = "model_unavailable"
+		if errors.Is(err, store.ErrNoModelRoute) && m.SupportsProtocol(requestedProtocol) {
+			diagnostics.Code = "route_unavailable"
+		}
 		failure(w, 400, "模型未启用、未定价或没有可用账号")
 		return
 	}
@@ -403,6 +406,7 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 	excluded := map[int64]bool{}
 	refreshTried := map[int64]bool{}
 	wsHandshakeFailed := false
+	routeUnavailable := false
 	out := result{status: 503, err: errors.New("没有可用上游账号")}
 	for attempt := 1; attempt <= 3; attempt++ {
 		if r.Context().Err() != nil {
@@ -415,6 +419,7 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 				out = result{status: 503, err: e}
 				var unavailable *scheduleUnavailable
 				if errors.As(e, &unavailable) {
+					routeUnavailable = unavailable.status == 0 && portable && (!websocket || turn.state.Owner() == 0)
 					out.retryAfter = unavailable.until
 					if unavailable.status != 0 {
 						out.status = unavailable.status
@@ -577,6 +582,9 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 		diagnostics.RetryAt = retry
 	}
 	diagnostics.Code = diagnosticCode(out, wsHandshakeFailed)
+	if routeUnavailable && out.status != 499 {
+		diagnostics.Code = "route_unavailable"
+	}
 	finish(out)
 }
 

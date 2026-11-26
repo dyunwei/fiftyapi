@@ -84,6 +84,10 @@ func (c *SMTP) SendMaintenanceAlert(ctx context.Context, email string, counts Ma
 	return c.send(ctx, email, "FiftyAPI 维护告警 / Maintenance alert", body)
 }
 
+func (c *SMTP) SendOperationalAlert(ctx context.Context, email, body string) error {
+	return c.send(ctx, email, "FiftyAPI 路由运行状态 / Routing status", body)
+}
+
 func (c *SMTP) send(ctx context.Context, email, subject, body string) error {
 	if err := c.Validate(); err != nil {
 		return err

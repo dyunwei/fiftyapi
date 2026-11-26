@@ -2,7 +2,11 @@ package server
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log"
+	"net/url"
+	"strings"
 	"time"
 
 	"fiftyapi/internal/mailer"
@@ -31,10 +35,11 @@ func (a *API) sendMaintenanceAlerts(ctx context.Context) error {
 	if settings.AlertRecipient == "" {
 		return nil
 	}
+	incidentErr := a.sendOperationalIncidents(ctx, settings)
 	health, healthErr := a.backups.Health(ctx, time.Now())
 	issues, err := a.store.UnsentMaintenanceIssues(ctx, healthErr == nil && health.Stale)
 	if err != nil || len(issues) == 0 {
-		return err
+		return errors.Join(err, incidentErr)
 	}
 	var counts mailer.MaintenanceCounts
 	for _, issue := range issues {
@@ -54,5 +59,34 @@ func (a *API) sendMaintenanceAlerts(ctx context.Context) error {
 	}
 	save, cancel := context.WithTimeout(context.WithoutCancel(ctx), 3*time.Second)
 	defer cancel()
-	return a.store.MarkMaintenanceIssuesSent(save, issues)
+	return errors.Join(incidentErr, a.store.MarkMaintenanceIssuesSent(save, issues))
+}
+
+func (a *API) sendOperationalIncidents(ctx context.Context, settings emailSettings) error {
+	changes, err := a.store.IncidentTransitions(ctx, time.Now())
+	if err != nil || len(changes) == 0 {
+		return err
+	}
+	var body strings.Builder
+	for _, v := range changes {
+		state := "故障 / Incident"
+		if v.Recovered {
+			state = "已恢复 / Recovered"
+		}
+		cause := "上游断流 / Upstream stream interrupted"
+		if v.Cause == "route_unavailable" {
+			cause = "路由不可用 / Route unavailable"
+		}
+		fmt.Fprintf(&body, "%s · %q · %s · %s\n", state, v.Model, v.Protocol, cause)
+		if validPublicURL(settings.PublicURL) {
+			query := url.Values{"model": {v.Model}, "protocol": {v.Protocol}}
+			fmt.Fprintf(&body, "%s/#models?%s\n", strings.TrimRight(settings.PublicURL, "/"), query.Encode())
+		}
+	}
+	if err = settings.smtp().SendOperationalAlert(ctx, settings.AlertRecipient, body.String()); err != nil {
+		return err
+	}
+	save, cancel := context.WithTimeout(context.WithoutCancel(ctx), 3*time.Second)
+	defer cancel()
+	return a.store.RecordIncidentTransitions(save, changes)
 }
