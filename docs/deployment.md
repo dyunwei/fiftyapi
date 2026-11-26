@@ -37,7 +37,8 @@ Rocky Linux 启用 SELinux 时，默认 Docker 命名卷可直接使用；若选
 
 ```sh
 cp .env.example .env
-docker compose up -d --build
+docker compose pull
+docker compose up -d --no-build
 ```
 
 `.env` 中两个密钥可留空，程序会在数据卷中自动生成 `/data/master.key` 和 `/data/setup-token`（权限 0600），重启、重建容器时复用。读取初始化口令：`docker compose exec fiftyapi cat /data/setup-token`。不要把两个值统一设为 `fiftyapi`；显式配置的环境变量优先，仍需满足长度和格式要求。依赖网络受限时可设置 `GOPROXY=https://goproxy.cn,direct` 再构建。Compose 默认绑定宿主机 `0.0.0.0:8080`，可通过 `http://localhost:8080` 或 `http://服务器IP:8080` 访问；数据默认保存到 Docker 管理的命名卷 `data`（通常名为 `fiftyapi_data`，实际前缀取决于 Compose 项目名）。入口脚本以 root 准备数据目录权限后，切换到 UID/GID 10001 运行服务；Compose 根目录只读。bind mount 同样会自动处理数据目录及已有文件的归属；显式指定非 root `--user` 时需自行保证目录可写。
@@ -171,7 +172,7 @@ Docker named volume 可停机后导出到本机目录再备份；恢复 bind mou
 
 ## 升级与管理接口
 
-升级 Docker Compose 时可直接运行 `docker compose up -d --build`。用 `docker compose ps fiftyapi` 检查健康状态，用 `docker compose logs --tail 100 fiftyapi` 查看启动或迁移错误。容器健康后，用原 API Key 运行客户端自检，验证模型列表和 WebSocket 握手。发布流水线使用独立数据卷和模拟上游验证容器替换、原密钥、额度、断连预占释放和重连。
+使用发布镜像升级时，执行 `docker compose pull` 和 `docker compose up -d --no-build`。从源码构建时，先设置 `FIFTYAPI_IMAGE=fiftyapi:local`，再执行 `docker compose up -d --build`。用 `docker compose ps fiftyapi` 检查健康状态，用 `docker compose logs --tail 100 fiftyapi` 查看启动或迁移错误。容器健康后，用原 API Key 运行客户端自检，验证模型列表和 WebSocket 握手。发布流水线使用独立数据卷和模拟上游验证容器替换、原密钥、额度、断连预占释放和重连。
 
 先按本文离线备份流程备份数据库及主密钥，再替换二进制/重新构建容器并启动；保持原 DB 路径、主密钥和监听地址。首次启动自动执行所需迁移，v0.4.0 的数据库 schema 为 24。升级后不能用旧二进制直接打开已迁移数据库；回退需恢复升级前备份。前端已嵌入新二进制，更新源码不会改变正在运行的旧进程。
 

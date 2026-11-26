@@ -41,7 +41,8 @@ From the source checkout:
 ```sh
 cp .env.example .env
 # Both key fields may remain blank; unique random values are generated automatically.
-docker compose up -d --build
+docker compose pull
+docker compose up -d --no-build
 ```
 
 When blank, the service generates `/data/master.key` and `/data/setup-token` with mode 0600 and reuses them across restarts and container recreation. Read the initial setup token with `docker compose exec fiftyapi cat /data/setup-token`. Explicit environment values take precedence and must satisfy their format and length requirements; do not use a shared value such as `fiftyapi`. Compose binds host `0.0.0.0:8080` (accessible at `http://localhost:8080` or `http://SERVER_IP:8080`), stores data in the Docker-managed named volume `data` (usually `fiftyapi_data`, depending on the Compose project name), runs with a read-only root filesystem and allows 60 seconds for shutdown. Keep `.env` private and back it up separately. Set `FIFTYAPI_COOKIE_SECURE=true` for public HTTPS access. Compose defaults to `TZ=Asia/Shanghai`; change it if desired.
@@ -108,7 +109,7 @@ This path also serves HTTP POST. Configure the remaining paths and your domain/H
 
 ## Upgrade and rollback
 
-For a Docker Compose upgrade, run `docker compose up -d --build`. Check health with `docker compose ps fiftyapi` and look for startup or migration errors with `docker compose logs --tail 100 fiftyapi`. Once healthy, run the client connection check with an existing key to verify model discovery and WebSocket handshakes. CI exercises container replacement, key and budget persistence, interrupted reservations, and reconnection with an isolated volume and a simulated upstream.
+For a published-image upgrade, run `docker compose pull` and `docker compose up -d --no-build`. For a source build, set `FIFTYAPI_IMAGE=fiftyapi:local` and run `docker compose up -d --build`. Check health with `docker compose ps fiftyapi` and look for startup or migration errors with `docker compose logs --tail 100 fiftyapi`. Once healthy, run the client connection check with an existing key to verify model discovery and WebSocket handshakes. CI exercises container replacement, key and budget persistence, interrupted reservations, and reconnection with an isolated volume and a simulated upstream.
 
 1. Stop the service and back up the database, any existing WAL/SHM files, and the original master key.
 2. Replace the binary or rebuild the container using the same data path and key.
