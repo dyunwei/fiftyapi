@@ -5,6 +5,34 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 English | 中文说明见各版本下方折叠区域
 
+## 0.4.0 (2026-11-26)
+
+### Added
+
+- Backup health reports the latest successful backup and restore check separately. Administrators can verify a stored archive from the console. Scheduled backups alert after 48 hours without a success or when none has succeeded.
+- The dashboard groups failures by cause, protocol and upstream account, with direct links to filtered request logs. Maintenance email reports sustained routing failures or stream interruptions and verified recovery.
+- Model route status explains local availability, cooldowns and concurrency. Client setup checks the selected model and shows affected budget windows and known reset times.
+- The dashboard shows approximate first-output P50 and P95 for SSE and WebSocket over the last hour. Administrators can verify and sync selected upstream accounts one at a time and retry failed accounts separately.
+- Added simulated mixed-load coverage for streaming, dashboard queries and online backup with 100,000 existing log entries.
+
+### Upgrade notes
+
+- Startup applies SQLite migration 024 to persist incident notification state. Back up the database and keep the original master key before upgrading. To run v0.3.2 again, restore the pre-upgrade database backup with that key.
+- For Compose builds, update the source and run `docker compose up -d --build`. Published-image deployments can pull the new image and recreate the container. Existing WebSocket clients need to reconnect.
+
+<details>
+<summary>中文说明</summary>
+
+- 备份健康分别显示最近成功备份和恢复预检。管理员可在控制台校验已有归档。启用每日备份后，从未成功或超过 48 小时未成功时会告警。
+- 仪表盘按故障原因、协议和上游账号分组，可直接进入筛选后的日志。维护邮件增加持续路由故障、上游断流及恢复通知。
+- 模型路由状态显示本地可用性、冷却和并发。客户端配置检查选中的模型，并显示受限额度窗口和已知的重置时间。
+- 仪表盘分别显示 SSE、WebSocket 近一小时首段输出的近似 P50 和 P95。管理员可逐个验证并同步所选上游账号，只重试失败项。
+- 增加混合负载回归，模拟 10 万条历史日志、长流式请求、管理查询和在线备份并行。
+- 启动时自动执行 SQLite 迁移 024，保存故障通知状态。升级前备份数据库并保留原主密钥。回退到 v0.3.2 时，需要用原密钥恢复升级前的数据库备份。
+- Compose 源码部署更新后执行 `docker compose up -d --build`。使用发布镜像时拉取新镜像后重建容器。已有 WebSocket 客户端需要重连。
+
+</details>
+
 ## 0.3.2 (2026-11-24)
 
 ### Added
