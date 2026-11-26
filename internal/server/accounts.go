@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"errors"
+	"fiftyapi/internal/i18n"
 	"net/http"
 	"strconv"
 	"time"
@@ -89,7 +90,11 @@ func (a *API) verifyAccount(w http.ResponseWriter, r *http.Request, id identity)
 	defer cancel()
 	models, err := a.accounts.Verify(ctx, target)
 	if err != nil {
-		writeError(w, 502, err.Error())
+		state := "retry"
+		if account, readErr := a.store.Account(r.Context(), target); readErr == nil && account.State == "reauth_required" {
+			state = "reauth_required"
+		}
+		writeJSON(w, http.StatusBadGateway, map[string]string{"error": i18n.Translate(w.Header().Get("Content-Language"), err.Error()), "state": state})
 		return
 	}
 	writeJSON(w, 200, map[string]any{"state": "catalog_ready", "models": models, "inference_verified": false})

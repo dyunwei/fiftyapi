@@ -136,3 +136,5 @@ A temporary OpenAI 429, including an unspecified 429 without evidence of quota e
 Session recognition accepts `session-id`, `session_id`, `x-session-id`, `conversation_id` and `client_metadata.session_id`. Migration `018_openai_session_identity.sql` adds the device table and session hold field automatically. Back up the database and master key before upgrading; rollback requires the pre-upgrade database.
 
 In **Models and prices → View route status**, administrators can inspect synced mappings by protocol and see account, model, cooldown, and concurrency blockers. The view uses local state without contacting upstream providers or evaluating session affinity.
+
+In **Upstream accounts**, admins can select enabled accounts and verify and sync their catalogs one at a time. The page shows individual results, can stop after the current account, and can retry failed items. Reauthorize accounts marked as requiring reauthorization before verifying them again.

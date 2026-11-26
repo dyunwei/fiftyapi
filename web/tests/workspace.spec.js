@@ -888,3 +888,29 @@ test('仪表盘统计单行、快捷操作与额度并排且桌面保持单屏',
  const quota=await page.locator('.quota-card').first().boundingBox()
  expect(quota.y).toBeGreaterThanOrEqual(quick.y+quick.height)
 })
+
+test('批量验证逐项展示且只重试临时失败',async({page})=>{
+ await page.context().addCookies(adminCookies)
+ await page.route('**/api/admin/accounts',route=>route.fulfill({json:[
+  {id:901,name:'Batch ready',enabled:true,provider:'gateway',state:'catalog_ready'},
+  {id:902,name:'Batch retry',enabled:true,provider:'gateway',state:'catalog_ready'},
+  {id:903,name:'Batch reauth',enabled:true,provider:'gateway',state:'reauth_required'}
+ ]}))
+ const calls=[]
+ await page.route(/\/api\/admin\/accounts\/90[123]\/verify$/,async route=>{
+  const id=new URL(route.request().url()).pathname.split('/').at(-2)
+  calls.push(id)
+  if(id==='902'&&calls.filter(a=>a===id).length===1)return route.fulfill({status:502,json:{state:'retry',error:'fixture failure'}})
+  if(id==='903')return route.fulfill({status:502,json:{state:'reauth_required',error:'fixture reauth'}})
+  return route.fulfill({json:{models:['fixture']}})
+ })
+ await page.goto(baseURL+'/#accounts')
+ await page.getByRole('button',{name:'选择筛选结果中的已启用账号'}).click()
+ await page.getByRole('button',{name:'验证并同步所选账号（3）'}).click()
+ const result=page.getByRole('region',{name:'批量验证结果'})
+ await expect(result).toContainText('Batch reauth · 需要重新授权')
+ await expect(result).toContainText('Batch retry · 验证失败')
+ await result.getByRole('button',{name:'重试失败项'}).click()
+ await expect(result).toContainText('Batch retry · 验证成功')
+ expect(calls).toEqual(['901','902','903','902'])
+})
