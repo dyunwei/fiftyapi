@@ -86,27 +86,57 @@ type RouteCandidate struct {
 	CooldownUntil            int64
 }
 
+type RouteStatus struct {
+	RouteCandidate `json:"-"`
+	Name           string
+	Reason         string
+}
+
 func (s *Store) RouteCandidates(ctx context.Context, model, scope string, protocol ...string) ([]RouteCandidate, error) {
-	legacyScope := scope
-	if strings.HasPrefix(scope, "generate:") || strings.HasPrefix(scope, "generate/") {
-		legacyScope = "generate:" + model
-	}
 	requested := ""
 	if len(protocol) > 0 {
 		requested = protocol[0]
 	}
-	rows, err := s.DB.QueryContext(ctx, `SELECT a.id,a.provider,am.upstream_id,am.protocols,p.priority,p.weight,p.concurrency,p.max_queue,p.wait_ms,h.failures,h.error_rate,h.first_output_ms,COALESCE((SELECT max(until_at) FROM account_cooldowns c WHERE c.account_id=a.id AND c.scope IN ('',?,?)),0)
- FROM upstream_accounts a JOIN account_models am ON am.account_id=a.id JOIN models m ON m.id=am.model_id AND m.enabled=1 JOIN account_policies p ON p.account_id=a.id JOIN account_health h ON h.account_id=a.id
- WHERE am.model_id=? AND a.enabled=1 AND a.state IN ('catalog_ready','ready') AND (?='' OR EXISTS(SELECT 1 FROM json_each(am.protocols) WHERE value=?)) ORDER BY p.priority,a.id`, scope, legacyScope, model, requested, requested)
+	statuses, err := s.routeStatus(ctx, model, scope, requested, false)
+	out := make([]RouteCandidate, 0, len(statuses))
+	for _, row := range statuses {
+		out = append(out, row.RouteCandidate)
+	}
+	return out, err
+}
+
+func (s *Store) ModelRouteStatus(ctx context.Context, model, protocol string) ([]RouteStatus, error) {
+	return s.routeStatus(ctx, model, "generate/"+protocol+":"+model, protocol, true)
+}
+
+func (s *Store) routeStatus(ctx context.Context, model, scope, requested string, all bool) ([]RouteStatus, error) {
+	legacyScope := scope
+	if strings.HasPrefix(scope, "generate:") || strings.HasPrefix(scope, "generate/") {
+		legacyScope = "generate:" + model
+	}
+	const matches = `(?='' OR EXISTS(SELECT 1 FROM json_each(am.protocols) WHERE value=?))`
+	const eligible = `m.enabled=1 AND a.enabled=1 AND a.state IN ('catalog_ready','ready')`
+	query := `SELECT a.id,a.provider,am.upstream_id,am.protocols,p.priority,p.weight,p.concurrency,p.max_queue,p.wait_ms,h.failures,h.error_rate,h.first_output_ms,COALESCE((SELECT max(until_at) FROM account_cooldowns c WHERE c.account_id=a.id AND c.scope IN ('',?,?)),0),
+ a.name, CASE WHEN m.enabled=0 THEN 'model_disabled' WHEN a.enabled=0 THEN 'account_disabled'
+ WHEN a.state='reauth_required' THEN 'reauth_required' WHEN a.state NOT IN ('catalog_ready','ready') THEN 'account_not_ready'
+ WHEN NOT ` + matches + ` THEN 'protocol_mismatch' ELSE '' END
+ FROM upstream_accounts a JOIN account_models am ON am.account_id=a.id JOIN models m ON m.id=am.model_id JOIN account_policies p ON p.account_id=a.id JOIN account_health h ON h.account_id=a.id
+ WHERE am.model_id=? AND a.deleted_at IS NULL`
+	args := []any{scope, legacyScope, requested, requested, model}
+	if !all {
+		query += " AND " + eligible + " AND " + matches
+		args = append(args, requested, requested)
+	}
+	rows, err := s.DB.QueryContext(ctx, query+" ORDER BY p.priority,a.id", args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	out := []RouteCandidate{}
+	out := []RouteStatus{}
 	for rows.Next() {
-		var c RouteCandidate
+		var c RouteStatus
 		var protocols string
-		if err = rows.Scan(&c.ID, &c.Provider, &c.UpstreamID, &protocols, &c.Policy.Priority, &c.Policy.Weight, &c.Policy.Concurrency, &c.Policy.MaxQueue, &c.Policy.WaitMS, &c.Failures, &c.ErrorRate, &c.FirstOutputMS, &c.CooldownUntil); err != nil {
+		if err = rows.Scan(&c.ID, &c.Provider, &c.UpstreamID, &protocols, &c.Policy.Priority, &c.Policy.Weight, &c.Policy.Concurrency, &c.Policy.MaxQueue, &c.Policy.WaitMS, &c.Failures, &c.ErrorRate, &c.FirstOutputMS, &c.CooldownUntil, &c.Name, &c.Reason); err != nil {
 			return nil, err
 		}
 		_ = json.Unmarshal([]byte(protocols), &c.Protocols)

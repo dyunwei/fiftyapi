@@ -1,4 +1,5 @@
 {
+  "读取路由状态失败": "Could not read route status",
   "创建恢复预检文件失败": "Could not create a restore check file",
   "故障摘要筛选仅供管理员使用": "Only administrators can filter by failure summary",
   "已有备份操作正在执行": "Another backup operation is in progress",

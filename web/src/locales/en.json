@@ -1,4 +1,12 @@
 {
+  "模型路由状态": "Model route status",
+  "查看路由状态": "View route status",
+  "可参与调度": "Eligible for routing",
+  "账号并发已满": "Account concurrency limit reached",
+  "账号已停用": "Account disabled",
+  "账号目录未就绪": "Account catalog not ready",
+  "该路由不支持此协议": "Route does not support this protocol",
+  "此模型暂无已同步的上游路由。": "This model has no synced upstream routes.",
   "近一小时首段输出（近似值）": "First output over the last hour (approximate)",
   "P50 {0} ms · P95 {1} ms · {2} 次": "P50 {0} ms · P95 {1} ms · {2} samples",
   "WebSocket 名额已满": "WebSocket connection limit reached",

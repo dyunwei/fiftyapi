@@ -150,6 +150,7 @@ func (a *API) Handler() http.Handler {
 	mux.HandleFunc("DELETE /api/keys/{id}", a.protect(false, true, a.deleteKey))
 	mux.HandleFunc("GET /api/client-readiness", a.protect(false, false, a.clientReadiness))
 	mux.HandleFunc("GET /api/models", a.protect(false, false, a.models))
+	mux.HandleFunc("GET /api/admin/model-routes", a.protect(true, false, a.modelRoutes))
 	mux.HandleFunc("GET /api/admin/models", a.protect(true, false, a.models))
 	mux.HandleFunc("PUT /api/admin/models", a.protect(true, true, a.setModel))
 	mux.HandleFunc("GET /api/logs", a.protect(false, false, a.logs))
