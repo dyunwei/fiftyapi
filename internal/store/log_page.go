@@ -137,6 +137,6 @@ func (s *Store) LogListPage(ctx context.Context, f LogFilter, page, size int) (L
 
 func (s *Store) Charge(ctx context.Context, id string) (Charge, error) {
 	var c Charge
-	err := s.DB.QueryRowContext(ctx, `SELECT c.id,c.user_id,c.key_id,c.model_id,c.reservation,c.amount,c.status,c.created_at,COALESCE(NULLIF(l.error,''),'结算日志未完整保存') FROM request_charges c LEFT JOIN request_logs l ON l.id=c.id WHERE c.id=?`, id).Scan(&c.ID, &c.UserID, &c.KeyID, &c.ModelID, &c.Reservation, &c.Amount, &c.Status, &c.CreatedAt, &c.Error)
+	err := s.DB.QueryRowContext(ctx, `SELECT c.id,c.user_id,c.key_id,c.model_id,c.reservation,c.amount,c.status,c.created_at,COALESCE(l.error,'结算日志未完整保存') FROM request_charges c LEFT JOIN request_logs l ON l.id=c.id WHERE c.id=?`, id).Scan(&c.ID, &c.UserID, &c.KeyID, &c.ModelID, &c.Reservation, &c.Amount, &c.Status, &c.CreatedAt, &c.Error)
 	return c, err
 }

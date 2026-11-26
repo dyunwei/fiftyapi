@@ -147,3 +147,25 @@ func TestRetrySettlementAuditsAndRejectsInflight(t *testing.T) {
 		t.Fatal("missing or duplicated retry audit", err, count)
 	}
 }
+
+func TestChargeReasonDistinguishesMissingLogFromSuccess(t *testing.T) {
+	s, user, key := quotaStore(t)
+	ctx := context.Background()
+	const id = "normal-settlement"
+	if err := s.Reserve(ctx, id, user, key, "model", Price{Input: 1000000}, 20, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	missing, err := s.Charge(ctx, id)
+	if err != nil || missing.Error != "结算日志未完整保存" {
+		t.Fatalf("missing log reason = %q, err = %v", missing.Error, err)
+	}
+	log := accountingLog(id, user, key, 10, 0)
+	log.Status, log.Error = 200, ""
+	if err := s.FinalizeRequest(ctx, log); err != nil {
+		t.Fatal(err)
+	}
+	settled, err := s.Charge(ctx, id)
+	if err != nil || settled.Status != "settled" || settled.Amount != 10 || settled.Error != "" {
+		t.Fatalf("normal settlement = %+v, err = %v", settled, err)
+	}
+}

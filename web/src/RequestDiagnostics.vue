@@ -63,7 +63,10 @@ function copyDiagnostics() {
     </div>
   </dl>
   <p v-if="nextStep" class="notice">{{ nextStep }}</p>
-  <button type="button" class="secondary" @click="copyDiagnostics">{{ t('复制诊断') }}</button>
+  <div class="actions">
+    <button type="button" class="secondary" @click="emit('copy', log.id)">{{ t('复制请求 ID') }}</button>
+    <button type="button" class="secondary" @click="copyDiagnostics">{{ t('复制诊断') }}</button>
+  </div>
 </template>
 
 <style scoped>

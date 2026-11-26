@@ -1,6 +1,8 @@
 
 ### Administrator failure diagnostics
 
+Members can view and copy the request ID in **Request diagnostics** when reporting an issue to an administrator. The administrator log list includes a request ID column. Settlement details show a reason when one is recorded.
+
 Administrators can open matching request logs for the selected dashboard time range by selecting a failure group. Groups use diagnostic cause, protocol, and upstream account.
 
 A WebSocket handshake rejected with HTTP 429 at the per-user connection limit records the connection count and configured limit at the time of rejection. `HTTP JSON` in the list describes the handshake error response.
