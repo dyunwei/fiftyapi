@@ -1,4 +1,6 @@
 {
+  "近一小时首段输出（近似值）": "First output over the last hour (approximate)",
+  "P50 {0} ms · P95 {1} ms · {2} 次": "P50 {0} ms · P95 {1} ms · {2} samples",
   "WebSocket 名额已满": "WebSocket connection limit reached",
   "上游限流": "Upstream rate limit",
   "流式响应中断": "Stream interrupted",

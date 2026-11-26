@@ -511,6 +511,11 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 			elapsed := writer.firstOutput.Sub(started)
 			h.performance.mu.Lock()
 			h.performance.firstOutput.observe(elapsed)
+			if websocket {
+				h.performance.websocket.observe(*writer.firstOutput, writer.firstOutput.Sub(start))
+			} else if httpTransport(w.Header().Get("Content-Type")) == "http_sse" {
+				h.performance.sse.observe(*writer.firstOutput, writer.firstOutput.Sub(start))
+			}
 			h.performance.mu.Unlock()
 			ms := elapsed.Milliseconds()
 			observation.FirstOutputMS = &ms

@@ -9,6 +9,11 @@ const rows = [
   ['first_output', '流式首段输出'],
 ]
 const formatter = computed(() => new Intl.NumberFormat(locale.value, { maximumFractionDigits: 2 }))
+function percentiles(sample) {
+  if (!sample?.samples) return t('暂无样本')
+  const ms = n => n < 0 ? '>120000' : formatter.value.format(n)
+  return t('P50 {0} ms · P95 {1} ms · {2} 次', [ms(sample.p50_ms), ms(sample.p95_ms), formatter.value.format(sample.samples)])
+}
 function summary(sample) {
   if (!sample?.samples) return t('暂无样本')
   return t('{0} ms · {1} 次', [formatter.value.format(sample.average_ms), formatter.value.format(sample.samples)])
@@ -25,6 +30,11 @@ function summary(sample) {
           <dt>{{ t(label) }}</dt>
           <dd>{{ summary(metrics[key]) }}</dd>
         </div>
+      </dl>
+      <p class="subtle">{{ t('近一小时首段输出（近似值）') }}</p>
+      <dl>
+        <div><dt>SSE</dt><dd>{{ percentiles(metrics.sse_last_hour) }}</dd></div>
+        <div><dt>WebSocket</dt><dd>{{ percentiles(metrics.websocket_last_hour) }}</dd></div>
       </dl>
     </div>
   </details>
