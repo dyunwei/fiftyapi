@@ -354,6 +354,6 @@ fiftyapi restore --from backup.tar.gz --check --key-file data/master.key
 
 ## 自动维护开关
 
-`FIFTYAPI_AUTO_MAINTENANCE` 默认 `true`，每日同步价格与检查 Codex 稳定版本；设为 `false` 可离线运行。`FIFTYAPI_MORNING_PROBES` 默认 `false`；只有显式开启后才运行消耗上游额度的晨间推理探测。账号目录同步和 OAuth 必要刷新仍会执行。详见 [低维护账号共享](low-maintenance.md)。
+`FIFTYAPI_AUTO_MAINTENANCE` 默认 `true`，每日同步价格与检查 Codex 稳定版本；Docker Compose 可在 `.env` 中设为 `false` 并执行 `docker compose up -d fiftyapi`，停用这两项任务。`FIFTYAPI_MORNING_PROBES` 默认 `false`；只有显式开启后才运行消耗上游额度的晨间推理探测。账号目录同步和 OAuth 必要刷新仍会执行。详见 [低维护账号共享](low-maintenance.md)。
 
 维护邮件也会报告按模型和协议分组的路由不可用及上游断流。两个连续的五分钟窗口内各出现至少三次同类故障才告警；最近十分钟无同类故障且最近五分钟至少有三次成功才通知恢复。已发送状态跨重启保留。配置公共访问地址后，邮件可直接打开模型路由状态。
