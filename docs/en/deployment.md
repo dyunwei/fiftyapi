@@ -45,6 +45,8 @@ docker compose pull
 docker compose up -d --no-build
 ```
 
+Compose defaults to `dyunwei/fiftyapi:latest`. If you cannot reach Docker Hub directly, set `FIFTYAPI_IMAGE=docker.1ms.run/dyunwei/fiftyapi:latest` in `.env` before pulling. For source builds, set `FIFTYAPI_IMAGE=fiftyapi:local`. If you cannot reach the default Go module proxy, set `GOPROXY=https://goproxy.cn,direct` to download dependencies.
+
 When blank, the service generates `/data/master.key` and `/data/setup-token` with mode 0600 and reuses them across restarts and container recreation. Read the initial setup token with `docker compose exec fiftyapi cat /data/setup-token`. Explicit environment values take precedence and must satisfy their format and length requirements; do not use a shared value such as `fiftyapi`. Compose binds host `0.0.0.0:8080` (accessible at `http://localhost:8080` or `http://SERVER_IP:8080`), stores data in the Docker-managed named volume `data` (usually `fiftyapi_data`, depending on the Compose project name), runs with a read-only root filesystem and allows 60 seconds for shutdown. Keep `.env` private and back it up separately. Set `FIFTYAPI_COOKIE_SECURE=true` for public HTTPS access. Compose defaults to `TZ=Asia/Shanghai`; change it if desired.
 
 Adjust host settings in `.env` without editing `compose.yaml`:
@@ -68,7 +70,7 @@ The command above builds from source. To use the published Docker Hub image, fol
 
 ## Published images
 
-The published image is [`dyunwei/fiftyapi` on Docker Hub](https://hub.docker.com/r/dyunwei/fiftyapi). With the repository's Compose configuration, set `FIFTYAPI_IMAGE=dyunwei/fiftyapi` in `.env`, then run `docker compose pull` followed by `docker compose up -d --no-build`. Without a source checkout, run the image directly:
+The published image is [`dyunwei/fiftyapi` on Docker Hub](https://hub.docker.com/r/dyunwei/fiftyapi). With the repository's Compose configuration, run `docker compose pull` followed by `docker compose up -d --no-build`. Without a source checkout, run the image directly:
 
 ```sh
 mkdir -p data

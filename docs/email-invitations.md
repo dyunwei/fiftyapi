@@ -34,7 +34,7 @@ FIFTYAPI_SMTP_TLS=starttls
 
 `starttls` 要求服务器支持 STARTTLS，通常配合 587；隐式 TLS 使用 `tls`，通常配合 465。不会因 TLS 失败退回明文。`none` 只允许 localhost/127.0.0.1/::1，供本机模拟测试使用。
 
-Docker 配置后执行 `docker compose up -d --build`，使新环境生效。二进制不会自动读取 `.env`，需将变量注入进程环境后再运行。不要把邮件密码提交到 GitHub 或发到聊天中。
+Docker 配置后执行 `docker compose up -d --no-build`，使新环境生效。二进制不会自动读取 `.env`，需将变量注入进程环境后再运行。不要把邮件密码提交到 GitHub 或发到聊天中。
 
 未配置 SMTP 时服务仍可启动、原用户仍可登录；页面的邮件邀请不可用，可在系统设置中补充配置。部分 SMTP 参数缺失、发件地址无效或公共 URL 不合规时拒绝启动，避免生成无法使用的链接。
 

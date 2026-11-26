@@ -41,7 +41,9 @@ docker compose pull
 docker compose up -d --no-build
 ```
 
-`.env` 中两个密钥可留空，程序会在数据卷中自动生成 `/data/master.key` 和 `/data/setup-token`（权限 0600），重启、重建容器时复用。读取初始化口令：`docker compose exec fiftyapi cat /data/setup-token`。不要把两个值统一设为 `fiftyapi`；显式配置的环境变量优先，仍需满足长度和格式要求。依赖网络受限时可设置 `GOPROXY=https://goproxy.cn,direct` 再构建。Compose 默认绑定宿主机 `0.0.0.0:8080`，可通过 `http://localhost:8080` 或 `http://服务器IP:8080` 访问；数据默认保存到 Docker 管理的命名卷 `data`（通常名为 `fiftyapi_data`，实际前缀取决于 Compose 项目名）。入口脚本以 root 准备数据目录权限后，切换到 UID/GID 10001 运行服务；Compose 根目录只读。bind mount 同样会自动处理数据目录及已有文件的归属；显式指定非 root `--user` 时需自行保证目录可写。
+Compose 默认使用 `dyunwei/fiftyapi:latest`。如果无法直连 Docker Hub，可先在 `.env` 中设置 `FIFTYAPI_IMAGE=docker.1ms.run/dyunwei/fiftyapi:latest` 再拉取镜像。从源码构建时，设置 `FIFTYAPI_IMAGE=fiftyapi:local`。如果无法访问默认的 Go 模块代理，可设置 `GOPROXY=https://goproxy.cn,direct` 下载依赖。
+
+`.env` 中两个密钥可留空，程序会在数据卷中自动生成 `/data/master.key` 和 `/data/setup-token`（权限 0600），重启、重建容器时复用。读取初始化口令：`docker compose exec fiftyapi cat /data/setup-token`。不要把两个值统一设为 `fiftyapi`；显式配置的环境变量优先，仍需满足长度和格式要求。Compose 默认绑定宿主机 `0.0.0.0:8080`，可通过 `http://localhost:8080` 或 `http://服务器IP:8080` 访问；数据默认保存到 Docker 管理的命名卷 `data`（通常名为 `fiftyapi_data`，实际前缀取决于 Compose 项目名）。入口脚本以 root 准备数据目录权限后，切换到 UID/GID 10001 运行服务；Compose 根目录只读。bind mount 同样会自动处理数据目录及已有文件的归属；显式指定非 root `--user` 时需自行保证目录可写。
 
 在 `.env` 中调整宿主机配置，无需修改 `compose.yaml`：
 
@@ -64,7 +66,7 @@ docker compose up -d --no-build
 
 ## 使用已发布镜像
 
-Docker Hub 镜像为 [`dyunwei/fiftyapi`](https://hub.docker.com/r/dyunwei/fiftyapi)。使用仓库中的 Compose 配置时，将 `.env` 的 `FIFTYAPI_IMAGE` 设置为 `dyunwei/fiftyapi`，再执行：
+Docker Hub 镜像为 [`dyunwei/fiftyapi`](https://hub.docker.com/r/dyunwei/fiftyapi)。使用仓库中的 Compose 配置时，执行：
 
 ```sh
 docker compose pull

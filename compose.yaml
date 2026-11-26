@@ -4,7 +4,7 @@ services:
       context: .
       args:
         GOPROXY: "${GOPROXY:-https://proxy.golang.org,direct}"
-    image: "${FIFTYAPI_IMAGE:-fiftyapi:local}"
+    image: "${FIFTYAPI_IMAGE:-dyunwei/fiftyapi:latest}"
     restart: unless-stopped
     stop_grace_period: 60s
     ports:
