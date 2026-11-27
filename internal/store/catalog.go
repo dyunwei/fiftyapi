@@ -169,8 +169,41 @@ func refreshModelProtocols(ctx context.Context, tx *sql.Tx, model string) error 
 	_, err = tx.ExecContext(ctx, "UPDATE models SET protocols=? WHERE id=?", string(raw), model)
 	return err
 }
+
+const catalogAvailability = `EXISTS(SELECT 1 FROM account_models am JOIN upstream_accounts a ON a.id=am.account_id WHERE am.model_id=m.id AND a.enabled=1 AND a.state IN ('catalog_ready','ready'))`
+
+// The member catalog uses the same account scope as generation. Derive the
+// protocol list from reachable accounts so it never advertises a private route.
+const userCatalog = `WITH member_routes AS (
+ SELECT am.model_id,am.protocols,a.enabled=1 AND a.state IN ('catalog_ready','ready') AS available
+ FROM account_models am JOIN upstream_accounts a ON a.id=am.account_id
+ WHERE a.deleted_at IS NULL AND ` + accountAccessPredicate + `
+) `
+
+const userCatalogAvailability = `EXISTS(SELECT 1 FROM member_routes WHERE model_id=m.id AND available)`
+const userCatalogProtocols = `(SELECT json_group_array(protocol) FROM (
+ SELECT DISTINCT value AS protocol FROM member_routes mr,json_each(mr.protocols)
+ WHERE mr.model_id=m.id AND (mr.available OR NOT ` + userCatalogAvailability + `) ORDER BY value
+))`
+const userCatalogVisibility = `EXISTS(SELECT 1 FROM member_routes WHERE model_id=m.id)`
+
 func (s *Store) Models(ctx context.Context) ([]Model, error) {
-	rows, err := s.DB.QueryContext(ctx, "SELECT m.id,m.provider,m.upstream_id,m.enabled,m.synced_at,m.protocols,m.pricing_key,EXISTS(SELECT 1 FROM account_models am JOIN upstream_accounts a ON a.id=am.account_id WHERE am.model_id=m.id AND a.enabled=1 AND a.state IN ('catalog_ready','ready')) FROM models m ORDER BY m.provider,m.id")
+	return s.models(ctx, 0)
+}
+
+func (s *Store) UserModels(ctx context.Context, user int64) ([]Model, error) {
+	return s.models(ctx, user)
+}
+
+func (s *Store) models(ctx context.Context, user int64) ([]Model, error) {
+	prefix, protocols, available, where := "", "m.protocols", catalogAvailability, ""
+	var args []any
+	if user > 0 {
+		prefix, protocols, available = userCatalog, userCatalogProtocols, userCatalogAvailability
+		where = " WHERE " + userCatalogVisibility
+		args = append(args, user)
+	}
+	rows, err := s.DB.QueryContext(ctx, prefix+"SELECT m.id,m.provider,m.upstream_id,m.enabled,m.synced_at,"+protocols+",m.pricing_key,"+available+" FROM models m"+where+" ORDER BY m.provider,m.id", args...)
 	if err != nil {
 		return nil, err
 	}

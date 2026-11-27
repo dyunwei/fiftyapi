@@ -175,9 +175,20 @@ func (h *Handler) selectAccount(ctx context.Context, user int64, model, scope st
 	queueContext, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	ctx = queueContext
-	rows, err := h.store.RouteCandidates(ctx, model, scope, requestProtocol(ctx))
+	rows, err := h.store.UserRouteCandidates(ctx, user, model, scope, requestProtocol(ctx))
 	if err != nil {
 		return selection{}, err
+	}
+	if len(rows) == 0 {
+		// A group denial is local to this user and should not trigger a global
+		// route incident.
+		global, err := h.store.RouteCandidates(ctx, model, scope, requestProtocol(ctx))
+		if err != nil {
+			return selection{}, err
+		}
+		if len(global) > 0 {
+			return selection{}, store.ErrAccountAccess
+		}
 	}
 	previous := int64(0)
 	if len(fingerprint) > 0 {
@@ -187,7 +198,13 @@ func (h *Handler) selectAccount(ctx context.Context, user int64, model, scope st
 			return selection{}, err
 		}
 		if previous != 0 && hold > time.Now().Unix() {
-			return selection{}, &scheduleUnavailable{status: 429, until: hold, message: "原会话账号暂时限流，请稍后重试或新建会话"}
+			allowed, err := h.store.AccountAllowsUser(ctx, previous, user)
+			if err != nil {
+				return selection{}, err
+			}
+			if allowed {
+				return selection{}, &scheduleUnavailable{status: 429, until: hold, message: "原会话账号暂时限流，请稍后重试或新建会话"}
+			}
 		}
 	}
 	candidates := []store.RouteCandidate{}
@@ -258,7 +275,7 @@ func (h *Handler) selectAccount(ctx context.Context, user int64, model, scope st
 		}
 		// Re-read after refresh/queue setup: disabling or changing a model must take
 		// effect before dispatch, not after a stale account snapshot is selected.
-		current, e := h.store.RouteCandidates(ctx, model, scope, requestProtocol(ctx))
+		current, e := h.store.UserRouteCandidates(ctx, user, model, scope, requestProtocol(ctx))
 		if e != nil {
 			return selection{}, false
 		}
@@ -291,7 +308,7 @@ func (h *Handler) selectAccount(ctx context.Context, user int64, model, scope st
 		release := func() { once.Do(slot.release) }
 		// Recheck authorization/routing after waiting. No upstream call is held in
 		// a SQLite transaction and no canceled request starts a fresh inference.
-		fresh, e := h.store.RouteCandidates(ctx, model, scope, requestProtocol(ctx))
+		fresh, e := h.store.UserRouteCandidates(ctx, user, model, scope, requestProtocol(ctx))
 		valid = false
 		for _, row := range fresh {
 			if row.ID == c.ID && row.CooldownUntil <= time.Now().Unix() {
@@ -309,6 +326,11 @@ func (h *Handler) selectAccount(ctx context.Context, user int64, model, scope st
 		credential, e = h.accounts.Access(accessCtx, c.ID)
 		stopAccess()
 		if e != nil || ctx.Err() != nil {
+			release()
+			return selection{}, false
+		}
+		allowed, e := h.store.AccountAllowsUser(ctx, c.ID, user)
+		if e != nil || !allowed {
 			release()
 			return selection{}, false
 		}

@@ -21,7 +21,7 @@ func (a *API) clientReadiness(w http.ResponseWriter, r *http.Request, id identit
 		return
 	}
 	ctx := r.Context()
-	models, err := a.store.Models(ctx)
+	models, err := a.store.UserModels(ctx, id.user.ID)
 	if err != nil {
 		writeError(w, 500, "读取模型失败")
 		return

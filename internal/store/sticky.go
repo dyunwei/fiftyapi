@@ -56,7 +56,9 @@ func (s *Store) ClaimGatewaySession(ctx context.Context, user, account int64, ha
 		return 0, err
 	}
 	if portable && previous > 0 {
-		if _, err = tx.ExecContext(ctx, "UPDATE gateway_sessions SET account_id=? WHERE session_hash=? AND account_id=? AND user_id=? AND hold_until<=?", account, hash, previous, user, now); err != nil {
+		if _, err = tx.ExecContext(ctx, `UPDATE gateway_sessions SET account_id=?,hold_until=0
+ WHERE session_hash=? AND account_id=? AND user_id=? AND (hold_until<=? OR NOT EXISTS(
+ SELECT 1 FROM upstream_accounts a WHERE a.id=gateway_sessions.account_id AND a.deleted_at IS NULL AND `+accountAccessPredicate+`))`, account, hash, previous, user, now, user); err != nil {
 			return 0, err
 		}
 	}

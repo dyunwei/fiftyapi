@@ -95,7 +95,7 @@ func (h *Handler) Models(w http.ResponseWriter, r *http.Request) {
 		failure(w, 500, "读取用户访问限制失败")
 		return
 	}
-	models, err := h.store.Models(r.Context())
+	models, err := h.store.UserModels(r.Context(), user.ID)
 	if err != nil {
 		failure(w, 500, "读取模型失败")
 		return
@@ -108,7 +108,7 @@ func (h *Handler) Models(w http.ResponseWriter, r *http.Request) {
 	}
 	models = filtered
 	if r.URL.Query().Get("client_version") != "" {
-		if err = h.codexManifest(w, r, models); err != nil {
+		if err = h.codexManifest(w, r, user.ID, models); err != nil {
 			failure(w, 502, err.Error())
 		}
 		return
@@ -417,6 +417,9 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 		if e != nil {
 			if attempt == 1 {
 				out = result{status: 503, err: e}
+				if errors.Is(e, store.ErrAccountAccess) {
+					out.status = 403
+				}
 				var unavailable *scheduleUnavailable
 				if errors.As(e, &unavailable) {
 					routeUnavailable = unavailable.status == 0 && portable && (!websocket || turn.state.Owner() == 0)
@@ -582,6 +585,9 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 		diagnostics.RetryAt = retry
 	}
 	diagnostics.Code = diagnosticCode(out, wsHandshakeFailed)
+	if errors.Is(out.err, store.ErrAccountAccess) {
+		diagnostics.Code = "account_access"
+	}
 	if routeUnavailable && out.status != 499 {
 		diagnostics.Code = "route_unavailable"
 	}

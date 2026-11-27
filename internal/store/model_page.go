@@ -16,6 +16,7 @@ type ModelPage struct {
 }
 
 type ModelFilter struct {
+	UserID        int64
 	AllowedModels *[]string
 	AccountID     int64
 	Protocol      string
@@ -27,10 +28,15 @@ func (s *Store) ModelPage(ctx context.Context, page, size int, search string, pu
 	if page < 1 || page > 1000000 || size < 1 || size > 100 {
 		return out, ErrNotFound
 	}
-	available := `EXISTS(SELECT 1 FROM account_models am JOIN upstream_accounts a ON a.id=am.account_id WHERE am.model_id=m.id AND a.enabled=1 AND a.state IN ('catalog_ready','ready'))`
+	prefix, protocols, available := "", "m.protocols", catalogAvailability
 	from := ` FROM models m LEFT JOIN model_prices p ON p.id=(SELECT id FROM model_prices WHERE model_id=m.id ORDER BY id DESC LIMIT 1)`
 	where := ` WHERE 1=1`
 	args := []any{}
+	if len(filters) > 0 && filters[0].UserID > 0 {
+		prefix, protocols, available = userCatalog, userCatalogProtocols, userCatalogAvailability
+		where += " AND " + userCatalogVisibility
+		args = append(args, filters[0].UserID)
+	}
 	if q := strings.TrimSpace(search); q != "" {
 		where += ` AND (instr(lower(m.id),lower(?))>0 OR instr(lower(m.provider),lower(?))>0 OR instr(lower(m.upstream_id),lower(?))>0)`
 		args = append(args, q, q, q)
@@ -47,7 +53,7 @@ func (s *Store) ModelPage(ctx context.Context, page, size int, search string, pu
 			args = append(args, f.AccountID)
 		}
 		if f.Protocol != "" {
-			where += ` AND EXISTS(SELECT 1 FROM json_each(m.protocols) WHERE value=?)`
+			where += ` AND EXISTS(SELECT 1 FROM json_each(` + protocols + `) WHERE value=?)`
 			args = append(args, f.Protocol)
 		}
 		switch f.Status {
@@ -71,10 +77,10 @@ func (s *Store) ModelPage(ctx context.Context, page, size int, search string, pu
 		return out, err
 	}
 	defer tx.Rollback()
-	if err = tx.QueryRowContext(ctx, `SELECT count(*)`+from+where, args...).Scan(&out.Total); err != nil {
+	if err = tx.QueryRowContext(ctx, prefix+`SELECT count(*)`+from+where, args...).Scan(&out.Total); err != nil {
 		return out, err
 	}
-	rows, err := tx.QueryContext(ctx, `SELECT m.id,m.provider,m.upstream_id,m.enabled,m.synced_at,m.protocols,m.pricing_key,`+available+`,p.id,p.input,p.output,p.cached,p.cache_write,p.source,p.rules`+from+where+` ORDER BY m.provider,m.id LIMIT ? OFFSET ?`, append(args, size, (page-1)*size)...)
+	rows, err := tx.QueryContext(ctx, prefix+`SELECT m.id,m.provider,m.upstream_id,m.enabled,m.synced_at,`+protocols+`,m.pricing_key,`+available+`,p.id,p.input,p.output,p.cached,p.cache_write,p.source,p.rules`+from+where+` ORDER BY m.provider,m.id LIMIT ? OFFSET ?`, append(args, size, (page-1)*size)...)
 	if err != nil {
 		return out, err
 	}

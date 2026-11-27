@@ -210,6 +210,7 @@ func (a *API) deleteKey(w http.ResponseWriter, r *http.Request, id identity) {
 }
 func (a *API) models(w http.ResponseWriter, r *http.Request, id identity) {
 	q := r.URL.Query()
+	public := !strings.HasPrefix(r.URL.Path, "/api/admin/")
 	if q.Has("page") || q.Has("page_size") || q.Has("q") || q.Has("account_id") || q.Has("protocol") || q.Has("status") {
 		pageText, sizeText := q.Get("page"), q.Get("page_size")
 		if !q.Has("page") {
@@ -225,7 +226,8 @@ func (a *API) models(w http.ResponseWriter, r *http.Request, id identity) {
 			return
 		}
 		filter := store.ModelFilter{Protocol: q.Get("protocol"), Status: q.Get("status")}
-		if !strings.HasPrefix(r.URL.Path, "/api/admin/") {
+		if public {
+			filter.UserID = id.user.ID
 			access, err := a.store.UserAccess(r.Context(), id.user.ID)
 			if err != nil {
 				writeError(w, 500, "读取用户访问限制失败")
@@ -246,7 +248,7 @@ func (a *API) models(w http.ResponseWriter, r *http.Request, id identity) {
 			return
 		}
 		if q.Has("account_id") {
-			if !strings.HasPrefix(r.URL.Path, "/api/admin/") {
+			if public {
 				writeError(w, 403, "仅管理员可按上游账号筛选")
 				return
 			}
@@ -257,7 +259,7 @@ func (a *API) models(w http.ResponseWriter, r *http.Request, id identity) {
 			}
 			filter.AccountID = account
 		}
-		result, err := a.store.ModelPage(r.Context(), page, size, r.URL.Query().Get("q"), !strings.HasPrefix(r.URL.Path, "/api/admin/"), filter)
+		result, err := a.store.ModelPage(r.Context(), page, size, r.URL.Query().Get("q"), public, filter)
 		if err != nil {
 			writeError(w, 500, "读取模型失败")
 			return
@@ -265,12 +267,18 @@ func (a *API) models(w http.ResponseWriter, r *http.Request, id identity) {
 		writeJSON(w, 200, result)
 		return
 	}
-	models, err := a.store.Models(r.Context())
+	var models []store.Model
+	var err error
+	if public {
+		models, err = a.store.UserModels(r.Context(), id.user.ID)
+	} else {
+		models, err = a.store.Models(r.Context())
+	}
 	if err != nil {
 		writeError(w, 500, "读取模型失败")
 		return
 	}
-	if !strings.HasPrefix(r.URL.Path, "/api/admin/") {
+	if public {
 		access, err := a.store.UserAccess(r.Context(), id.user.ID)
 		if err != nil {
 			writeError(w, 500, "读取用户访问限制失败")

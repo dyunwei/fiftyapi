@@ -97,7 +97,11 @@ func (s *Store) RouteCandidates(ctx context.Context, model, scope string, protoc
 	if len(protocol) > 0 {
 		requested = protocol[0]
 	}
-	statuses, err := s.routeStatus(ctx, model, scope, requested, false)
+	return s.UserRouteCandidates(ctx, 0, model, scope, requested)
+}
+
+func (s *Store) UserRouteCandidates(ctx context.Context, user int64, model, scope, protocol string) ([]RouteCandidate, error) {
+	statuses, err := s.routeStatus(ctx, model, scope, protocol, false, user)
 	out := make([]RouteCandidate, 0, len(statuses))
 	for _, row := range statuses {
 		out = append(out, row.RouteCandidate)
@@ -106,10 +110,10 @@ func (s *Store) RouteCandidates(ctx context.Context, model, scope string, protoc
 }
 
 func (s *Store) ModelRouteStatus(ctx context.Context, model, protocol string) ([]RouteStatus, error) {
-	return s.routeStatus(ctx, model, "generate/"+protocol+":"+model, protocol, true)
+	return s.routeStatus(ctx, model, "generate/"+protocol+":"+model, protocol, true, 0)
 }
 
-func (s *Store) routeStatus(ctx context.Context, model, scope, requested string, all bool) ([]RouteStatus, error) {
+func (s *Store) routeStatus(ctx context.Context, model, scope, requested string, all bool, user int64) ([]RouteStatus, error) {
 	legacyScope := scope
 	if strings.HasPrefix(scope, "generate:") || strings.HasPrefix(scope, "generate/") {
 		legacyScope = "generate:" + model
@@ -126,6 +130,10 @@ func (s *Store) routeStatus(ctx context.Context, model, scope, requested string,
 	if !all {
 		query += " AND " + eligible + " AND " + matches
 		args = append(args, requested, requested)
+	}
+	if user != 0 {
+		query += " AND " + accountAccessPredicate
+		args = append(args, user)
 	}
 	rows, err := s.DB.QueryContext(ctx, query+" ORDER BY p.priority,a.id", args...)
 	if err != nil {

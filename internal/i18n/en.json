@@ -1,4 +1,12 @@
 {
+  "分组名称须为 1–64 个字符": "Group names must be 1–64 characters long",
+  "访问分组名称已存在": "An access group with that name already exists",
+  "访问分组不存在": "Access group not found",
+  "访问分组重复": "Duplicate access group",
+  "上游账号访问范围无效": "Invalid upstream account access scope",
+  "用户无权使用该模型的上游账号": "The user does not have access to an upstream account for this model",
+  "读取访问分组失败": "Could not load access groups",
+  "读取上游账号访问范围失败": "Could not load upstream account access",
   "读取路由状态失败": "Could not read route status",
   "创建恢复预检文件失败": "Could not create a restore check file",
   "故障摘要筛选仅供管理员使用": "Only administrators can filter by failure summary",

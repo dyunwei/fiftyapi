@@ -56,6 +56,14 @@ Only when `FIFTYAPI_MORNING_PROBES=true`, enabled OpenAI OAuth accounts with syn
 
 Optional usage protection caps reasoning effort (`low`, `medium`, `high`), explicit thinking token budgets (1024–1048576, zero unlimited). There is no separate speed permission. Codex has no independent hard thinking-token cap. Claude adaptive thinking uses effort; explicit thinking uses a token budget. Antigravity uses a native envelope and no longer applies converter effort mappings. These settings do not guarantee exact token consumption or equivalent vendor effort levels.
 
+### Grant upstream account access by group
+
+Create department or project groups in **Team members → Access groups**. Open a member’s **Access limits** to assign one group. All of the member’s API keys use their current group. Existing model allowlists and concurrency limits still apply.
+
+In **Upstream accounts → Account access**, choose **All users** or **Selected groups only**. An account can grant access to multiple groups. Existing accounts remain open on upgrade, and newly added accounts start open. Ungrouped members can use open accounts. A restricted account with no groups selected is unavailable to all gateway users. Deleting a group leaves its members ungrouped and removes it from account grants. Each account keeps its access mode.
+
+The member catalog lists available models and protocols served by accounts the member can use. Account access is checked after queuing and on retries and later session turns. Requests already sent upstream can finish. Administrator verification, catalog sync, and targeted tests still use the selected account.
+
 ## Email invitations
 
 Under **System settings → Email settings**, configure the public HTTP or HTTPS site origin (LAN IPs and hostnames are supported), SMTP host, port, sender, username/password and TLS mode. STARTTLS commonly uses 587, TLS commonly uses 465; plaintext is restricted to local testing. Enable invitations and save, then send a test message.

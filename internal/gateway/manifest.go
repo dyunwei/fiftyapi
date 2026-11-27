@@ -10,7 +10,7 @@ import (
 	"net/url"
 )
 
-func (h *Handler) codexManifest(w http.ResponseWriter, r *http.Request, models []store.Model) error {
+func (h *Handler) codexManifest(w http.ResponseWriter, r *http.Request, user int64, models []store.Model) error {
 	version := r.URL.Query().Get("client_version")
 	if !providers.ValidClientVersion(version) {
 		return errors.New("Codex 客户端版本无效")
@@ -24,7 +24,7 @@ func (h *Handler) codexManifest(w http.ResponseWriter, r *http.Request, models [
 			if !m.Enabled || m.Price == nil || !m.Available || !m.SupportsProtocol("responses") {
 				continue
 			}
-			candidates, e := h.store.RouteCandidates(r.Context(), m.ID, "manifest:"+m.ID, "responses")
+			candidates, e := h.store.UserRouteCandidates(r.Context(), user, m.ID, "manifest:"+m.ID, "responses")
 			if e != nil {
 				return e
 			}
@@ -51,7 +51,7 @@ func (h *Handler) codexManifest(w http.ResponseWriter, r *http.Request, models [
 	}
 	visible := map[string]bool{}
 	for _, m := range models {
-		visible[m.ID] = true
+		visible[m.ID] = m.Enabled && m.Price != nil && m.Available && m.SupportsProtocol("responses")
 	}
 	for upstream, public := range allowed {
 		if !visible[public] {
@@ -61,6 +61,13 @@ func (h *Handler) codexManifest(w http.ResponseWriter, r *http.Request, models [
 	c, err := h.accounts.Access(r.Context(), accountID)
 	if err != nil {
 		return err
+	}
+	authorized, err := h.store.AccountAllowsUser(r.Context(), accountID, user)
+	if err != nil {
+		return err
+	}
+	if !authorized {
+		return store.ErrAccountAccess
 	}
 	endpoint := c.Config.ModelsURL
 	if c.Config.Provider == "gateway" {

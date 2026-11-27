@@ -46,6 +46,7 @@ OpenAI 的日期、身份、模型与复现条件见 [OpenAI 验收](openai-acce
 | --- | --- |
 | 协议与账号 | Responses JSON/SSE/WebSocket、Messages、原生 Chat、Antigravity v1internal；OAuth 刷新轮换、路由隔离、冷却和安全切换 |
 | 价格与账务 | 不可变快照、档位/缓存价格、幂等结算、取消/断流、零结算、异常恢复、预占释放及用户并发限制 |
+| 访问分组 | Go HTTP 测试客户端、模拟 Codex 目录身份 `0.164.0`、Responses 和夹具模型 `model`、`private-model`；覆盖账号隔离、撤销后的会话续接、重试和目录过滤。另用 SQLite 夹具验证 Chat 与 Responses 的目录协议隔离。未运行原生客户端或真实供应商。 |
 | 请求诊断 | 模拟 OpenAI、Codex 身份 `0.164.0`、fixture 模型 `model`；协议不匹配、预算阻塞、限流、WebSocket 握手失败、SSE 首段与队列耗时 |
 | Antigravity 目录测试 | 2026-11-18，身份 `2.23.0`、fixture 模型 `native-probe-model`；原生请求预览、默认推理地址、429/RetryInfo、安全脱敏与不重复调用 |
 | 客户端传输自检 | Python 3.11 助手、本机网关及模拟 HTTP；Responses/Messages SSE 间隔、事件合并检测、WebSocket 握手。只验证客户端到网关，不运行原生客户端或模型推理 |

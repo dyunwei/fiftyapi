@@ -14,6 +14,7 @@ import (
 type UserAccess struct {
 	Models      []string `json:"models"`
 	Concurrency int      `json:"concurrency"`
+	GroupID     *int64   `json:"group_id"`
 }
 
 func (p UserAccess) Allows(model string) bool {
@@ -35,7 +36,7 @@ type accessQuerier interface {
 func readUserAccess(ctx context.Context, q accessQuerier, user int64) (UserAccess, error) {
 	var out UserAccess
 	var raw string
-	err := q.QueryRowContext(ctx, "SELECT models,concurrency FROM user_access WHERE user_id=?", user).Scan(&raw, &out.Concurrency)
+	err := q.QueryRowContext(ctx, "SELECT models,concurrency,group_id FROM user_access WHERE user_id=?", user).Scan(&raw, &out.Concurrency, &out.GroupID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return out, nil
 	}
@@ -60,15 +61,29 @@ func (s *Store) SetUserAccess(ctx context.Context, actor, user int64, p UserAcce
 		seen[model] = true
 	}
 	raw, _ := json.Marshal(p.Models)
-	details, _ := json.Marshal(p)
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	if _, err = tx.ExecContext(ctx, "INSERT INTO user_access(user_id,models,concurrency) VALUES(?,?,?) ON CONFLICT(user_id) DO UPDATE SET models=excluded.models,concurrency=excluded.concurrency", user, string(raw), p.Concurrency); err != nil {
+	// Omitted group_id preserves membership for existing API clients. Zero clears it.
+	updateGroup := p.GroupID != nil
+	if updateGroup && *p.GroupID == 0 {
+		p.GroupID = nil
+	}
+	if p.GroupID != nil {
+		if err = validAccessGroup(ctx, tx, *p.GroupID); err != nil {
+			return err
+		}
+	}
+	err = tx.QueryRowContext(ctx, `INSERT INTO user_access(user_id,models,concurrency,group_id) VALUES(?,?,?,?)
+ ON CONFLICT(user_id) DO UPDATE SET models=excluded.models,concurrency=excluded.concurrency,
+ group_id=CASE WHEN ? THEN excluded.group_id ELSE user_access.group_id END
+ RETURNING group_id`, user, string(raw), p.Concurrency, p.GroupID, updateGroup).Scan(&p.GroupID)
+	if err != nil {
 		return err
 	}
+	details, _ := json.Marshal(p)
 	if _, err = tx.ExecContext(ctx, "INSERT INTO admin_audit_logs(actor_id,action,target_id,details,created_at) VALUES(?,'user_access',?,?,?)", actor, user, string(details), time.Now().Unix()); err != nil {
 		return err
 	}
