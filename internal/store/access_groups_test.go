@@ -2,9 +2,12 @@ package store
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"path/filepath"
 	"slices"
 	"testing"
+	"time"
 
 	"fiftyapi/internal/modelref"
 )
@@ -41,7 +44,7 @@ func TestAccessGroupsLimitMemberCatalogProtocols(t *testing.T) {
 	if err = s.SetModel(ctx, actor, "model", true, &Price{Input: 100, Output: 100}); err != nil {
 		t.Fatal(err)
 	}
-	group, err := s.SetAccessGroup(ctx, actor, 0, "Engineering")
+	group, err := s.SetAccessGroup(ctx, actor, 0, "Engineering", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,7 +83,7 @@ func TestAccessGroupsLimitMemberCatalogProtocols(t *testing.T) {
 		t.Fatal(err)
 	}
 	memberAccess, err := s.UserAccess(ctx, actor)
-	if err != nil || memberAccess.GroupID != nil || memberAccess.Concurrency != 3 {
+	if err != nil || memberAccess.GroupID != nil || memberAccess.Concurrency != 0 {
 		t.Fatalf("member access after group removal: %+v, %v", memberAccess, err)
 	}
 	access, err := s.AccountAccess(ctx, restricted)
@@ -88,4 +91,80 @@ func TestAccessGroupsLimitMemberCatalogProtocols(t *testing.T) {
 		t.Fatalf("account access after group removal: %+v, %v", access, err)
 	}
 	check([]string{"chat"}, 0)
+}
+
+func TestGroupPolicyUpgradeAndPerMemberConcurrency(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "db")
+	s, err := Open(ctx, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	actor, err := s.CreateAdmin(ctx, "admin", "hash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	member, err := s.CreateUser(ctx, actor, "member", "hash", 1000, 1000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	group, err := s.SetAccessGroup(ctx, actor, 0, "Legacy", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = s.SetUserAccess(ctx, actor, actor, UserAccess{GroupID: &group.ID, Models: []string{"old"}, Concurrency: 2}); err != nil {
+		t.Fatal(err)
+	}
+	_, err = s.DB.Exec(`ALTER TABLE access_groups DROP COLUMN models;
+ ALTER TABLE access_groups DROP COLUMN concurrency;
+ DELETE FROM schema_migrations WHERE version=26;`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	s, err = Open(ctx, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	groups, err := s.AccessGroups(ctx)
+	if err != nil || len(groups) != 1 || groups[0].PolicyConfigured {
+		t.Fatalf("legacy group policy activated during upgrade: %+v, %v", groups, err)
+	}
+	legacy, err := s.UserAccess(ctx, actor)
+	if err != nil || legacy.Concurrency != 2 || legacy.Allows("new") || !legacy.Allows("old") {
+		t.Fatalf("upgrade changed individual limits: %+v, %v", legacy, err)
+	}
+
+	if _, err = s.SetAccessGroup(ctx, actor, group.ID, group.Name, &AccessGroupPolicy{Models: []string{"new"}, Concurrency: 1}); err != nil {
+		t.Fatal(err)
+	}
+	if err = s.SetUserGroup(ctx, actor, member, group.ID); err != nil {
+		t.Fatal(err)
+	}
+	for _, user := range []int64{actor, member} {
+		key, _, err := s.CreateAPIKey(ctx, user, "test")
+		if err != nil {
+			t.Fatal(err)
+		}
+		now := time.Now()
+		if err = s.Reserve(ctx, fmt.Sprintf("old-%d", user), user, key.ID, "old", Price{}, 1, now); !errors.Is(err, ErrModelAccess) {
+			t.Fatalf("legacy model access persisted for user %d: %v", user, err)
+		}
+		if err = s.Reserve(ctx, fmt.Sprintf("new-%d", user), user, key.ID, "new", Price{}, 1, now); err != nil {
+			t.Fatalf("first concurrent request for user %d: %v", user, err)
+		}
+		if err = s.Reserve(ctx, fmt.Sprintf("extra-%d", user), user, key.ID, "new", Price{}, 1, now); !errors.Is(err, ErrUserConcurrency) {
+			t.Fatalf("group concurrency limit not applied per member %d: %v", user, err)
+		}
+	}
+	if err = s.SetUserGroup(ctx, actor, member, 0); err != nil {
+		t.Fatal(err)
+	}
+	ungrouped, err := s.UserAccess(ctx, member)
+	if err != nil || ungrouped.GroupID != nil || ungrouped.Concurrency != 0 || !ungrouped.Allows("old") {
+		t.Fatalf("policy after removing member from group: %+v, %v", ungrouped, err)
+	}
 }

@@ -168,6 +168,7 @@ func (a *API) Handler() http.Handler {
 	mux.HandleFunc("DELETE /api/admin/access-groups/{id}", a.protect(true, true, a.accessGroups))
 	mux.HandleFunc("GET /api/admin/accounts/{id}/access", a.protect(true, false, a.accountAccess))
 	mux.HandleFunc("PUT /api/admin/accounts/{id}/access", a.protect(true, true, a.accountAccess))
+	mux.HandleFunc("PUT /api/admin/users/{id}/group", a.protect(true, true, a.setUserGroup))
 	mux.HandleFunc("GET /api/admin/users/{id}/access", a.protect(true, false, a.userAccess))
 	mux.HandleFunc("PUT /api/admin/users/{id}/access", a.protect(true, true, a.userAccess))
 	mux.HandleFunc("GET /api/admin/settings/maintenance", a.protect(true, false, a.maintenanceSettings))

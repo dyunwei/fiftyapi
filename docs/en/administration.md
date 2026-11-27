@@ -58,7 +58,9 @@ Optional usage protection caps reasoning effort (`low`, `medium`, `high`), expli
 
 ### Grant upstream account access by group
 
-Create department or project groups in **Team members → Access groups**. Open a member’s **Access limits** to assign one group. All of the member’s API keys use their current group. Existing model allowlists and concurrency limits still apply.
+Create or edit groups in **Team members → Access groups** and set their priced model allowlist and concurrency limit per member. Assign groups directly in the **Access groups** column. All of a member’s API keys follow their assigned group's policy. Set concurrency to 0 to use the upstream account limits. Ungrouped members can use priced models from open accounts by default.
+
+Upgrading preserves existing individual limits. Saving a policy for an existing group applies it to every member of that group. Changing a member’s group also replaces their old limits with the destination group’s policy.
 
 In **Upstream accounts → Account access**, choose **All users** or **Selected groups only**. An account can grant access to multiple groups. Existing accounts remain open on upgrade, and newly added accounts start open. Ungrouped members can use open accounts. A restricted account with no groups selected is unavailable to all gateway users. Deleting a group leaves its members ungrouped and removes it from account grants. Each account keeps its access mode.
 

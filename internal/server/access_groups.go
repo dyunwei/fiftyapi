@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"errors"
 	"fiftyapi/internal/store"
 	"net/http"
@@ -35,12 +36,23 @@ func (a *API) accessGroups(w http.ResponseWriter, r *http.Request, id identity) 
 		return
 	}
 	var in struct {
-		Name string `json:"name"`
+		Name        string          `json:"name"`
+		Models      json.RawMessage `json:"models"`
+		Concurrency *int            `json:"concurrency"`
 	}
 	if !decode(w, r, &in) {
 		return
 	}
-	group, err := a.store.SetAccessGroup(ctx, id.user.ID, target, in.Name)
+	var policy *store.AccessGroupPolicy
+	if in.Models != nil || in.Concurrency != nil {
+		policy = &store.AccessGroupPolicy{}
+		if in.Concurrency == nil || in.Models == nil || json.Unmarshal(in.Models, &policy.Models) != nil {
+			writeError(w, 400, "分组访问策略无效")
+			return
+		}
+		policy.Concurrency = *in.Concurrency
+	}
+	group, err := a.store.SetAccessGroup(ctx, id.user.ID, target, in.Name, policy)
 	if err != nil {
 		writeAccessError(w, err)
 		return

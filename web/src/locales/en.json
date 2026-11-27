@@ -1,4 +1,10 @@
 {
+  "删除访问分组「{0}」？该组成员将变为未分组，并失去此组的账号授权和访问策略。": "Delete access group “{0}”? Members will become ungrouped and lose this group’s account grants and access policy.",
+  "编辑分组 {0}": "Edit group {0}",
+  "此分组仍使用升级前的个人限制。保存后，组内所有成员将使用下方的分组策略。": "This group still uses individual limits from before the upgrade. Saving applies the policy below to every member.",
+  "每位成员的最大并发": "Maximum concurrency per member",
+  "0 表示仅使用上游账号的并发限制。": "Use 0 to rely on upstream account concurrency limits.",
+  "{0} 的访问分组": "Access group for {0}",
   "访问分组": "Access groups",
   "上游账号访问范围": "Upstream account access",
   "访问范围": "Account access",

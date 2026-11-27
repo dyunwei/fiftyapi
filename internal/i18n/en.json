@@ -1,4 +1,6 @@
 {
+  "分组访问策略无效": "Invalid group access policy",
+  "请选择访问分组": "Select an access group",
   "分组名称须为 1–64 个字符": "Group names must be 1–64 characters long",
   "访问分组名称已存在": "An access group with that name already exists",
   "访问分组不存在": "Access group not found",

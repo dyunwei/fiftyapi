@@ -39,7 +39,7 @@ func TestAccessGroupScopesGenerationAndCodexManifest(t *testing.T) {
 	defer upstream.Close()
 	g := setupGateway(t, "openai", upstream)
 	addPoolAccount(t, g)
-	group, err := g.s.SetAccessGroup(ctx, g.user, 0, "Engineering")
+	group, err := g.s.SetAccessGroup(ctx, g.user, 0, "Engineering", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

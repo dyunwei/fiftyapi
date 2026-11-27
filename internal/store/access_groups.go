@@ -15,6 +15,24 @@ var ErrAccountAccess = errors.New("用户无权使用该模型的上游账号")
 type AccessGroup struct {
 	ID   int64  `json:"id"`
 	Name string `json:"name"`
+	AccessGroupPolicy
+	PolicyConfigured bool `json:"policy_configured"`
+}
+
+type AccessGroupPolicy struct {
+	Models      []string `json:"models"`
+	Concurrency int      `json:"concurrency"`
+}
+
+const accessGroupColumns = "id,name,COALESCE(models,'null'),COALESCE(concurrency,0),concurrency IS NOT NULL"
+
+func scanAccessGroup(row interface{ Scan(...any) error }) (AccessGroup, error) {
+	var group AccessGroup
+	var models string
+	if err := row.Scan(&group.ID, &group.Name, &models, &group.Concurrency, &group.PolicyConfigured); err != nil {
+		return group, err
+	}
+	return group, json.Unmarshal([]byte(models), &group.Models)
 }
 
 type AccountAccess struct {
@@ -29,15 +47,15 @@ const accountAccessPredicate = `(a.group_restricted=0 OR EXISTS(
 ))`
 
 func (s *Store) AccessGroups(ctx context.Context) ([]AccessGroup, error) {
-	rows, err := s.DB.QueryContext(ctx, "SELECT id,name FROM access_groups ORDER BY name COLLATE NOCASE,id")
+	rows, err := s.DB.QueryContext(ctx, "SELECT "+accessGroupColumns+" FROM access_groups ORDER BY name COLLATE NOCASE,id")
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	groups := []AccessGroup{}
 	for rows.Next() {
-		var group AccessGroup
-		if err := rows.Scan(&group.ID, &group.Name); err != nil {
+		group, err := scanAccessGroup(rows)
+		if err != nil {
 			return nil, err
 		}
 		groups = append(groups, group)
@@ -45,10 +63,21 @@ func (s *Store) AccessGroups(ctx context.Context) ([]AccessGroup, error) {
 	return groups, rows.Err()
 }
 
-func (s *Store) SetAccessGroup(ctx context.Context, actor, id int64, name string) (AccessGroup, error) {
+func (s *Store) SetAccessGroup(ctx context.Context, actor, id int64, name string, policy *AccessGroupPolicy) (AccessGroup, error) {
 	name = strings.TrimSpace(name)
 	if name == "" || utf8.RuneCountInString(name) > 64 {
 		return AccessGroup{}, errors.New("分组名称须为 1–64 个字符")
+	}
+	if id == 0 && policy == nil {
+		policy = &AccessGroupPolicy{}
+	}
+	var models, concurrency any
+	if policy != nil {
+		if err := validateAccessPolicy(policy.Models, policy.Concurrency); err != nil {
+			return AccessGroup{}, err
+		}
+		raw, _ := json.Marshal(policy.Models)
+		models, concurrency = string(raw), policy.Concurrency
 	}
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
@@ -62,23 +91,31 @@ func (s *Store) SetAccessGroup(ctx context.Context, actor, id int64, name string
 	if duplicate {
 		return AccessGroup{}, errors.New("访问分组名称已存在")
 	}
-	action := "rename_access_group"
+	action := "update_access_group"
+	var row *sql.Row
 	if id == 0 {
 		action = "create_access_group"
-		err = tx.QueryRowContext(ctx, "INSERT INTO access_groups(name) VALUES(?) RETURNING id", name).Scan(&id)
+		row = tx.QueryRowContext(ctx, "INSERT INTO access_groups(name,models,concurrency) VALUES(?,?,?) RETURNING "+accessGroupColumns, name, models, concurrency)
 	} else {
-		err = tx.QueryRowContext(ctx, "UPDATE access_groups SET name=? WHERE id=? RETURNING id", name, id).Scan(&id)
+		row = tx.QueryRowContext(ctx, "UPDATE access_groups SET name=?,models=COALESCE(?,models),concurrency=COALESCE(?,concurrency) WHERE id=? RETURNING "+accessGroupColumns, name, models, concurrency, id)
 	}
+	group, err := scanAccessGroup(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return AccessGroup{}, ErrNotFound
 	}
 	if err != nil {
 		return AccessGroup{}, err
 	}
-	if err = audit(ctx, tx, actor, action, id); err != nil {
+	if id != 0 && policy != nil {
+		if _, err = tx.ExecContext(ctx, "UPDATE user_access SET models='null',concurrency=0 WHERE group_id=? AND (models<>'null' OR concurrency<>0)", id); err != nil {
+			return AccessGroup{}, err
+		}
+	}
+	details, _ := json.Marshal(group)
+	if _, err = tx.ExecContext(ctx, "INSERT INTO admin_audit_logs(actor_id,action,target_id,details,created_at) VALUES(?,?,?,?,?)", actor, action, group.ID, string(details), time.Now().Unix()); err != nil {
 		return AccessGroup{}, err
 	}
-	return AccessGroup{ID: id, Name: name}, tx.Commit()
+	return group, tx.Commit()
 }
 
 func (s *Store) DeleteAccessGroup(ctx context.Context, actor, id int64) error {
@@ -87,6 +124,11 @@ func (s *Store) DeleteAccessGroup(ctx context.Context, actor, id int64) error {
 		return err
 	}
 	defer tx.Rollback()
+	if _, err = tx.ExecContext(ctx, `UPDATE user_access SET models='null',concurrency=0
+ WHERE group_id=? AND EXISTS(SELECT 1 FROM access_groups WHERE id=group_id AND concurrency IS NOT NULL)
+ AND (models<>'null' OR concurrency<>0)`, id); err != nil {
+		return err
+	}
 	err = tx.QueryRowContext(ctx, "DELETE FROM access_groups WHERE id=? RETURNING id", id).Scan(&id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ErrNotFound

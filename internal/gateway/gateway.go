@@ -440,6 +440,15 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 			out = result{status: 401, known: true, complete: true, err: errors.New("排队期间用户或 API Key 已停用")}
 			break
 		}
+		access, e := h.store.UserAccess(r.Context(), user.ID)
+		if e != nil || !access.Allows(m.ID) {
+			chosen.Release()
+			out = result{status: 403, err: store.ErrModelAccess}
+			if e != nil {
+				out = result{status: 500, err: errors.New("读取用户访问限制失败")}
+			}
+			break
+		}
 		logEntry.AccountID = &chosen.ID
 		logEntry.Provider = chosen.Route.Provider
 		started := time.Now()
@@ -585,8 +594,11 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 		diagnostics.RetryAt = retry
 	}
 	diagnostics.Code = diagnosticCode(out, wsHandshakeFailed)
-	if errors.Is(out.err, store.ErrAccountAccess) {
+	switch {
+	case errors.Is(out.err, store.ErrAccountAccess):
 		diagnostics.Code = "account_access"
+	case errors.Is(out.err, store.ErrModelAccess):
+		diagnostics.Code = "model_access"
 	}
 	if routeUnavailable && out.status != 499 {
 		diagnostics.Code = "route_unavailable"

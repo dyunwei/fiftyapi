@@ -286,3 +286,9 @@ html[lang="en"] .nav-item{white-space:normal}
 .access-group-list .actions { flex-shrink: 0; }
 .access-group-options { min-inline-size: 0; margin: 0; }
 .access-group-options .checkbox { overflow-wrap: anywhere; }
+
+.member-access-groups { margin-bottom: 16px; }
+.member-access-group-content { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 24px; padding: 16px; align-items: start; }
+.access-group-form { display: grid; gap: 12px; max-width: 540px; }
+.access-group-form p { margin: 0; }
+.member-table .member-group-select { width: 100%; min-width: 112px; max-width: 200px; }
