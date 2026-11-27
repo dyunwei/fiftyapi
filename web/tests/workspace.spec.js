@@ -783,12 +783,12 @@ test('自动维护设置集中保存版本，候选版本不自动启用',async(
  await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
 })
 
-test('访问分组在成员页配置策略、直接分配并授权上游账号',async({page})=>{
+test('访问分组弹窗配置策略，成员表格直接分配并授权上游账号',async({page})=>{
  await page.context().addCookies(adminCookies);await page.goto(baseURL)
  await page.locator('.nav-item').filter({hasText:'团队成员'}).click()
  const dialog=page.getByRole('dialog')
  const groupsButton=page.getByRole('button',{name:'访问分组',exact:true})
- const groups=page.getByRole('region',{name:'访问分组'})
+ const groups=page.getByRole('dialog',{name:'访问分组',exact:true})
  await groupsButton.click()
  await groups.getByLabel('新分组名称').fill('研发测试组')
  await groups.getByLabel('每位成员的最大并发').fill('3')
@@ -801,6 +801,8 @@ test('访问分组在成员页配置策略、直接分配并授权上游账号',
  await groups.getByLabel('修改分组名称').fill('研发组')
  await groups.getByRole('button',{name:'保存',exact:true}).click()
  await expect(groups.getByText('研发组',{exact:true})).toBeVisible()
+ await groups.getByRole('button',{name:'关闭',exact:true}).last().click()
+ await expect(groupsButton).toBeFocused()
  const memberGroup=page.getByRole('combobox',{name:/的访问分组$/}).first()
  await memberGroup.selectOption({label:'研发组'})
  await expect(memberGroup.locator('option:checked')).toHaveText('研发组')
@@ -820,10 +822,11 @@ test('访问分组在成员页配置策略、直接分配并授权上游账号',
  await dialog.getByRole('button',{name:'保存',exact:true}).click()
  await expect(dialog).toHaveCount(0)
  await page.locator('.nav-item').filter({hasText:'团队成员'}).click()
- if(await groupsButton.getAttribute('aria-expanded')==='false')await groupsButton.click()
+ await groupsButton.click()
  page.once('dialog',prompt=>prompt.accept())
  await groups.getByRole('button',{name:'删除：研发组'}).click()
  await expect(groups.getByText('研发组',{exact:true})).toHaveCount(0)
+ await groups.getByRole('button',{name:'关闭',exact:true}).last().click()
  await expect(memberGroup).toHaveValue('0')
 })
 
